@@ -29,7 +29,7 @@
   ],
   "photo_proof_for_drinks": true,
   "seeker_location_interval_s": 20,
-  "hiding_period_s": null,
+  "hiding_period_s": 3600,
   "rounds": null,
-  "todo": "Hiding period, rounds and scoring from the official small-game rules"
+  "todo": "Rounds and scoring from the official small-game rules"
 }
