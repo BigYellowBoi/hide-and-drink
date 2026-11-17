@@ -23,6 +23,9 @@
   --r-card: 16px;
   --r-pill: 999px;
 
+  /* iOS blurs ~14pt under the status bar in home-screen apps: drop anything top-pinned below it. */
+  --hdrdrop: 0px;
+
   color-scheme: dark;
   font-family: var(--font-body);
   font-size: 16px;
@@ -32,20 +35,53 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+@media (display-mode: standalone) {
+  html:root {
+    --hdrdrop: 14px;
+  }
+}
+
+html.standalone {
+  --hdrdrop: 14px;
+}
+
 * {
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
+  overscroll-behavior: none;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
+body {
   min-height: 100dvh;
   background: var(--bg);
+}
+
+/* Solid strip over the status bar and blur band, so scrolled content never shows through blurred. */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(env(safe-area-inset-top, 0px) + var(--hdrdrop));
+  background: var(--bg);
+  z-index: 100;
+  pointer-events: none;
 }
 
 .shell {
   max-width: 480px;
   margin: 0 auto;
-  padding: calc(16px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+  padding: calc(env(safe-area-inset-top, 0px) + var(--hdrdrop) + 16px) 16px calc(24px + env(safe-area-inset-bottom, 0px));
 }
 
 h1,
@@ -843,7 +879,7 @@ details.card > summary h2 {
 
 .stale-banner {
   position: sticky;
-  top: calc(4px + env(safe-area-inset-top));
+  top: calc(env(safe-area-inset-top, 0px) + var(--hdrdrop) + 8px);
   z-index: 10;
   margin: 8px 0 0;
   padding: 12px 16px;
