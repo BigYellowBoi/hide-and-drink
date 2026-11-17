@@ -27,8 +27,8 @@ select is(
     order by 1
   ),
   array[
-    'can_join_topic', 'can_see', 'can_use_presence', 'create_game', 'is_player', 'join_game',
-    'my_team', 'server_time', 'set_play_area', 'set_team', 'start_game',
+    'can_join_topic', 'can_see', 'can_use_presence', 'create_game', 'get_city_pack',
+    'is_player', 'join_game', 'my_team', 'server_time', 'set_play_area', 'set_team', 'start_game',
     'topic_for', 'update_config'
   ],
   'signed-in clients can call only the allow-listed functions'

@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "city": "brisbane",
+  "label": "Brisbane",
+  "play_areas": ["brisbane-inner"],
+  "buffer_m": 2000,
+  "projected_crs": "EPSG:7856",
+  "simplify_m": 2,
+  "gtfs": {
+    "name": "TransLink SEQ GTFS",
+    "url": "https://gtfsrt.api.translink.com.au/GTFS/SEQ_GTFS.zip",
+    "licence": "CC BY 4.0, State of Queensland (Department of Transport and Main Roads)"
+  },
+  "osm": {
+    "name": "OpenStreetMap",
+    "licence": "ODbL 1.0, OpenStreetMap contributors",
+    "overpass_urls": [
+      "https://overpass-api.de/api/interpreter",
+      "https://overpass.private.coffee/api/interpreter",
+      "https://overpass.kumi.systems/api/interpreter"
+    ],
+    "pbf_url": "https://download.bbbike.org/osm/bbbike/Brisbane/Brisbane.osm.pbf"
+  },
+  "abs": {
+    "licence": "CC BY 4.0, Australian Bureau of Statistics",
+    "datasets": {
+      "suburbs_localities": {
+        "name": "ABS ASGS 2021 Suburbs and Localities",
+        "url": "https://geo.abs.gov.au/arcgis/rest/services/ASGS2021/SAL/MapServer/0",
+        "code_field": "sal_code_2021",
+        "name_field": "sal_name_2021",
+        "id_prefix": "abs:sal"
+      },
+      "lga": {
+        "name": "ABS ASGS 2025 Local Government Areas",
+        "url": "https://geo.abs.gov.au/arcgis/rest/services/ASGS2025/LGA/MapServer/0",
+        "code_field": "LGA_CODE_2025",
+        "name_field": "LGA_NAME_2025",
+        "id_prefix": "abs:lga"
+      }
+    }
+  },
+  "venues_file": "venues/brisbane.json"
+}
