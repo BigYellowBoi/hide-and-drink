@@ -114,7 +114,7 @@ Latency harness (fail deploy if p95 > 1 s), leak test (seeker client never recei
 ## 11. Open questions
 
 - Is the 0.5 mi railway-station zone still a rule?
-- Hiding period, rounds and scoring: official small-game values?
+- Rounds and scoring: official small-game values? (Hiding period default set to 1 hour.)
 - Copies per curse (assumed 1 each).
 - Curse of Nathan: no text yet.
 - Who clears an until_cleared curse (default: seekers tap Done, hider confirms)?
