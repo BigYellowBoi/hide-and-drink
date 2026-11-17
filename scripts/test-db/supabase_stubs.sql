@@ -54,6 +54,7 @@ create table realtime.messages (
 );
 alter table realtime.messages enable row level security;
 grant select, insert on realtime.messages to authenticated;
+grant usage on all sequences in schema realtime to authenticated;
 
 -- Realtime sets this per connection attempt; tests set it with set_config.
 create function realtime.topic()

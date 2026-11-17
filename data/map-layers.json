@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "comment": "Map layers the pipeline builds into each city pack. A layer id equals the `source` string that question options in data/questions.json use, so questions find their layer by id. OSM rules: a feature matches a rule when every key in `all` matches and, if `any` is given, at least one key in `any` matches. Values are lists of allowed values, or \"*\" for any value; semicolon lists (cuisine=burger;kebab) match per item. `none` rules exclude.",
+  "layers": [
+    {
+      "id": "venues",
+      "label": "Venues serving alcohol",
+      "from": "osm",
+      "geometry": "point",
+      "require_name": true,
+      "kind_keys": ["amenity", "craft", "tourism", "leisure"],
+      "rules": [
+        { "all": { "amenity": ["bar", "pub", "biergarten", "nightclub", "casino", "stripclub"] } },
+        { "all": { "craft": ["brewery", "winery", "distillery", "cider", "sake"] } },
+        { "all": { "tourism": ["winery"] } },
+        { "all": { "microbrewery": ["yes"] } },
+        {
+          "all": {
+            "amenity": [
+              "restaurant", "cafe", "fast_food", "food_court", "ice_cream", "social_club",
+              "community_centre", "events_venue", "theatre", "cinema", "arts_centre", "music_venue"
+            ]
+          },
+          "any": {
+            "bar": ["yes"],
+            "alcohol": ["yes", "served"],
+            "drink:beer": ["yes", "served", "only"],
+            "drink:wine": ["yes", "served", "only"],
+            "drink:spirits": ["yes", "served", "only"],
+            "drink:cocktail": ["yes", "served", "only"],
+            "drink:cider": ["yes", "served", "only"]
+          }
+        },
+        { "all": { "tourism": ["hotel", "hostel", "motel"], "bar": ["yes"] } },
+        { "all": { "leisure": ["bowling_alley", "sports_centre", "golf_course"], "bar": ["yes"] } }
+      ],
+      "none": [{ "all": { "shop": "*" } }, { "all": { "access": ["private", "no"] } }]
+    },
+    {
+      "id": "stations",
+      "label": "Stations",
+      "from": "gtfs",
+      "geometry": "point",
+      "modes": ["rail", "metro", "tram", "ferry", "bus"],
+      "parent_stations_only_for": ["bus"],
+      "merge_same_name_within_m": 300
+    },
+    {
+      "id": "gtfs:ferry stops",
+      "label": "Ferry terminals",
+      "from": "gtfs",
+      "geometry": "point",
+      "modes": ["ferry"],
+      "merge_same_name_within_m": 0
+    },
+    {
+      "id": "abs:suburbs_localities",
+      "label": "Suburbs",
+      "from": "abs",
+      "dataset": "suburbs_localities",
+      "geometry": "polygon"
+    },
+    {
+      "id": "abs:lga",
+      "label": "Local government areas",
+      "from": "abs",
+      "dataset": "lga",
+      "geometry": "polygon"
+    },
+    {
+      "id": "osm:highway (named)",
+      "label": "Streets",
+      "from": "osm",
+      "geometry": "line",
+      "require_name": true,
+      "merge_by_name": true,
+      "rules": [
+        {
+          "all": {
+            "highway": [
+              "motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential",
+              "living_street", "pedestrian", "motorway_link", "trunk_link", "primary_link",
+              "secondary_link", "tertiary_link"
+            ]
+          }
+        }
+      ],
+      "none": [{ "all": { "area": ["yes"] } }]
+    },
+    { "id": "osm:leisure=park", "label": "Parks", "from": "osm", "geometry": "point", "require_name": true, "rules": [{ "all": { "leisure": ["park"] } }] },
+    { "id": "osm:tourism=museum", "label": "Museums", "from": "osm", "geometry": "point", "require_name": true, "rules": [{ "all": { "tourism": ["museum"] } }] },
+    { "id": "osm:amenity=cinema", "label": "Cinemas", "from": "osm", "geometry": "point", "require_name": true, "rules": [{ "all": { "amenity": ["cinema"] } }] },
+    { "id": "osm:amenity=library", "label": "Libraries", "from": "osm", "geometry": "point", "require_name": true, "rules": [{ "all": { "amenity": ["library"] } }] },
+    { "id": "osm:amenity=hospital", "label": "Hospitals", "from": "osm", "geometry": "point", "require_name": true, "rules": [{ "all": { "amenity": ["hospital"] } }] },
+    { "id": "osm:amenity=stripclub", "label": "Strip clubs", "from": "osm", "geometry": "point", "require_name": true, "rules": [{ "all": { "amenity": ["stripclub"] } }] },
+    { "id": "osm:cuisine=kebab", "label": "Kebab shops", "from": "osm", "geometry": "point", "require_name": true, "rules": [{ "all": { "cuisine": ["kebab"] } }] },
+    { "id": "osm:shop=convenience", "label": "Convenience stores", "from": "osm", "geometry": "point", "require_name": true, "rules": [{ "all": { "shop": ["convenience"] } }] }
+  ]
+}
