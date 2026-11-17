@@ -21,7 +21,10 @@ const MESSAGES: Record<string, string> = {
   play_area_required: 'Choose a play area.',
   hiding_period_required: 'Set the hiding period (in General settings).',
   not_live: 'Not connected. Wait for the live dot.',
-  not_a_player: 'You are not in this game.',
+  not_a_player: 'You are not in this game. The host may have removed you.',
+  removed_from_game: 'The host removed you from this game.',
+  cannot_remove_host: 'The host can\'t be removed.',
+  player_not_found: 'That player has already left.',
   network: 'Network problem. Try again.',
 }
 

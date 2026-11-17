@@ -34,11 +34,20 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
   const [areas, setAreas] = useState<PlayAreaSummary[] | null>(null)
   /** Open editor: 'new' to draw from scratch, 'current' to edit the chosen area. */
   const [editing, setEditing] = useState<'new' | 'current' | null>(null)
+  /** Player whose remove button has been tapped once (tap again to confirm). */
+  const [removing, setRemoving] = useState<string | null>(null)
 
   const isHost = userId !== null && userId === lobby.hostId
   const me = lobby.players.find((p) => p.userId === userId)
   const blockers = startBlockers(lobby)
   const disabled = busy || !canAct
+
+  // Disarm after a few seconds (iOS doesn't blur buttons, so onBlur alone isn't enough).
+  useEffect(() => {
+    if (!removing) return
+    const t = setTimeout(() => setRemoving(null), 3000)
+    return () => clearTimeout(t)
+  }, [removing])
 
   // Everyone loads the saved areas (to preview the chosen one); reload when the host picks one
   // this phone hasn't seen yet (just saved).
@@ -85,6 +94,26 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
     return ok
   }
 
+  const canRemove = (p: LobbyPlayer) => isHost && !p.isHost
+  const removeButton = (p: LobbyPlayer) => {
+    const armed = removing === p.userId
+    return (
+      <button
+        className={`small secondary player-remove${armed ? ' danger' : ''}`}
+        disabled={disabled}
+        aria-label={armed ? `Tap again to remove ${p.name}` : `Remove ${p.name}`}
+        onClick={() => {
+          if (!armed) return setRemoving(p.userId)
+          setRemoving(null)
+          void run(() => sync.action('remove_player', { p_user_id: p.userId }))
+        }}
+        onBlur={() => armed && setRemoving(null)}
+      >
+        {armed ? 'Remove?' : '✕'}
+      </button>
+    )
+  }
+
   /** Tap a name to move that player to the other team: your own name, or anyone's if you host. */
   const canMove = (p: LobbyPlayer) => p.userId === userId || isHost
   const move = (p: LobbyPlayer, team: Team) => setTeam(team, p.userId === userId ? undefined : p)
@@ -103,7 +132,7 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
   )
 
   const renderMember = (p: LobbyPlayer) => (
-    <li key={p.userId}>
+    <li key={p.userId} className="player-row">
       {canMove(p) && p.team ? (
         <button
           className={`player player-tap${p.userId === userId ? ' player-me' : ''}`}
@@ -116,6 +145,7 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
       ) : (
         <span className="player">{nameContent(p)}</span>
       )}
+      {canRemove(p) && removeButton(p)}
     </li>
   )
 
@@ -126,7 +156,7 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
       <section className="card">
         <h2>Teams</h2>
         <p className="muted small-note team-hint">
-          {isHost ? 'Tap a name to switch their team.' : 'Tap your name to switch team.'}
+          {isHost ? 'Tap a name to switch their team, ✕ to remove them.' : 'Tap your name to switch team.'}
         </p>
         <div className="team-lists">
           {TEAMS.map((t) => {
@@ -157,6 +187,7 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
                   <span className="player-who">{nameContent(p)}</span>
                   {isHost && p.userId !== userId && (
                     <span className="player-moves">
+                      {canRemove(p) && removeButton(p)}
                       {TEAMS.map((t) => (
                         <button
                           key={t.id}

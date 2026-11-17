@@ -544,6 +544,24 @@ button.small {
   margin-top: 16px;
 }
 
+/* Team member with the host's remove button beside the name. */
+.player-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.player-row > .player {
+  flex: 1;
+  min-width: 0;
+}
+
+button.player-remove {
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
+}
+
 .player {
   display: flex;
   align-items: center;

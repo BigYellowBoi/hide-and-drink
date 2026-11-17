@@ -231,6 +231,21 @@ describe('GameSync', () => {
     sync.stop()
   })
 
+  it('stops with a clear error when the host removes us', async () => {
+    const server = new FakeServer()
+    server.append('game_created')
+    const sync = await started(server)
+    server.deliver(server.append('player_removed', 'all', { user_id: 'someone-else' }))
+    await flush()
+    expect(sync.getSnapshot().status).toBe('live')
+    server.deliver(server.append('player_removed', 'all', { user_id: ME }))
+    await flush()
+    expect(sync.getSnapshot().status).toBe('error')
+    expect(sync.getSnapshot().error).toBe('removed_from_game')
+    expect(server.topics.size).toBe(0)
+    sync.stop()
+  })
+
   it('starts over with the new team view when our team changes', async () => {
     const server = new FakeServer()
     server.team = null

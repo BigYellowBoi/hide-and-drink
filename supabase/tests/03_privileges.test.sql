@@ -28,8 +28,8 @@ select is(
   ),
   array[
     'can_join_topic', 'can_see', 'can_use_presence', 'create_game', 'get_city_pack',
-    'is_player', 'join_game', 'my_team', 'save_play_area', 'server_time', 'set_play_area', 'set_team', 'start_game',
-    'topic_for', 'update_config'
+    'is_player', 'join_game', 'my_team', 'remove_player', 'save_play_area', 'server_time', 'set_play_area',
+    'set_team', 'start_game', 'topic_for', 'update_config'
   ],
   'signed-in clients can call only the allow-listed functions'
 );

@@ -346,6 +346,11 @@ export class GameSync {
       return
     }
     this.events = [...this.events, event]
+    if (event.type === 'player_removed' && event.payload.user_id === this.userId) {
+      // The host removed us. The server has already revoked access; stop listening.
+      this.fail('removed_from_game')
+      return
+    }
     if (event.type === 'team_changed' && event.payload.user_id === this.userId && event.payload.team !== this.team) {
       // Our own visibility changed. resync() picks up the new team from the server.
       void this.resync()
@@ -382,6 +387,11 @@ export class GameSync {
 
   private fail(message: string): void {
     this.error = message
+    // Terminal: drop topics and timers, but keep listeners so the screen shows why.
+    for (const ch of this.channels.values()) ch.unsubscribe()
+    this.channels.clear()
+    for (const t of [this.gapTimer, this.retryTimer]) if (t) clearTimeout(t)
+    if (this.pollTimer) clearInterval(this.pollTimer)
     this.setStatus('error')
   }
 
