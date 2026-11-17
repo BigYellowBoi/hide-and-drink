@@ -54,3 +54,79 @@ h2 {
 .bad {
   color: #f87171;
 }
+
+.conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+.conn-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #737373;
+}
+
+.conn-live .conn-dot {
+  background: #4ade80;
+}
+
+.conn-connecting .conn-dot,
+.conn-syncing .conn-dot {
+  background: #f2b705;
+  animation: conn-pulse 1s ease-in-out infinite;
+}
+
+.conn-offline .conn-dot,
+.conn-error .conn-dot {
+  background: #f87171;
+}
+
+.conn-note {
+  color: #a3a3a3;
+}
+
+@keyframes conn-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+input,
+button {
+  font: inherit;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #404040;
+  background: #1a1a1a;
+  color: inherit;
+}
+
+button {
+  background: #f2b705;
+  color: #1a1a1a;
+  border: none;
+  font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.4;
+}
+
+.log {
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-left: 0;
+  list-style: none;
+}

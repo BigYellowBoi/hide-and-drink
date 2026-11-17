@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { pingSupabase, supabaseConfigured } from './lib/supabase'
 import { copiesByCategory, deckSize, questionTypes } from './lib/seed'
+import { SyncCheck } from './components/SyncCheck'
 
 type Status = { state: 'checking' } | { state: 'ok'; ms: number } | { state: 'error'; message: string }
 
@@ -21,7 +22,7 @@ export default function App() {
   return (
     <main className="shell">
       <h1>Hide + Drink</h1>
-      <p className="muted">Phase 0 build check</p>
+      <p className="muted">Phase 1 sync check</p>
 
       <section className="card">
         <h2>Backend</h2>
@@ -32,6 +33,8 @@ export default function App() {
           {status.state === 'error' && <span className="bad">{status.message}</span>}
         </p>
       </section>
+
+      <SyncCheck />
 
       <section className="card">
         <h2>Seed data</h2>
