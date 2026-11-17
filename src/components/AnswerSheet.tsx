@@ -12,6 +12,7 @@ import { supabase } from '../lib/supabase'
 import { ANSWERS, answerText, candidatesOf, km, NULL_ANSWER, optionText, questionLabel, questionText, type Question } from '../play/state'
 import { LockIcon } from './BarPicker'
 import { DeadlineRing } from './DeadlineRing'
+import type { MapDot } from './GameMap'
 import { LazyGameMap } from './lazyMap'
 
 interface Props {
@@ -22,6 +23,8 @@ interface Props {
   playArea: AreaCollection | null
   zone: HiderZone
   ruled: FeatureCollection
+  /** Seekers' positions, with name tags. */
+  seekers: readonly MapDot[]
   canAct: boolean
   now: number
   /** City pack features, for suggestions that need them (matching, bonus count rules). */
@@ -38,7 +41,7 @@ interface Photo {
  * Hider's answer sheet: sits at the top until answered. The suggestion is only a
  * suggestion; nothing is sent until the hider picks an answer and taps Send.
  */
-export function AnswerSheet({ sync, question: q, askerName, city, playArea, zone, ruled, canAct, now, layer }: Props) {
+export function AnswerSheet({ sync, question: q, askerName, city, playArea, zone, ruled, seekers, canAct, now, layer }: Props) {
   const [choice, setChoice] = useState<string | null>(null)
   const [text, setText] = useState('')
   const [photo, setPhoto] = useState<Photo | null>(null)
@@ -87,11 +90,12 @@ export function AnswerSheet({ sync, question: q, askerName, city, playArea, zone
       tool: questionTool(q),
       ruled,
       zone: zone.bar ? { lng: zone.bar.point[0], lat: zone.bar.point[1], radiusM: zone.bar.radiusM, team: 'hiders' as const } : null,
-      dots: zone.gps
-        ? [{ id: 'me', lng: zone.gps.point[0], lat: zone.gps.point[1], team: 'hiders' as const, me: true }]
-        : [],
+      dots: [
+        ...seekers,
+        ...(zone.gps ? [{ id: 'me', lng: zone.gps.point[0], lat: zone.gps.point[1], team: 'hiders' as const, me: true }] : []),
+      ],
     }),
-    [q, ruled, zone],
+    [q, ruled, zone, seekers],
   )
 
   const send = async () => {

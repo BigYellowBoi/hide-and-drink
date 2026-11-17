@@ -46,6 +46,18 @@ describe('deriveLobby', () => {
     expect(s.playAreaName).toBe('Inner')
   })
 
+  it('drops players who leave and hands the host over', () => {
+    const s = deriveLobby([...lobbyEvents(), ev('player_left', { user_id: 'h', name: 'Hana', new_host_id: 'a' })])
+    expect(s.hostId).toBe('a')
+    expect(s.players.map((p) => [p.name, p.isHost])).toEqual([
+      ['Amy', true],
+      ['Sam', false],
+    ])
+    const t = deriveLobby([...lobbyEvents(), ev('player_left', { user_id: 's', name: 'Sam', new_host_id: null })])
+    expect(t.hostId).toBe('h')
+    expect(t.players.map((p) => p.name)).toEqual(['Hana', 'Amy'])
+  })
+
   it('drops removed players', () => {
     const s = deriveLobby([...lobbyEvents(), ev('player_removed', { user_id: 'a', name: 'Amy' })])
     expect(s.players.map((p) => p.name)).toEqual(['Hana', 'Sam'])

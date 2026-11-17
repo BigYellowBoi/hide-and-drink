@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Map as MapLibre, NavigationControl, Popup, setWorkerUrl, type GeoJSONSource, type LngLatBoundsLike, type Map as MapLibreMap } from 'maplibre-gl'
+import { Map as MapLibre, Marker, NavigationControl, Popup, setWorkerUrl, type GeoJSONSource, type LngLatBoundsLike, type Map as MapLibreMap } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { FeatureCollection } from 'geojson'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { supabase } from '../lib/supabase'
 import { loadCityPack, type CityPack } from '../map/cityPack'
-import { circlePolygon } from '../map/geo'
+import { circlePolygon, distanceM, formatDistance } from '../map/geo'
 import { boundsOf, outsideMask, type AreaCollection } from '../map/playArea'
 import { hatchImage, MAP_COLORS, mapStyle, TAPPABLE_LAYERS } from '../map/style'
 
@@ -14,12 +14,35 @@ export interface MapOverlay {
   zone?: { lng: number; lat: number; radiusM: number; team: 'hiders' | 'seekers' } | null
   bars?: { id: string; name: string; lng: number; lat: number }[]
   selectedBar?: string | null
-  /** me: this phone (white centre). */
-  dots?: { id: string; lng: number; lat: number; team: 'hiders' | 'seekers'; me?: boolean }[]
+  /** me: this phone (white centre). A name shows as a tag under the dot; tapping it gives the distance from me. */
+  dots?: MapDot[]
   /** Area ruled out by answered questions (grey hatch). */
   ruled?: FeatureCollection
+  /** Where the hider can still be (white outline), when anything is ruled out. */
+  remaining?: FeatureCollection
   /** A question tool: radar circle, thermometer line (seeker red). */
   tool?: FeatureCollection
+}
+
+export interface MapDot {
+  id: string
+  lng: number
+  lat: number
+  team: 'hiders' | 'seekers'
+  me?: boolean
+  name?: string
+  /** Old position (that phone stopped reporting): the tag is dimmed. */
+  stale?: boolean
+}
+
+/** "Sam · 420 m away" (straight line from this phone's dot), or just the name without one. */
+function describeDot(dots: readonly MapDot[], id: unknown): string {
+  const dot = dots.find((d) => d.id === id)
+  if (!dot) return ''
+  if (dot.me) return 'You'
+  const me = dots.find((d) => d.me)
+  const name = dot.name ?? (dot.team === 'seekers' ? 'Seeker' : 'Hider')
+  return me ? `${name} · ${formatDistance(distanceM([me.lng, me.lat], [dot.lng, dot.lat]))} away` : name
 }
 
 const TEAM_COLOR = { hiders: MAP_COLORS.hider, seekers: MAP_COLORS.seeker } as const
@@ -80,6 +103,9 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
   const onReadyRef = useRef(onReady)
   const onBarTapRef = useRef(onBarTap)
   const onTapRef = useRef(onTap)
+  const dotsRef = useRef<readonly MapDot[]>([])
+  const popupRef = useRef<Popup | null>(null)
+  const tagsRef = useRef(new Map<string, Marker>())
   useEffect(() => {
     onReadyRef.current = onReady
     onBarTapRef.current = onBarTap
@@ -116,7 +142,6 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right')
     mapRef.current = map
 
-    let popup: Popup | null = null
     map.on('click', (e) => onTapRef.current?.([e.lngLat.lng, e.lngLat.lat]))
     if (tapNames) {
       map.on('click', (e) => {
@@ -127,12 +152,15 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
           ],
           { layers: TAPPABLE_LAYERS },
         )[0]
-        popup?.remove()
+        popupRef.current?.remove()
         if (!hit) return
         if (hit.layer.id === 'bars' && typeof hit.properties?.id === 'string') onBarTapRef.current?.(hit.properties.id)
         const label = document.createElement('span')
-        label.textContent = describeFeature(hit.layer.id, hit.properties ?? {})
-        popup = new Popup({ closeButton: false, className: 'map-popup', offset: 8 })
+        label.textContent =
+          hit.layer.id === 'dots'
+            ? describeDot(dotsRef.current, hit.properties?.id)
+            : describeFeature(hit.layer.id, hit.properties ?? {})
+        popupRef.current = new Popup({ closeButton: false, className: 'map-popup', offset: 8 })
           .setLngLat(e.lngLat)
           .setDOMContent(label)
           .addTo(map)
@@ -146,8 +174,11 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
       setLoaded(true)
       onReadyRef.current?.(map)
     })
+    const tags = tagsRef.current
     return () => {
-      popup?.remove()
+      popupRef.current?.remove()
+      for (const m of tags.values()) m.remove()
+      tags.clear()
       map.remove()
       mapRef.current = null
       fittedArea.current = null
@@ -176,13 +207,56 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
   const selectedBar = overlay?.selectedBar ?? null
   const dots = overlay?.dots
   const ruled = overlay?.ruled
+  const remaining = overlay?.remaining
   const tool = overlay?.tool
   useEffect(() => {
     const map = mapRef.current
     if (!map || !loaded) return
     ;(map.getSource('ruled') as GeoJSONSource | undefined)?.setData(ruled ?? EMPTY)
+    ;(map.getSource('remaining') as GeoJSONSource | undefined)?.setData(remaining ?? EMPTY)
     ;(map.getSource('tool') as GeoJSONSource | undefined)?.setData(tool ?? EMPTY)
-  }, [ruled, tool, loaded])
+  }, [ruled, remaining, tool, loaded])
+
+  // Name tags under other people's dots (the style has no glyphs, so these are HTML markers).
+  // Tapping one shows the straight-line distance from this phone.
+  useEffect(() => {
+    dotsRef.current = dots ?? []
+    const map = mapRef.current
+    if (!map || !loaded) return
+    const tags = tagsRef.current
+    const named = (dots ?? []).filter((d) => !d.me && d.name)
+    for (const [id, m] of tags) {
+      if (!named.some((d) => d.id === id)) {
+        m.remove()
+        tags.delete(id)
+      }
+    }
+    for (const d of named) {
+      let m = tags.get(d.id)
+      if (!m) {
+        const el = document.createElement('button')
+        el.type = 'button'
+        el.className = `map-tag map-tag-${d.team}`
+        el.addEventListener('click', (ev) => {
+          ev.stopPropagation()
+          const cur = dotsRef.current.find((x) => x.id === d.id)
+          if (!cur) return
+          const label = document.createElement('span')
+          label.textContent = describeDot(dotsRef.current, d.id)
+          popupRef.current?.remove()
+          popupRef.current = new Popup({ closeButton: false, className: 'map-popup', offset: 8 })
+            .setLngLat([cur.lng, cur.lat])
+            .setDOMContent(label)
+            .addTo(map)
+        })
+        m = new Marker({ element: el, anchor: 'top', offset: [0, 9] })
+        tags.set(d.id, m.setLngLat([d.lng, d.lat]).addTo(map))
+      }
+      m.getElement().textContent = d.name ?? ''
+      m.getElement().classList.toggle('map-tag-stale', d.stale === true)
+      m.setLngLat([d.lng, d.lat])
+    }
+  }, [dots, loaded])
 
   useEffect(() => {
     const map = mapRef.current
@@ -209,7 +283,7 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
       type: 'FeatureCollection',
       features: (dots ?? []).map((d) => ({
         type: 'Feature',
-        properties: { id: d.id, me: d.me === true, color: TEAM_COLOR[d.team] },
+        properties: { id: d.id, me: d.me === true, color: TEAM_COLOR[d.team], name: d.name ?? '' },
         geometry: { type: 'Point', coordinates: [d.lng, d.lat] },
       })),
     })

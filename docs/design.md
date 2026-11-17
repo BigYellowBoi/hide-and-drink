@@ -80,10 +80,10 @@ Flow: Home → Lobby → (host: setup) → Start round → each phone switches t
 | Lobby | Everyone | Big join code + QR. Hiders and Seekers as full-width lists, one above the other (not side-by-side columns: names get cut off on phones). Tap your name to switch team; the host can tap anyone's. "Join" button under the team you're not in; unassigned players listed below. Host setup checklist, slide to start |
 | Deck builder | Host | Presets, category tabs with live totals, -/count/+ per card (0 greys out), "+ New card" |
 | Pick a bar | Hider | Hiding countdown, map + list of valid bars by distance, 100 m circle preview, slide to lock in |
-| Hider map | Hider | Own bar circle and position, freeze banner, "New question" card with deadline |
+| Hider map | Hider | Own bar circle and position, seekers' name-tagged dots (tap for distance), freeze banner, "New question" card with deadline |
 | Answer sheet | Hider | Question type + asker, deadline ring, mini map, suggested answer (flag if it differs across the circle), big answer buttons, reward reminder |
 | Hand | Hider | Selected card large, Cast / Discard, hand strip below, lock label |
-| Seeker map | Seekers | Hatched shading, bars still possible, teammates, active curse strip, Ask button |
+| Seeker map | Seekers | Hatched shading with the remaining area outlined in white, bars still possible, teammates' name-tagged dots, active curse strip, Ask button |
 | Ask | Seekers | 7 type tiles with draw/keep, tool on the map (e.g. radar circle), option chips, Send |
 | Effects | Seekers | "Questions blocked" banner, curse cards with timer or We did it / Veto, vetoes used |
 | Log | Both (filtered) | Newest first, elapsed time, coloured dot by type, photo proof thumbnails, penalties in amber |

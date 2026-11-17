@@ -24,7 +24,7 @@ export interface SyncSnapshot {
   present: readonly string[]
   /** Local time (ms) the status last left 'live', or null while live or before the first sync. */
   staleSince: number | null
-  /** Seekers only: latest position per seeker teammate (ephemeral, never in the event log). */
+  /** Latest position per seeker, for both teams (ephemeral, never in the event log). */
   positions: readonly SeekerPosition[]
 }
 
@@ -303,15 +303,15 @@ export class GameSync {
       this.events = this.rebuilding
       this.rebuilding = null
     }
-    if (this.team === 'seekers') void this.refreshPositions()
+    if (this.team) void this.refreshPositions()
   }
 
-  /** Teammates' latest positions, for a fresh view after (re)joining. Best effort. */
+  /** Seekers' latest positions, for a fresh view after (re)joining. Best effort. */
   private async refreshPositions(): Promise<void> {
     if (!this.transport.fetchPositions) return
     try {
       const rows = await this.transport.fetchPositions(this.gameId)
-      if (this.stopped || this.team !== 'seekers') return
+      if (this.stopped || !this.team) return
       for (const p of rows) this.mergePosition(p)
       this.emit()
     } catch {
@@ -331,7 +331,7 @@ export class GameSync {
   }
 
   private onSignal(event: string, raw: unknown): void {
-    if (this.stopped || event !== 'position' || this.team !== 'seekers') return
+    if (this.stopped || event !== 'position' || !this.team) return
     const p = parsePosition(raw)
     if (!p || (raw as { game_id?: unknown }).game_id !== this.gameId) return
     if (this.mergePosition(p)) this.emit()
@@ -371,7 +371,8 @@ export class GameSync {
           this.settle()
         },
         presence,
-        topic === teamTopic(this.gameId, 'seekers') ? (event, raw) => this.onSignal(event, raw) : undefined,
+        // Seeker positions arrive on both team topics.
+        topic !== gameTopic(this.gameId) ? (event, raw) => this.onSignal(event, raw) : undefined,
       )
     }
     this.settle()

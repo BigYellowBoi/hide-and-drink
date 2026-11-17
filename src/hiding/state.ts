@@ -95,3 +95,14 @@ export function formatClock(ms: number, { up = false } = {}): string {
   const s = String(total % 60).padStart(2, '0')
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`
 }
+
+/**
+ * How old a seeker's position is, for their name tag: null while it's fresh (within two
+ * report intervals plus slack), else "45 s" or "3 min". Phones only report while the app is
+ * open, so a stale dot means that phone is locked or in someone's pocket.
+ */
+export function positionAge(atMs: number, serverNow: number, intervalS: number): string | null {
+  const ageS = Math.max(0, (serverNow - atMs) / 1000)
+  if (ageS <= 2 * intervalS + 10) return null
+  return ageS < 60 ? `${Math.round(ageS)} s` : `${Math.floor(ageS / 60)} min`
+}
