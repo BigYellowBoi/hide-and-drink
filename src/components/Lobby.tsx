@@ -2,7 +2,7 @@ import { Suspense, useEffect, useState } from 'react'
 import type { GameSync } from '../sync/engine'
 import type { Team } from '../sync/types'
 import { supabase } from '../lib/supabase'
-import { listPlayAreas, type PlayAreaSummary } from '../lobby/playAreas'
+import { isBuiltIn, listPlayAreas, madeBy, type PlayAreaSummary } from '../lobby/playAreas'
 import { describeCode, describeError } from '../lobby/messages'
 import { startBlockers, type LobbyPlayer, type LobbyState } from '../lobby/state'
 import { ConfigEditor } from './ConfigEditor'
@@ -222,7 +222,7 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
               <option value="">{areas ? 'Choose a play area' : 'Loading…'}</option>
               {areas?.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.name}
+                  {isBuiltIn(a) ? a.name : `${a.name} (${madeBy(a)})`}
                 </option>
               ))}
             </select>
@@ -236,7 +236,8 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
               <LazyGameMap city={lobby.city} playArea={current.area} className="lobby-map" />
             </Suspense>
             <p className="muted small-note">
-              {formatKm2(areaKm2(current.area))} · bars in yellow, stations in white
+              <span className="map-tag">{madeBy(current)}</span> {formatKm2(areaKm2(current.area))} · bars in
+              yellow, stations in white
             </p>
           </>
         )}

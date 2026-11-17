@@ -8,6 +8,7 @@ import type { SyncTransport } from './sync/transport'
 import { useGameSync } from './sync/useGameSync'
 import { ConnectionStatus } from './components/ConnectionStatus'
 import { Home } from './components/Home'
+import { Settings } from './components/Settings'
 import { Lobby } from './components/Lobby'
 import { Started } from './components/Started'
 import { StaleBanner } from './components/StaleBanner'
@@ -80,6 +81,7 @@ function GameScreen({ gameId, transport, onLeave }: { gameId: string; transport:
 
 export default function App() {
   const [gameId, setGameId] = useState<string | null>(() => readLocal(GAME_KEY))
+  const [settings, setSettings] = useState(false)
 
   const enter = (id: string | null) => {
     writeLocal(GAME_KEY, id)
@@ -98,8 +100,10 @@ export default function App() {
           </>
         ) : gameId ? (
           <GameScreen key={gameId} gameId={gameId} transport={transport} onLeave={() => enter(null)} />
+        ) : settings ? (
+          <Settings transport={transport} onBack={() => setSettings(false)} />
         ) : (
-          <Home transport={transport} onEnter={enter} />
+          <Home transport={transport} onEnter={enter} onSettings={() => setSettings(true)} />
         )}
         <p className="muted small">Build {import.meta.env.VITE_BUILD_SHA?.slice(0, 7) ?? 'local'}</p>
       </main>
