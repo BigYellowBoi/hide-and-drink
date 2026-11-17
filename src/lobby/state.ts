@@ -134,6 +134,8 @@ export function applyLobbyEvent(state: LobbyState, e: GameEvent): LobbyState {
         },
       }
     }
+    case 'seeking_started':
+      return state.status === 'hiding' ? { ...state, status: 'seeking' } : state
     default:
       return state
   }

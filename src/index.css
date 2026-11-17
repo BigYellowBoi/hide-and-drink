@@ -1242,3 +1242,400 @@ button.map-row-delete {
 .settings-bar > button {
   justify-self: start;
 }
+
+/* ------------------------------------------------------------------ play (in-round) */
+
+.topbar-timer {
+  display: grid;
+  justify-items: center;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.topbar-timer small {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Room for the fixed tab bar. */
+.game-body:has(.tabbar) {
+  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+}
+
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 16px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+
+.tabbar button {
+  position: relative;
+  flex: 1;
+  max-width: 160px;
+  min-height: 48px;
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.tabbar button.on {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.tab-dot {
+  position: absolute;
+  top: 8px;
+  right: 18px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--alert);
+}
+
+.lock-label {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--hider);
+}
+
+.flag {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--alert);
+  color: var(--alert-ink);
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.penalty {
+  color: var(--alert);
+}
+
+/* Deadline ring */
+.ring {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+
+.ring svg {
+  position: absolute;
+  inset: 0;
+}
+
+.ring-track,
+.ring-fill {
+  fill: none;
+  stroke-width: 5;
+}
+
+.ring-track {
+  stroke: var(--line);
+}
+
+.ring-fill {
+  stroke: var(--text);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.5s linear;
+}
+
+.ring-soon .ring-fill {
+  stroke: var(--alert);
+}
+
+.ring-late .ring-track {
+  stroke: var(--alert);
+}
+
+.ring-digits {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.ring-late .ring-digits {
+  color: var(--alert);
+}
+
+/* Answer sheet (hider) and the seekers' waiting card */
+.answer-sheet {
+  box-shadow: inset 0 0 0 2px var(--hider);
+}
+
+.sheet-head,
+.waiting {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sheet-head h2,
+.waiting h2 {
+  margin: 0 0 4px;
+}
+
+.sheet-head p,
+.waiting p {
+  margin: 0;
+}
+
+.waiting {
+  box-shadow: inset 0 0 0 2px var(--seeker-on-dark);
+}
+
+.mini-map {
+  height: 180px;
+  margin-top: 12px;
+}
+
+.suggestion {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.suggestion p {
+  margin: 0;
+}
+
+.answer-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+button.answer {
+  min-height: 72px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  background: transparent;
+  color: var(--text);
+  border-color: var(--line);
+  border-radius: var(--r-card);
+}
+
+button.answer.on {
+  background: var(--hider);
+  border-color: var(--hider);
+  color: var(--hider-ink);
+}
+
+/* Ask (seekers) */
+.type-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+button.type-tile {
+  display: grid;
+  gap: 2px;
+  min-height: 64px;
+  padding: 8px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border-color: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+}
+
+button.type-tile .small {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+button.type-tile.on {
+  border-color: var(--seeker-on-dark);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+button.option-chip {
+  min-height: 44px;
+  background: transparent;
+  color: var(--text);
+  border-color: var(--line);
+}
+
+button.option-chip.on {
+  background: var(--seeker);
+  border-color: var(--seeker);
+  color: var(--seeker-ink);
+}
+
+.thermo {
+  margin-top: 12px;
+}
+
+.thermo p {
+  margin: 0 0 8px;
+}
+
+.ask-map {
+  height: 300px;
+  margin-top: 16px;
+}
+
+button.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hider);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+/* Map tab */
+.map-wrap {
+  position: relative;
+}
+
+.bars-left {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 6px 14px;
+  border-radius: var(--r-pill);
+  background: var(--text);
+  color: var(--bg);
+  font-weight: 700;
+  font-size: 15px;
+  pointer-events: none;
+}
+
+.map-card > .small {
+  margin: 0;
+  padding: 8px 16px 12px;
+}
+
+.bar-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+button.bar-row,
+.bar-row.static {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 2px solid transparent;
+  color: var(--text);
+  font-weight: 400;
+  text-align: left;
+}
+
+button.bar-row.on {
+  border-color: var(--hider);
+}
+
+.bar-picker input {
+  width: 100%;
+}
+
+.bar-picker h2 {
+  margin: 0 0 4px;
+}
+
+.bar-picker .slide {
+  margin-top: 16px;
+}
+
+.bar-locked p {
+  margin: 0;
+}
+
+.question-list,
+.play-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.question-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.play-log li {
+  display: grid;
+  grid-template-columns: 10px 64px 1fr;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.log-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.log-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.log-asked .log-dot {
+  background: var(--seeker-on-dark);
+}
+
+.log-answered .log-dot,
+.log-bar .log-dot {
+  background: var(--hider);
+}
+
+.log-seeking .log-dot {
+  background: var(--ok);
+}
+
+.log-penalty .log-dot {
+  background: var(--alert);
+}
+
+.log-penalty {
+  color: var(--alert);
+}

@@ -5,7 +5,8 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { supabase } from '../lib/supabase'
 import { loadCityPack, type CityPack } from '../map/cityPack'
 import { boundsOf, outsideMask, type AreaCollection } from '../map/playArea'
-import { mapStyle, TAPPABLE_LAYERS } from '../map/style'
+import type { FeatureCollection } from 'geojson'
+import { hatchImage, mapStyle, OVERLAY_SOURCES, TAPPABLE_LAYERS, type OverlaySource } from '../map/style'
 
 interface Props {
   city: string
@@ -16,7 +17,13 @@ interface Props {
   className?: string
   /** Tap a station, bar or line to see its name. */
   tapNames?: boolean
+  /** Extra layers: ruled-out hatch, question tool, hider zone, own position. */
+  overlays?: Partial<Record<OverlaySource, FeatureCollection>>
+  /** Called with [lon, lat] on every tap. */
+  onTap?: (lngLat: [number, number]) => void
 }
+
+const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] }
 
 // MapLibre finds its worker next to its own module, which bundling breaks: point it at the
 // worker file Vite emits instead.
@@ -42,16 +49,18 @@ function describeFeature(layer: string, props: Record<string, unknown>): string 
 }
 
 /** MapLibre map of the city pack: streets, water, transit lines, stations, venues and the play area. */
-export function GameMap({ city, playArea, onReady, className, tapNames = true }: Props) {
+export function GameMap({ city, playArea, onReady, className, tapNames = true, overlays, onTap }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const [pack, setPack] = useState<CityPack | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
   const onReadyRef = useRef(onReady)
+  const onTapRef = useRef(onTap)
   useEffect(() => {
     onReadyRef.current = onReady
-  }, [onReady])
+    onTapRef.current = onTap
+  }, [onReady, onTap])
 
   useEffect(() => {
     if (!supabase) return
@@ -84,6 +93,7 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true }:
     mapRef.current = map
 
     let popup: Popup | null = null
+    map.on('click', (e) => onTapRef.current?.([e.lngLat.lng, e.lngLat.lat]))
     if (tapNames) {
       map.on('click', (e) => {
         const hit = map.queryRenderedFeatures(
@@ -104,6 +114,8 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true }:
       })
     }
     map.once('load', () => {
+      // Hatch for the ruled-out area. Its source stays empty until after load, so this is in time.
+      if (!map.hasImage('hatch')) map.addImage('hatch', hatchImage())
       // Start the compact attribution collapsed: it covers half a phone-sized map otherwise.
       map.getContainer().querySelector('.maplibregl-compact-show')?.classList.remove('maplibregl-compact-show')
       setLoaded(true)
@@ -127,6 +139,12 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true }:
       map.fitBounds(boundsOf(playArea) as LngLatBoundsLike, { padding: 24, duration: 0 })
     }
   }, [playArea, loaded])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !loaded) return
+    for (const id of OVERLAY_SOURCES) (map.getSource(id) as GeoJSONSource | undefined)?.setData(overlays?.[id] ?? EMPTY)
+  }, [overlays, loaded])
 
   return (
     <div className={`game-map ${className ?? ''}`}>

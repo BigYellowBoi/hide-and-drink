@@ -27,9 +27,10 @@ select is(
     order by 1
   ),
   array[
-    'can_join_topic', 'can_see', 'can_use_presence', 'create_game', 'delete_play_area', 'get_city_pack',
+    'answer_question', 'ask_question', 'can_join_topic', 'can_see', 'can_use_presence', 'choose_bar', 'create_game',
+    'delete_play_area', 'get_city_pack',
     'is_player', 'join_game', 'my_team', 'remove_player', 'save_play_area', 'server_time', 'set_play_area',
-    'set_team', 'start_game', 'topic_for', 'update_config'
+    'set_team', 'settle_timers', 'start_game', 'topic_for', 'update_config'
   ],
   'signed-in clients can call only the allow-listed functions'
 );
