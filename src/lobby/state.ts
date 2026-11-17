@@ -90,6 +90,10 @@ export function applyLobbyEvent(state: LobbyState, e: GameEvent): LobbyState {
         players: state.players.map((x) => (x.userId === userId ? { ...x, team: asTeam(p.team) } : x)),
       }
     }
+    case 'player_removed': {
+      const userId = str(p.user_id)
+      return { ...state, players: state.players.filter((x) => x.userId !== userId) }
+    }
     case 'config_changed':
       return isObject(p.config) ? { ...state, config: p.config } : state
     case 'play_area_changed':
