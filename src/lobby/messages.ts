@@ -57,6 +57,7 @@ const MESSAGES: Record<string, string> = {
   hand_full: 'Your hand is full. Discard a card to make room.',
   card_not_in_hand: 'That card is no longer in your hand.',
   card_not_configured: 'That card is missing its settings.',
+  card_not_playable: 'Time bonuses aren\'t played: keep them in your hand until the round ends.',
   card_behaviour_not_supported: 'That kind of card isn\'t in the app yet. Play it by hand.',
   effect_not_found: 'That curse is no longer in play.',
   effect_not_active: 'That curse is already waiting for the hider.',

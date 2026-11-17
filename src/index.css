@@ -2084,3 +2084,10 @@ button.pcard {
 .log-card .log-dot {
   background: var(--brand-red);
 }
+
+/* Hider-only: time bonus held in hand, next to the main clock. */
+.topbar-bonus {
+  color: var(--ok);
+  font-size: 0.6em;
+  font-weight: 600;
+}
