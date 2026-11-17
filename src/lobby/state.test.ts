@@ -46,6 +46,11 @@ describe('deriveLobby', () => {
     expect(s.playAreaName).toBe('Inner')
   })
 
+  it('drops removed players', () => {
+    const s = deriveLobby([...lobbyEvents(), ev('player_removed', { user_id: 'a', name: 'Amy' })])
+    expect(s.players.map((p) => p.name)).toEqual(['Hana', 'Sam'])
+  })
+
   it('records the start and the locked teams', () => {
     const s = deriveLobby([
       ...lobbyEvents(),
