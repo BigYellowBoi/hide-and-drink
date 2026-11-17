@@ -61,7 +61,6 @@ export function Home({ transport, onEnter }: { transport: SyncTransport; onEnter
             onChange={(e) => setName(e.target.value)}
             maxLength={24}
             autoComplete="nickname"
-            placeholder="e.g. Louis"
             autoFocus={!name}
           />
         </label>
