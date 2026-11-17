@@ -132,18 +132,53 @@ it(`p95 send-to-receive <= ${P95_MS} ms with ${PLAYERS} players`, async () => {
     const s = p.sync.getSnapshot()
     return s.canAct && s.lastSeq >= lastSeq
   }
+  /**
+   * Wait for phones to catch up before they send. If a broadcast went missing, fetch it,
+   * as the app's own safety-net poll would; the late arrival still counts in the results.
+   */
+  const catchUp = async (what: string, ps: Player[]) => {
+    const ready = () => ps.every(senderReady)
+    try {
+      await waitFor(what, ready, ARRIVAL_TIMEOUT_MS)
+    } catch {
+      await Promise.all(ps.map((p) => p.sync.resync()))
+      await waitFor(what, ready, ARRIVAL_TIMEOUT_MS)
+    }
+  }
+
+  // Warm up: a freshly started stack can take a few seconds before broadcasts from the
+  // database flow. Not representative of a running server, so send unmeasured events until
+  // one reaches every phone by broadcast.
+  const host = players[0]
+  let warmups = 0
+  const warmStart = performance.now()
+  for (;;) {
+    if (performance.now() - warmStart > 60_000) throw new Error('broadcasts never started flowing')
+    await catchUp('phones to catch up during warm-up', [host])
+    const res = (await host.sync.action('update_config', { p_config: { harness_warmup: ++warmups } })) as {
+      seq: number
+    }
+    const seq = Number(res.seq)
+    lastSeq = Math.max(lastSeq, seq)
+    const ok = await waitFor('warm-up event', () => players.every((p) => p.appliedAt.has(seq)), 2000)
+      .then(() => true)
+      .catch(() => false)
+    if (ok) break
+    await Promise.all(players.map((p) => p.sync.resync()))
+  }
+  const warmupMs = performance.now() - warmStart
 
   // One action at a time, rotating sender, like normal play.
   for (let r = 0; r < ROUNDS; r++) {
     const p = players[r % PLAYERS]
-    await waitFor(`${p.name} to catch up`, () => senderReady(p), ARRIVAL_TIMEOUT_MS)
+    await catchUp(`${p.name} to catch up`, [p])
     await send(p, r)
     await sleep(50 + Math.random() * 200)
   }
   // Everyone but the host taps at once.
   for (let b = 0; b < BURSTS; b++) {
     const senders = players.filter((p) => !p.isHost)
-    await waitFor('phones to catch up', () => senders.every(senderReady), ARRIVAL_TIMEOUT_MS)
+    await catchUp('phones to catch up', senders)
     await Promise.all(senders.map((p) => send(p, ROUNDS + b)))
     await sleep(300)
   }
@@ -178,7 +213,7 @@ it(`p95 send-to-receive <= ${P95_MS} ms with ${PLAYERS} players`, async () => {
     `### Latency harness: ${failed.length ? 'FAIL' : 'pass'}`,
     '',
     `${PLAYERS} players, ${sentAt.size} actions (${ROUNDS} sequential, ${BURSTS} bursts), p95 limit ${P95_MS} ms. ` +
-      `Presence converged in ${ms(presenceMs)} ms.`,
+      `Presence converged in ${ms(presenceMs)} ms. Warm-up: ${warmups} event(s), ${ms(warmupMs)} ms.`,
     '',
     '| | samples | missing | p50 ms | p95 ms | p99 ms | max ms |',
     '| --- | --- | --- | --- | --- | --- | --- |',
@@ -193,7 +228,7 @@ it(`p95 send-to-receive <= ${P95_MS} ms with ${PLAYERS} players`, async () => {
   if (process.env.LATENCY_REPORT) {
     writeFileSync(
       process.env.LATENCY_REPORT,
-      JSON.stringify({ players: PLAYERS, p95LimitMs: P95_MS, presenceMs, overall, rpc, perPlayer, failed }, null, 2),
+      JSON.stringify({ players: PLAYERS, p95LimitMs: P95_MS, presenceMs, warmups, warmupMs, overall, rpc, perPlayer, failed }, null, 2),
     )
   }
 
