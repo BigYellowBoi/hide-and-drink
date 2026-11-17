@@ -17,11 +17,12 @@ export function SlideToConfirm({ label, disabled = false, onConfirm }: Props) {
   const trackRef = useRef<HTMLDivElement>(null)
   const start = useRef<{ x: number; max: number } | null>(null)
   const [offset, setOffset] = useState(0)
-  const [dragging, setDragging] = useState(false)
+  /** Drag distance to the end while dragging, null otherwise. */
+  const [dragMax, setDragMax] = useState<number | null>(null)
 
   const reset = () => {
     start.current = null
-    setDragging(false)
+    setDragMax(null)
     setOffset(0)
   }
 
@@ -29,7 +30,7 @@ export function SlideToConfirm({ label, disabled = false, onConfirm }: Props) {
     if (disabled || !trackRef.current) return
     const max = trackRef.current.clientWidth - KNOB - 8
     start.current = { x: e.clientX, max }
-    setDragging(true)
+    setDragMax(max)
     e.currentTarget.setPointerCapture(e.pointerId)
   }
 
@@ -50,10 +51,10 @@ export function SlideToConfirm({ label, disabled = false, onConfirm }: Props) {
     if (e.key === 'Enter' && !disabled) onConfirm()
   }
 
-  const max = start.current?.max ?? 1
+  const dragging = dragMax !== null
   return (
     <div ref={trackRef} className={`slide${disabled ? ' slide-disabled' : ''}`}>
-      <span className="slide-label" style={{ opacity: dragging ? 1 - offset / max : 1 }}>
+      <span className="slide-label" style={{ opacity: dragging && dragMax > 0 ? 1 - offset / dragMax : 1 }}>
         {label}
       </span>
       <button
