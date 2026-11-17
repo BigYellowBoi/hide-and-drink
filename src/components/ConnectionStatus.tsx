@@ -9,13 +9,17 @@ const LABELS: Record<SyncStatus, string> = {
   error: 'Error',
 }
 
-/** Live/offline dot. Anything but green means actions are paused. */
+/**
+ * Status dot for the top bar. Anything but green means actions are paused; the stale banner
+ * says why, so here the label only shows when not live.
+ */
 export function ConnectionStatus({ status, canAct }: { status: SyncStatus; canAct: boolean }) {
+  const paused = !canAct && status !== 'idle'
+  const label = `${LABELS[status]}${paused ? ', actions paused' : ''}`
   return (
-    <span className={`conn conn-${status}`} role="status" aria-live="polite">
+    <span className={`conn conn-${status}`} role="status" aria-live="polite" aria-label={label} title={label}>
+      {status !== 'live' && <span aria-hidden="true">{LABELS[status]}</span>}
       <span className="conn-dot" aria-hidden="true" />
-      {LABELS[status]}
-      {!canAct && status !== 'idle' && <span className="conn-note"> · actions paused</span>}
     </span>
   )
 }

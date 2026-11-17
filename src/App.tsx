@@ -14,6 +14,8 @@ import { StaleBanner } from './components/StaleBanner'
 import { presenceOf } from './sync/presence'
 
 const transport = supabase ? supabaseTransport(supabase) : null
+const asset = (f: string) => `${import.meta.env.BASE_URL}${f}`
+const TEAM_CHIP = { hiders: 'Hider', seekers: 'Seeker' } as const
 
 function GameScreen({ gameId, transport, onLeave }: { gameId: string; transport: SyncTransport; onLeave: () => void }) {
   const game = useGameSync(gameId, transport)
@@ -21,11 +23,16 @@ function GameScreen({ gameId, transport, onLeave }: { gameId: string; transport:
   const [confirmLeave, setConfirmLeave] = useState(false)
   const presence = useMemo(() => presenceOf(game.present, game.status === 'live'), [game.present, game.status])
   const locked = !game.canAct && game.status !== 'idle' && game.status !== 'error'
+  const myTeam = lobby.players.find((p) => p.userId === game.userId)?.team ?? null
 
   return (
     <>
+      {/* Top bar: team chip left, screen label centre, status dot right (docs/design.md). */}
       <header className="topbar">
-        <h1>Hide + Drink</h1>
+        <span className={`chip chip-${myTeam ?? 'none'}`}>{myTeam ? TEAM_CHIP[myTeam] : 'No team'}</span>
+        <span className="topbar-label">
+          {lobby.started ? `Round ${lobby.started.round}` : lobby.code ? 'Lobby' : ''}
+        </span>
         <ConnectionStatus status={game.status} canAct={game.canAct} />
       </header>
 
@@ -83,18 +90,15 @@ export default function App() {
     <main className="shell">
       {!transport ? (
         <>
-          <h1>Hide + Drink</h1>
+          <div className="hero">
+            <img className="wordmark" src={asset('wordmark.svg')} alt="Hide + Drink" width={240} height={35} />
+          </div>
           <p className="bad">Backend not configured (see .env.example).</p>
         </>
       ) : gameId ? (
         <GameScreen key={gameId} gameId={gameId} transport={transport} onLeave={() => enter(null)} />
       ) : (
-        <>
-          <header className="topbar">
-            <h1>Hide + Drink</h1>
-          </header>
-          <Home transport={transport} onEnter={enter} />
-        </>
+        <Home transport={transport} onEnter={enter} />
       )}
       <p className="muted small">Build {import.meta.env.VITE_BUILD_SHA?.slice(0, 7) ?? 'local'}</p>
     </main>

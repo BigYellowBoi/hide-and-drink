@@ -123,7 +123,7 @@ export function ConfigEditor({ config, editable, busy, onSave }: Props) {
         </fieldset>
       ))}
       {editable && (
-        <div className="row">
+        <div className="row config-actions">
           <button
             disabled={busy || !draft}
             onClick={async () => {

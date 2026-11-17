@@ -47,6 +47,12 @@ export function Home({ transport, onEnter }: { transport: SyncTransport; onEnter
 
   return (
     <>
+      <div className="hero">
+        <img className="logo-tile" src={`${import.meta.env.BASE_URL}logo.svg`} alt="" width={112} height={112} />
+        <h1 className="sr-only">Hide + Drink</h1>
+        <img className="wordmark" src={`${import.meta.env.BASE_URL}wordmark.svg`} alt="Hide + Drink" width={240} height={35} />
+      </div>
+
       <section className="card">
         <label className="field">
           <span>Your name</span>
@@ -59,15 +65,21 @@ export function Home({ transport, onEnter }: { transport: SyncTransport; onEnter
             autoFocus={!name}
           />
         </label>
-      </section>
 
-      <section className="card">
-        <h2>Join a game</h2>
-        {linkCode && <p className="muted">Code from your link. Enter your name and tap Join.</p>}
-        <label className="field">
-          <span>Join code</span>
+        <button
+          className={linkCode ? 'wide secondary' : 'wide'}
+          disabled={busy || !trimmed}
+          onClick={() => run(() => createGame(transport, trimmed, defaultConfig))}
+        >
+          Create game
+        </button>
+
+        <p className="divider">or join with a code</p>
+        {linkCode && <p className="muted small-note">Code from your link. Enter your name and tap Join.</p>}
+        <div className="join-inline">
           <input
             className="code-input"
+            aria-label="Join code"
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4))}
             inputMode="text"
@@ -75,29 +87,22 @@ export function Home({ transport, onEnter }: { transport: SyncTransport; onEnter
             autoComplete="off"
             placeholder="ABCD"
           />
-        </label>
-        <button
-          className="wide"
-          disabled={busy || !trimmed || !codeOk}
-          onClick={() => run(() => joinGame(transport, code, trimmed))}
-        >
-          Join
-        </button>
+          <button
+            className={codeOk ? '' : 'secondary'}
+            disabled={busy || !trimmed || !codeOk}
+            onClick={() => run(() => joinGame(transport, code, trimmed))}
+          >
+            Join
+          </button>
+        </div>
         <p className="muted small-note">Or scan the host's QR code with your camera.</p>
       </section>
 
-      <section className="card">
-        <h2>Host a game</h2>
-        <button
-          className="wide secondary"
-          disabled={busy || !trimmed}
-          onClick={() => run(() => createGame(transport, trimmed, defaultConfig))}
-        >
-          Create game
-        </button>
-      </section>
-
-      {err && <p className="bad">{err}</p>}
+      {err && (
+        <p className="bad sticky-error" role="alert">
+          {err}
+        </p>
+      )}
     </>
   )
 }
