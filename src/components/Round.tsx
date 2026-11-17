@@ -1,10 +1,12 @@
 import { Suspense, useMemo, useState } from 'react'
 import type { FeatureCollection } from 'geojson'
 import type { LobbyState, StartedRound } from '../lobby/state'
-import { deriveHiding, formatClock, hidingZone, roundClock, type HidingZoneConfig } from '../hiding/state'
+import { deriveHiding, formatClock, hidingZone, positionAge, roundClock, type HidingZoneConfig } from '../hiding/state'
 import { useGeolocation, type GeoError } from '../hiding/useGeolocation'
 import { usePositionReporter } from '../hiding/usePositionReporter'
 import { useServerNow } from '../hiding/useServerNow'
+import { useWakeLock } from '../hiding/useWakeLock'
+import { readLocal, writeLocal } from '../lib/storage'
 import { distanceM, formatDistance } from '../map/geo'
 import { questionTool } from '../play/overlays'
 import { remainingBars, shade, type HiderZone } from '../play/shading'
@@ -38,6 +40,7 @@ const TABS = {
 } as const
 
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] }
+const AWAKE_KEY = 'hd.keepAwake'
 
 interface Props {
   sync: GameSync
@@ -96,12 +99,18 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
     [shading],
   )
   const round = started?.round
+  // Ages on the tags only need to move every few seconds, not on every clock tick.
+  const ageTick = Math.floor(now / 5000) * 5000
   const seekerDots = useMemo<MapDot[]>(() => {
     const seekers = new Map(lobby.players.filter((p) => p.team === 'seekers').map((p) => [p.userId, p.name]))
     return positions
       .filter((p) => p.userId !== userId && p.round === round && seekers.has(p.userId))
-      .map((p) => ({ id: p.userId, lng: p.lng, lat: p.lat, team: 'seekers' as const, name: seekers.get(p.userId) }))
-  }, [positions, userId, round, lobby.players])
+      .map((p) => {
+        const age = positionAge(p.at, ageTick, zone.locationIntervalS)
+        const name = seekers.get(p.userId) ?? 'Seeker'
+        return { id: p.userId, lng: p.lng, lat: p.lat, team: 'seekers' as const, name: age ? `${name} · ${age}` : name, stale: !!age }
+      })
+  }, [positions, userId, round, lobby.players, ageTick, zone.locationIntervalS])
 
   if (!started) return null
   const clock = roundClock(started.startedAt, started.hidingPeriodS, now)
@@ -414,6 +423,9 @@ function SeekerView({
   // Mounted for the whole round, whatever the tab, so everyone keeps getting this phone's position.
   const { fix, error } = useGeolocation(true)
   const lastSent = usePositionReporter(sync, fix, canAct, zone.locationIntervalS, true)
+  // Web apps get no GPS in the background, so sharing needs the app open with the screen on.
+  const [keepAwake, setKeepAwake] = useState(() => readLocal(AWAKE_KEY) !== 'off')
+  const wake = useWakeLock(keepAwake)
   const overlay = useMemo(
     () => ({
       dots: [...seekerDots, ...(fix ? [{ id: 'me', lng: fix.lng, lat: fix.lat, team: 'seekers' as const, me: true }] : [])],
@@ -450,6 +462,30 @@ function SeekerView({
             {fix && lastSent ? ` Sharing your location every ${Math.round(zone.locationIntervalS)} s.` : ''}
           </p>
           <GeoNote error={error} seeker />
+          <label className="toggle awake-toggle">
+            <input
+              type="checkbox"
+              checked={keepAwake}
+              disabled={wake === 'unsupported'}
+              onChange={(e) => {
+                setKeepAwake(e.target.checked)
+                writeLocal(AWAKE_KEY, e.target.checked ? 'on' : 'off')
+              }}
+            />
+            <span>
+              Keep screen on
+              <span className="muted small">
+                {' '}
+                {wake === 'unsupported'
+                  ? "This browser can't. Keep the app open and the screen unlocked to share your location."
+                  : wake === 'failed'
+                    ? "The phone refused (low power mode?). Your location stops when the screen locks."
+                    : keepAwake
+                      ? 'Your location only shares while the app is open, so one phone per group should keep this on (plug it into a power bank).'
+                      : 'Your location stops sharing when the screen locks or you switch apps.'}
+              </span>
+            </span>
+          </label>
         </section>
       )}
 

@@ -1765,3 +1765,17 @@ button.link {
   margin: 0;
   padding: 0 16px 12px;
 }
+
+.map-tag-stale {
+  opacity: 0.6;
+}
+
+.awake-toggle {
+  margin: 0;
+  padding: 0 16px 16px;
+  align-items: flex-start;
+}
+
+.awake-toggle .muted {
+  display: block;
+}

@@ -31,6 +31,8 @@ export interface MapDot {
   team: 'hiders' | 'seekers'
   me?: boolean
   name?: string
+  /** Old position (that phone stopped reporting): the tag is dimmed. */
+  stale?: boolean
 }
 
 /** "Sam · 420 m away" (straight line from this phone's dot), or just the name without one. */
@@ -251,6 +253,7 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
         tags.set(d.id, m.setLngLat([d.lng, d.lat]).addTo(map))
       }
       m.getElement().textContent = d.name ?? ''
+      m.getElement().classList.toggle('map-tag-stale', d.stale === true)
       m.setLngLat([d.lng, d.lat])
     }
   }, [dots, loaded])
