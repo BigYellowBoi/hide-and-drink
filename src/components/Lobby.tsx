@@ -106,7 +106,7 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
         <p className="muted small-note team-hint">
           {isHost ? 'Tap a name to switch their team.' : 'Tap your name to switch team.'}
         </p>
-        <div className="team-columns">
+        <div className="team-lists">
           {TEAMS.map((t) => {
             const list = lobby.players.filter((p) => p.team === t.id)
             return (
