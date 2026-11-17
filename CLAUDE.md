@@ -2,7 +2,7 @@
 
 Companion web app for our friend group's "Hide + Drink" variant of Jet Lag: The Game Hide and Seek. The hider hides at a bar; cards and curses are drinking themed. Private game, ~6 players (one hider team, one seeker team, ~3 each). Brisbane first, then Sydney.
 
-Full spec: `docs/spec.md`. Seed data: `data/`. Read only the parts relevant to the current task.
+Full spec: `docs/spec.md`. Design (colours, fonts, logos, screens): `docs/design.md`; follow it for any UI work. Seed data: `data/`. Read only the parts relevant to the current task.
 
 ## Non-negotiables
 
