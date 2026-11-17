@@ -70,7 +70,7 @@ export interface Question {
   overdue: boolean
 }
 
-export type LogKind = 'seeking' | 'asked' | 'answered' | 'penalty' | 'bar'
+export type LogKind = 'seeking' | 'asked' | 'answered' | 'penalty' | 'bar' | 'draw' | 'card'
 export interface LogEntry {
   seq: number
   kind: LogKind
@@ -80,6 +80,8 @@ export interface LogEntry {
   private?: boolean
   /** Storage path of an answer photo. */
   photo?: string
+  /** Dot colour (card category), when the kind's own colour doesn't fit. */
+  colour?: string
 }
 
 export interface PlayState {

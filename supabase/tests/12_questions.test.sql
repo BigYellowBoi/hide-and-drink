@@ -245,7 +245,7 @@ select pg_temp.as_user('22222222-2222-2222-2222-222222222222');
 select public.answer_question(pg_temp.gid(), current_setting('test.q3')::uuid, 'no',
   'dddddddd-0000-0000-0000-000000000051', pg_temp.seq());
 select is(
-  array(select type from public.events where game_id = pg_temp.gid() order by seq desc limit 2),
+  array(select type from public.events where game_id = pg_temp.gid() and type <> 'cards_drawn' order by seq desc limit 2),
   array['question_answered', 'answer_overdue'],
   'answering after the deadline logs the penalty first'
 );

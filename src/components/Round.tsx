@@ -15,6 +15,7 @@ import { shadingBounds, type LayerLookup } from '../play/features'
 import { useCityLayers } from '../play/useCityLayers'
 import { useHidingVenues } from '../play/useHidingVenues'
 import { useSettleTimers } from '../play/useSettleTimers'
+import { deriveCards, liveEffects, questionsBlockedBy, type CardsState } from '../cards/state'
 import type { GameSync } from '../sync/engine'
 import type { Presence } from '../sync/presence'
 import type { GameEvent, SeekerPosition } from '../sync/types'
@@ -22,21 +23,25 @@ import { AnswerSheet } from './AnswerSheet'
 import { AskPanel } from './AskPanel'
 import { BarPicker, LockIcon } from './BarPicker'
 import { DeadlineRing } from './DeadlineRing'
+import { BlockedBanner, ConfirmClear, EffectStrip, EffectsPanel } from './EffectsPanel'
+import { HandPanel } from './HandPanel'
 import type { MapDot } from './GameMap'
 import { LazyGameMap } from './lazyMap'
 import { PlayLog } from './PlayLog'
 import { PresenceDot } from './PresenceDot'
 
-type Tab = 'map' | 'ask' | 'questions' | 'log'
+type Tab = 'map' | 'ask' | 'hand' | 'effects' | 'questions' | 'log'
 const TABS = {
   hiders: [
     ['map', 'Map'],
+    ['hand', 'Hand'],
     ['questions', 'Questions'],
     ['log', 'Log'],
   ],
   seekers: [
     ['map', 'Map'],
     ['ask', 'Ask'],
+    ['effects', 'Effects'],
     ['log', 'Log'],
   ],
 } as const
@@ -57,12 +62,14 @@ interface Props {
 /** What every view of the round shares: question state, shading, the tool to draw. */
 interface Shared {
   play: PlayState
+  cards: CardsState
   ruled: FeatureCollection
   /** Outline of where the hider can still be, once anything is ruled out. */
   remaining: FeatureCollection | undefined
   /** Every seeker but this phone, with name tags (both teams see them). */
   seekerDots: MapDot[]
   goMap: () => void
+  goHand: () => void
   /** The open question's tool (radar circle, thermometer line). */
   tool: FeatureCollection | undefined
   tab: Tab
@@ -80,6 +87,8 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
   const now = useServerNow(sync)
   const zone = useMemo(() => hidingZone(lobby.config), [lobby.config])
   const play = useMemo(() => derivePlay(events), [events])
+  const cards = useMemo(() => deriveCards(events), [events])
+  const log = useMemo(() => [...play.log, ...cards.log].sort((a, b) => a.seq - b.seq), [play.log, cards.log])
   const [tab, setTab] = useState<Tab>('map')
   useSettleTimers(sync, play, canAct, now)
 
@@ -127,10 +136,12 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
   const nameOf = (id: string | null) => lobby.players.find((p) => p.userId === id)?.name ?? 'a seeker'
   const shared: Shared = {
     play,
+    cards,
     ruled: shading?.ruledOut ?? EMPTY,
     remaining,
     seekerDots,
     goMap: () => setTab('map'),
+    goHand: () => setTab('hand'),
     tool,
     tab,
     now,
@@ -173,9 +184,11 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
 
       {tab === 'questions' && <QuestionList questions={play.questions} />}
 
+      {tab === 'effects' && team && <EffectsPanel sync={sync} cards={cards} team={team} canAct={canAct} now={now} />}
+
       {tab === 'log' && (
         <>
-          <PlayLog play={play} lobby={lobby} />
+          <PlayLog log={log} lobby={lobby} />
           <section className="card">
             <p className="muted">
               Round {started.round} · {started.playAreaName ?? 'Play area'}
@@ -204,6 +217,8 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
           <button key={id} className={tab === id ? 'on' : ''} aria-current={tab === id} onClick={() => setTab(id)}>
             {label}
             {id === 'questions' && play.pending && <span className="tab-dot" aria-label="needs answer" />}
+            {id === 'hand' && cards.draws.length > 0 && <span className="tab-dot" aria-label="cards to keep" />}
+            {id === 'effects' && liveEffects(cards, now).length > 0 && <span className="tab-dot" aria-label="curses in play" />}
           </button>
         ))}
       </nav>
@@ -270,10 +285,12 @@ function HiderView({
   events,
   clock,
   play,
+  cards,
   ruled,
   remaining,
   seekerDots,
   goMap,
+  goHand,
   tool,
   tab,
   now,
@@ -329,6 +346,33 @@ function HiderView({
           layer={layer ?? undefined}
         />
       )}
+      {cards.effects
+        .filter((e) => e.status === 'clear_requested')
+        .map((e) => (
+          <ConfirmClear key={e.id} sync={sync} effect={e} canAct={canAct} />
+        ))}
+      {cards.draws.length > 0 && tab !== 'hand' && (
+        <section className="card pick-prompt">
+          <div>
+            <p className="eyebrow">
+              <LockIcon /> Only you see this
+            </p>
+            <h2>
+              Keep {cards.draws[0].pick} of {cards.draws[0].cards.length} cards
+            </h2>
+          </div>
+          <button className="small" onClick={goHand}>
+            Pick
+          </button>
+        </section>
+      )}
+      {tab === 'hand' && (
+        <>
+          <HandPanel sync={sync} cards={cards} canAct={canAct} />
+          {questionsBlockedBy(cards).length > 0 && <BlockedBanner effects={questionsBlockedBy(cards)} team="hiders" />}
+          <EffectsPanel sync={sync} cards={cards} team="hiders" canAct={canAct} now={now} />
+        </>
+      )}
       {!bar && tab !== 'map' && (
         <section className="card pick-prompt">
           <div>
@@ -383,6 +427,7 @@ function HiderView({
               )}
               <GeoNote error={error} waiting={!fix} />
             </section>
+            <EffectStrip cards={cards} now={now} />
             <section className="card map-card">
               <Suspense fallback={<div className="game-map play-map" />}>
                 <LazyGameMap
@@ -423,6 +468,7 @@ function SeekerView({
   canAct,
   clock,
   play,
+  cards,
   ruled,
   remaining,
   seekerDots,
@@ -447,9 +493,11 @@ function SeekerView({
     [seekerDots, fix, ruled, remaining, tool],
   )
   const pending = play.pending
+  const blocked = questionsBlockedBy(cards)
 
   return (
     <>
+      {blocked.length > 0 && tab !== 'effects' && <BlockedBanner effects={blocked} team="seekers" />}
       {pending && (
         <section className="card waiting">
           <div>
@@ -462,6 +510,7 @@ function SeekerView({
         </section>
       )}
 
+      {tab === 'map' && <EffectStrip cards={cards} now={now} />}
       {tab === 'map' && (
         <section className="card map-card">
           <Suspense fallback={<div className="game-map play-map" />}>
@@ -510,6 +559,7 @@ function SeekerView({
           canAct={canAct}
           seekingAt={clock.phase === 'hiding' ? now + clock.ms : null}
           pending={!!pending}
+          blocked={blocked.length ? `Questions are blocked until you complete ${blocked.map((e) => e.card.name).join(' and ')}.` : null}
           now={now}
           fix={fix}
           geoError={error}

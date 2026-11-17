@@ -4,22 +4,22 @@
     {
       "id": "powerup",
       "name": "Powerup",
-      "colour": "#4F7BE8"
+      "colour": "#9B8CF5"
     },
     {
       "id": "time_bonus",
       "name": "Time bonus",
-      "colour": "#3FA34D"
+      "colour": "#4FC88A"
     },
     {
       "id": "drink",
       "name": "Drink",
-      "colour": "#E8A33F"
+      "colour": "#F2B705"
     },
     {
       "id": "curse",
       "name": "Curse",
-      "colour": "#C9423A"
+      "colour": "#EC353A"
     }
   ],
   "behaviours": [
