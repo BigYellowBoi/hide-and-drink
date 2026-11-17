@@ -78,7 +78,22 @@ body::before {
   pointer-events: none;
 }
 
+/* The only scrolling box (fixed to all four edges); html and body never scroll. */
+.scroll {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* While a full-screen overlay is open, the page behind it can't scroll. */
+html.scroll-locked .scroll {
+  overflow: hidden;
+}
+
+/* 1px taller than the box so iOS still rubber-bands short pages. Bottom room lives here, not on .scroll. */
 .shell {
+  min-height: calc(100% + 1px);
   max-width: 480px;
   margin: 0 auto;
   padding: calc(env(safe-area-inset-top, 0px) + var(--hdrdrop) + 16px) 16px calc(24px + env(safe-area-inset-bottom, 0px));
@@ -1076,6 +1091,7 @@ details.card > summary h2 {
   flex: 0 0 auto;
   max-height: 45vh;
   overflow-y: auto;
+  overscroll-behavior: contain;
   width: 100%;
   max-width: 480px;
   margin: 0 auto;
