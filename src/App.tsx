@@ -10,7 +10,7 @@ import { ConnectionStatus } from './components/ConnectionStatus'
 import { Home } from './components/Home'
 import { Settings } from './components/Settings'
 import { Lobby } from './components/Lobby'
-import { Started } from './components/Started'
+import { Round, TopbarClock } from './components/Round'
 import { StaleBanner } from './components/StaleBanner'
 import { presenceOf } from './sync/presence'
 
@@ -31,9 +31,11 @@ function GameScreen({ gameId, transport, onLeave }: { gameId: string; transport:
       {/* Top bar: team chip left, screen label centre, status dot right (docs/design.md). */}
       <header className="topbar">
         <span className={`chip chip-${myTeam ?? 'none'}`}>{myTeam ? TEAM_CHIP[myTeam] : 'No team'}</span>
-        <span className="topbar-label">
-          {lobby.started ? `Round ${lobby.started.round}` : lobby.code ? 'Lobby' : ''}
-        </span>
+        {lobby.started && game.sync ? (
+          <TopbarClock sync={game.sync} started={lobby.started} />
+        ) : (
+          <span className="topbar-label">{lobby.code ? 'Lobby' : ''}</span>
+        )}
         <ConnectionStatus status={game.status} canAct={game.canAct} />
       </header>
 
@@ -48,7 +50,15 @@ function GameScreen({ gameId, transport, onLeave }: { gameId: string; transport:
         ) : lobby.status === 'lobby' ? (
           <Lobby sync={game.sync} lobby={lobby} userId={game.userId} canAct={game.canAct} presence={presence} />
         ) : (
-          <Started sync={game.sync} lobby={lobby} userId={game.userId} presence={presence} />
+          <Round
+            sync={game.sync}
+            lobby={lobby}
+            userId={game.userId}
+            canAct={game.canAct}
+            events={game.events}
+            positions={game.positions}
+            presence={presence}
+          />
         )}
       </div>
 

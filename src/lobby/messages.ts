@@ -27,6 +27,13 @@ const MESSAGES: Record<string, string> = {
   removed_from_game: 'The host removed you from this game.',
   cannot_remove_host: 'The host can\'t be removed.',
   player_not_found: 'That player has already left.',
+  hiders_only: 'Only the hider can do that.',
+  seekers_only: 'Only seekers share their location.',
+  round_not_running: 'No round is running.',
+  bar_already_chosen: 'Your team has already locked in a bar this round.',
+  venue_not_found: 'That bar is not on the map.',
+  venue_not_allowed: 'That bar is outside the hiding zone. Pick another.',
+  invalid_position: 'Bad GPS position.',
   network: 'Network problem. Try again.',
 }
 

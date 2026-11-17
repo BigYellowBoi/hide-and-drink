@@ -13,6 +13,7 @@ const idle: SyncSnapshot = {
   error: null,
   present: [],
   staleSince: null,
+  positions: [],
 }
 const noop = () => () => {}
 const getIdle = () => idle

@@ -1242,3 +1242,131 @@ button.map-row-delete {
 .settings-bar > button {
   justify-self: start;
 }
+
+/* ------------------------------------------------------------------ round: clock, bar picker, freeze */
+
+.topbar-clock {
+  display: grid;
+  justify-items: center;
+  line-height: 1.1;
+}
+
+.topbar-clock .topbar-label {
+  font-size: 12px;
+}
+
+.topbar-time {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.lock-icon {
+  vertical-align: -1px;
+  margin-right: 4px;
+}
+
+.picker-head h2,
+.bar-title {
+  margin: 4px 0;
+}
+
+.picker-late {
+  color: var(--alert);
+}
+
+.picker-map {
+  height: min(45vh, 420px);
+}
+
+.bar-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+  display: grid;
+  gap: 8px;
+}
+
+button.bar-row {
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 2px solid transparent;
+  text-align: left;
+  font-weight: 600;
+}
+
+button.bar-row-selected {
+  border-color: var(--hider);
+}
+
+.bar-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bar-meta {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.picker-confirm {
+  position: sticky;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+  z-index: 5;
+  margin-top: 16px;
+}
+
+.freeze-banner {
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + var(--hdrdrop) + 8px);
+  z-index: 9;
+  margin: 8px 0 0;
+  padding: 16px;
+  border-radius: var(--r-card);
+  background: var(--alert);
+  color: var(--alert-ink);
+}
+
+.freeze-banner strong {
+  font-family: var(--font-display);
+  font-size: 26px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.freeze-banner p {
+  margin: 4px 0 0;
+  font-weight: 600;
+}
+
+.mate-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.mate-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--seeker-on-dark);
+  box-shadow: 0 0 0 2px var(--text);
+}

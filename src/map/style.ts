@@ -12,6 +12,8 @@ export const MAP_COLORS = {
   muted: '#A9B4BF',
   venue: '#F2B705', // drink category colour
   areaOutline: '#F0F0F0',
+  hider: '#5BB4F0',
+  seeker: '#FF6B6F', // --seeker-on-dark
 } as const
 
 /** Pack layers each map source draws from (ids from data/map-layers.json). */
@@ -24,7 +26,7 @@ export const PACK_SOURCES = {
 } as const
 
 /** Layers that answer a tap with the feature's name. */
-export const TAPPABLE_LAYERS = ['venues', 'stations', 'lines', 'lines-ferry']
+export const TAPPABLE_LAYERS = ['bars', 'venues', 'stations', 'lines', 'lines-ferry']
 
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] }
 
@@ -48,6 +50,9 @@ export function mapStyle(pack: CityPack): StyleSpecification {
       venues: src(PACK_SOURCES.venues),
       mask: { type: 'geojson', data: EMPTY },
       area: { type: 'geojson', data: EMPTY },
+      zone: { type: 'geojson', data: EMPTY },
+      bars: { type: 'geojson', data: EMPTY },
+      dots: { type: 'geojson', data: EMPTY },
     },
     layers: [
       { id: 'ground', type: 'background', paint: { 'background-color': MAP_COLORS.ground } },
@@ -100,6 +105,18 @@ export function mapStyle(pack: CityPack): StyleSpecification {
         paint: { 'line-color': MAP_COLORS.areaOutline, 'line-width': 2.5 },
       },
       {
+        id: 'zone-fill',
+        type: 'fill',
+        source: 'zone',
+        paint: { 'fill-color': ['coalesce', ['get', 'color'], MAP_COLORS.hider], 'fill-opacity': 0.18 },
+      },
+      {
+        id: 'zone-line',
+        type: 'line',
+        source: 'zone',
+        paint: { 'line-color': ['coalesce', ['get', 'color'], MAP_COLORS.hider], 'line-width': 2 },
+      },
+      {
         id: 'venues',
         type: 'circle',
         source: 'venues',
@@ -119,6 +136,34 @@ export function mapStyle(pack: CityPack): StyleSpecification {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 2.5, 14, 5, 17, 8],
           'circle-stroke-color': MAP_COLORS.bg,
           'circle-stroke-width': 1.5,
+        },
+      },
+      {
+        // Bars the hider may pick; the selected one in hider blue.
+        id: 'bars',
+        type: 'circle',
+        source: 'bars',
+        paint: {
+          'circle-color': ['case', ['boolean', ['get', 'selected'], false], MAP_COLORS.hider, MAP_COLORS.venue],
+          'circle-radius': [
+            'interpolate', ['linear'], ['zoom'],
+            11, ['case', ['boolean', ['get', 'selected'], false], 6, 3],
+            15, ['case', ['boolean', ['get', 'selected'], false], 10, 6],
+          ],
+          'circle-stroke-color': ['case', ['boolean', ['get', 'selected'], false], MAP_COLORS.text, MAP_COLORS.bg],
+          'circle-stroke-width': ['case', ['boolean', ['get', 'selected'], false], 2.5, 1],
+        },
+      },
+      {
+        // People: you (white centre) and teammates, in team colour.
+        id: 'dots',
+        type: 'circle',
+        source: 'dots',
+        paint: {
+          'circle-color': ['case', ['boolean', ['get', 'me'], false], MAP_COLORS.text, ['get', 'color']],
+          'circle-radius': ['case', ['boolean', ['get', 'me'], false], 7, 6],
+          'circle-stroke-color': ['case', ['boolean', ['get', 'me'], false], ['get', 'color'], MAP_COLORS.text],
+          'circle-stroke-width': ['case', ['boolean', ['get', 'me'], false], 4, 2],
         },
       },
     ],
