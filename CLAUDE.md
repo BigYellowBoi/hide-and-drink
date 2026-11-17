@@ -29,6 +29,20 @@ Full spec: `docs/spec.md`. Seed data: `data/`. Read only the parts relevant to t
 - Units: metres and seconds in data; display km/min.
 - Keep this file short. Update it when a decision changes.
 
+## Commands
+
+- `npm run dev`: local dev server (needs `.env.local`, see `.env.example`)
+- `npm test`: Vitest unit tests (seed data checks live in `src/lib/seed.test.ts`)
+- `npm run lint`: oxlint
+- `npm run build`: type-check and production build into `dist/`
+- CI (`.github/workflows/deploy.yml`) runs lint, test and build on every PR, and deploys `main` to GitHub Pages
+
+## Layout
+
+- `src/lib/supabase.ts`: Supabase client from `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`
+- `src/lib/seed.ts`: typed access to `data/cards.json` and `data/questions.json`
+- Vite `base` is `/hide-and-drink/` (GitHub Pages path); keep asset paths relative to it
+
 ## Current phase
 
-Phase 0: foundations (repo, Supabase project, GitHub Pages deploy, seed data). See `docs/spec.md` for the phases and their gates.
+Phase 0 scaffold done (PWA, Pages deploy, Supabase client, seed data tests). Next: Supabase schema and seed loader, then Phase 1 (lobby, join code, event log, broadcast). See `docs/spec.md` for the phases and their gates.
