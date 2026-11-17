@@ -62,6 +62,11 @@ export class GameSync {
   private readonly clock = new ServerClock()
   private readonly sequencer: EventSequencer
   private events: GameEvent[] = []
+  /**
+   * While rebuilding the log for a new team view, fetched events collect here and the screen
+   * keeps showing the old log, so it never blanks. Swapped in once the rebuild is caught up.
+   */
+  private rebuilding: GameEvent[] | null = null
   private team: Team | null = null
   private userId: string | null = null
   private status: SyncStatus = 'idle'
@@ -259,7 +264,7 @@ export class GameSync {
         // Visibility changed: start over with the new team's view of the log.
         this.team = member.team
         this.sequencer.reset(audienceFor(this.team))
-        this.events = []
+        this.rebuilding = []
         this.stale = true
         this.rejoinTopics()
         return
@@ -267,6 +272,10 @@ export class GameSync {
       this.sequencer.applyFetched(after, events)
     } while (this.syncAgain)
     this.stale = false
+    if (this.rebuilding) {
+      this.events = this.rebuilding
+      this.rebuilding = null
+    }
   }
 
   private joinTopics(): void {
@@ -332,6 +341,10 @@ export class GameSync {
   }
 
   private onApplied(event: GameEvent): void {
+    if (this.rebuilding) {
+      this.rebuilding.push(event)
+      return
+    }
     this.events = [...this.events, event]
     if (event.type === 'team_changed' && event.payload.user_id === this.userId && event.payload.team !== this.team) {
       // Our own visibility changed. resync() picks up the new team from the server.
