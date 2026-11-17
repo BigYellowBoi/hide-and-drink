@@ -20,6 +20,10 @@ export interface SyncSnapshot {
   userId: string | null
   clockOffsetMs: number
   error: string | null
+  /** User ids with the app open (presence on the game topic). Only meaningful while live. */
+  present: readonly string[]
+  /** Local time (ms) the status last left 'live', or null while live or before the first sync. */
+  staleSince: number | null
 }
 
 export { ActionError }
@@ -62,6 +66,9 @@ export class GameSync {
   private userId: string | null = null
   private status: SyncStatus = 'idle'
   private error: string | null = null
+  private present: readonly string[] = []
+  private staleSince: number | null = null
+  private wasLive = false
 
   private channels = new Map<string, { state: ChannelState | 'joining'; unsubscribe: () => void }>()
   private online = true
@@ -272,6 +279,18 @@ export class GameSync {
         unsubscribe: () => {},
       }
       this.channels.set(topic, entry)
+      // Presence rides on the shared topic only, keyed by user id.
+      const presence =
+        topic === gameTopic(this.gameId) && this.userId
+          ? {
+              key: this.userId,
+              onSync: (keys: string[]) => {
+                if (this.channels.get(topic) !== entry) return
+                this.present = [...keys].sort()
+                this.emit()
+              },
+            }
+          : undefined
       entry.unsubscribe = this.transport.subscribe(
         topic,
         (raw) => this.onBroadcast(raw),
@@ -283,6 +302,7 @@ export class GameSync {
           else this.stale = true
           this.settle()
         },
+        presence,
       )
     }
     this.settle()
@@ -353,6 +373,12 @@ export class GameSync {
   }
 
   private setStatus(status: SyncStatus): void {
+    if (status === 'live') {
+      this.wasLive = true
+      this.staleSince = null
+    } else if (this.wasLive && this.staleSince === null) {
+      this.staleSince = this.now()
+    }
     this.status = status
     this.emit()
   }
@@ -372,6 +398,8 @@ export class GameSync {
       userId: this.userId,
       clockOffsetMs: this.clock.offsetMs,
       error: this.error,
+      present: this.present,
+      staleSince: this.staleSince,
     }
   }
 }

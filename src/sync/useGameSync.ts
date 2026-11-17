@@ -11,6 +11,8 @@ const idle: SyncSnapshot = {
   userId: null,
   clockOffsetMs: 0,
   error: null,
+  present: [],
+  staleSince: null,
 }
 const noop = () => () => {}
 const getIdle = () => idle

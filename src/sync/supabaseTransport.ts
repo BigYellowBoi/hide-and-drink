@@ -62,12 +62,19 @@ export function supabaseTransport(client: SupabaseClient): SyncTransport {
       return ms
     },
 
-    subscribe(topic, onEvent, onState) {
-      const channel = client.channel(topic, { config: { private: true } })
+    subscribe(topic, onEvent, onState, presence) {
+      const channel = client.channel(topic, {
+        config: { private: true, ...(presence ? { presence: { key: presence.key } } : {}) },
+      })
       channel.on('broadcast', { event: 'event' }, (msg) => onEvent(msg.payload))
+      if (presence) {
+        channel.on('presence', { event: 'sync' }, () => presence.onSync(Object.keys(channel.presenceState())))
+      }
       channel.subscribe((status) => {
         const state: ChannelState =
           status === 'SUBSCRIBED' ? 'subscribed' : status === 'CLOSED' ? 'closed' : 'error'
+        // Presence is best effort: a failed track only greys out our dot for others.
+        if (state === 'subscribed' && presence) void channel.track({ at: new Date().toISOString() }).catch(() => {})
         onState(state)
       })
       return () => {

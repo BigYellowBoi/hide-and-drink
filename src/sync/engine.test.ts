@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ActionError, GameSync } from './engine'
-import type { ActionResult, ChannelState, SyncTransport } from './transport'
+import type { ActionResult, ChannelState, PresenceOptions, SyncTransport } from './transport'
 import type { GameEvent, Team, Visibility } from './types'
 
 const GAME = 'game-1'
@@ -10,7 +10,10 @@ const ME = 'user-me'
 class FakeServer implements SyncTransport {
   log: GameEvent[] = []
   team: Team | null = 'seekers'
-  topics = new Map<string, { onEvent: (raw: unknown) => void; onState: (s: ChannelState) => void }>()
+  topics = new Map<
+    string,
+    { onEvent: (raw: unknown) => void; onState: (s: ChannelState) => void; presence?: PresenceOptions }
+  >()
   fetchCount = 0
   failFetch = false
   serverOffset = 5000
@@ -31,8 +34,13 @@ class FakeServer implements SyncTransport {
   async serverTime() {
     return Date.now() + this.serverOffset
   }
-  subscribe(topic: string, onEvent: (raw: unknown) => void, onState: (s: ChannelState) => void) {
-    this.topics.set(topic, { onEvent, onState })
+  subscribe(
+    topic: string,
+    onEvent: (raw: unknown) => void,
+    onState: (s: ChannelState) => void,
+    presence?: PresenceOptions,
+  ) {
+    this.topics.set(topic, { onEvent, onState, presence })
     return () => this.topics.delete(topic)
   }
   async call(fn: string, args: Record<string, unknown>) {
@@ -287,6 +295,44 @@ describe('GameSync', () => {
     topic.onEvent({ nonsense: true })
     topic.onEvent(null)
     expect(sync.getSnapshot().events).toHaveLength(0)
+    sync.stop()
+  })
+
+  it('tracks presence on the shared topic only, keyed by user id', async () => {
+    const server = new FakeServer()
+    const sync = await started(server)
+    expect(server.topics.get(`game:${GAME}`)?.presence?.key).toBe(ME)
+    expect(server.topics.get(`game:${GAME}:seekers`)?.presence).toBeUndefined()
+    server.topics.get(`game:${GAME}`)?.presence?.onSync(['user-b', ME])
+    expect(sync.getSnapshot().present).toEqual(['user-b', ME].sort())
+    sync.stop()
+  })
+
+  it('ignores presence from a topic it has since left', async () => {
+    const server = new FakeServer()
+    const sync = await started(server)
+    const old = server.topics.get(`game:${GAME}`)?.presence
+    sync.setOnline(false)
+    sync.setOnline(true) // rejoins: new channel entries
+    old?.onSync(['ghost'])
+    expect(sync.getSnapshot().present).toEqual([])
+    sync.stop()
+  })
+
+  it('records when it stopped being live and clears it on recovery', async () => {
+    const server = new FakeServer()
+    const sync = await started(server)
+    expect(sync.getSnapshot().staleSince).toBeNull()
+    const t = Date.now()
+    sync.setOnline(false)
+    expect(sync.getSnapshot().staleSince).toBe(t)
+    await vi.advanceTimersByTimeAsync(5000)
+    sync.setOnline(true)
+    expect(sync.getSnapshot().staleSince).toBe(t) // still catching up
+    server.ackAll()
+    await flush()
+    expect(sync.getSnapshot().status).toBe('live')
+    expect(sync.getSnapshot().staleSince).toBeNull()
     sync.stop()
   })
 })

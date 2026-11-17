@@ -7,6 +7,8 @@ import { describeCode, describeError } from '../lobby/messages'
 import { startBlockers, type LobbyPlayer, type LobbyState } from '../lobby/state'
 import { ConfigEditor } from './ConfigEditor'
 import { JoinCode } from './JoinCode'
+import type { Presence } from '../sync/presence'
+import { PresenceDot } from './PresenceDot'
 
 const TEAMS: { id: Team; label: string }[] = [
   { id: 'hiders', label: 'Hiders' },
@@ -19,9 +21,10 @@ interface Props {
   lobby: LobbyState
   userId: string | null
   canAct: boolean
+  presence: (userId: string) => Presence
 }
 
-export function Lobby({ sync, lobby, userId, canAct }: Props) {
+export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [areas, setAreas] = useState<PlayAreaSummary[] | null>(null)
@@ -69,6 +72,7 @@ export function Lobby({ sync, lobby, userId, canAct }: Props) {
   const renderPlayer = (p: LobbyPlayer) => (
     <li key={p.userId} className="player">
       <span className="player-name">
+        <PresenceDot online={presence(p.userId)} />
         {p.name}
         {p.isHost && <span className="badge">host</span>}
         {p.userId === userId && <span className="badge you">you</span>}

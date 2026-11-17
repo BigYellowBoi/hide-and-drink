@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { GameSync } from '../sync/engine'
 import type { LobbyState } from '../lobby/state'
+import type { Presence } from '../sync/presence'
+import { PresenceDot } from './PresenceDot'
 
 const mmss = (ms: number) => {
   const s = Math.max(0, Math.ceil(ms / 1000))
@@ -8,7 +10,14 @@ const mmss = (ms: number) => {
 }
 
 /** Placeholder after start until the phase 2 map screen: hiding countdown on server time. */
-export function Started({ sync, lobby, userId }: { sync: GameSync; lobby: LobbyState; userId: string | null }) {
+interface Props {
+  sync: GameSync
+  lobby: LobbyState
+  userId: string | null
+  presence: (userId: string) => Presence
+}
+
+export function Started({ sync, lobby, userId, presence }: Props) {
   const [now, setNow] = useState(() => sync.serverNow())
   useEffect(() => {
     const t = setInterval(() => setNow(sync.serverNow()), 250)
@@ -34,7 +43,14 @@ export function Started({ sync, lobby, userId }: { sync: GameSync; lobby: LobbyS
           {(['hiders', 'seekers'] as const).map((t) => (
             <li key={t}>
               <strong>{t === 'hiders' ? 'Hiders' : 'Seekers'}:</strong>{' '}
-              {lobby.players.filter((p) => p.team === t).map((p) => p.name).join(', ')}
+              {lobby.players
+                .filter((p) => p.team === t)
+                .map((p) => (
+                  <span key={p.userId} className="started-player">
+                    <PresenceDot online={presence(p.userId)} />
+                    {p.name}
+                  </span>
+                ))}
             </li>
           ))}
         </ul>

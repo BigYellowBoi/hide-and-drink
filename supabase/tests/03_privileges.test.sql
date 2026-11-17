@@ -27,7 +27,7 @@ select is(
     order by 1
   ),
   array[
-    'can_join_topic', 'can_see', 'create_game', 'is_player', 'join_game',
+    'can_join_topic', 'can_see', 'can_use_presence', 'create_game', 'is_player', 'join_game',
     'my_team', 'server_time', 'set_play_area', 'set_team', 'start_game',
     'topic_for', 'update_config'
   ],
