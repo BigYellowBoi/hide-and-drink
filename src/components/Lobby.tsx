@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import type { GameSync } from '../sync/engine'
 import type { Team } from '../sync/types'
 import { supabase } from '../lib/supabase'
@@ -10,6 +10,9 @@ import { JoinCode } from './JoinCode'
 import type { Presence } from '../sync/presence'
 import { PresenceDot } from './PresenceDot'
 import { SlideToConfirm } from './SlideToConfirm'
+import { LazyGameMap, LazyPlayAreaEditor } from './lazyMap'
+import type { PlayAreaDraft } from './PlayAreaEditor'
+import { areaKm2, formatKm2 } from '../map/playArea'
 
 const TEAMS: { id: Team; label: string }[] = [
   { id: 'hiders', label: 'Hiders' },
@@ -29,18 +32,24 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [areas, setAreas] = useState<PlayAreaSummary[] | null>(null)
+  /** Open editor: 'new' to draw from scratch, 'current' to edit the chosen area. */
+  const [editing, setEditing] = useState<'new' | 'current' | null>(null)
 
   const isHost = userId !== null && userId === lobby.hostId
   const me = lobby.players.find((p) => p.userId === userId)
   const blockers = startBlockers(lobby)
   const disabled = busy || !canAct
 
+  // Everyone loads the saved areas (to preview the chosen one); reload when the host picks one
+  // this phone hasn't seen yet (just saved).
+  const current = areas?.find((a) => a.id === lobby.playAreaId) ?? null
+  const missing = areas !== null && lobby.playAreaId !== null && current === null
   useEffect(() => {
-    if (!isHost || !supabase || areas || !canAct) return
+    if (!supabase || (areas && !missing) || !canAct) return
     listPlayAreas(supabase, lobby.city)
       .then(setAreas)
       .catch((e: unknown) => setErr(describeError(e)))
-  }, [isHost, lobby.city, areas, canAct])
+  }, [lobby.city, areas, missing, canAct])
 
   const run = async (fn: () => Promise<unknown>): Promise<boolean> => {
     setBusy(true)
@@ -62,6 +71,19 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
     )
 
   const unassigned = lobby.players.filter((p) => !p.team)
+
+  const savePlayArea = async (d: PlayAreaDraft) => {
+    const ok = await run(() =>
+      sync.action('save_play_area', {
+        p_name: d.name,
+        p_geojson: d.area,
+        p_play_area_id: d.overwriteId,
+        p_source: d.source,
+      }),
+    )
+    if (ok) setAreas(null) // refetch with the new polygon
+    return ok
+  }
 
   /** Tap a name to move that player to the other team: your own name, or anyone's if you host. */
   const canMove = (p: LobbyPlayer) => p.userId === userId || isHost
@@ -177,7 +199,44 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
         ) : (
           <p>{lobby.playAreaName ?? <span className="muted">Host hasn't chosen yet</span>}</p>
         )}
+        {current?.area && (
+          <>
+            <Suspense fallback={<div className="game-map lobby-map" />}>
+              <LazyGameMap city={lobby.city} playArea={current.area} className="lobby-map" />
+            </Suspense>
+            <p className="muted small-note">
+              {formatKm2(areaKm2(current.area))} · bars in yellow, stations in white
+            </p>
+          </>
+        )}
+        {isHost && (
+          <div className="row area-actions">
+            {current?.area && (
+              <button className="small secondary" disabled={disabled} onClick={() => setEditing('current')}>
+                Edit on map
+              </button>
+            )}
+            <button className="small secondary" disabled={disabled} onClick={() => setEditing('new')}>
+              Draw or import new
+            </button>
+          </div>
+        )}
       </section>
+
+      {editing && isHost && (
+        <Suspense fallback={<div className="editor" />}>
+          <LazyPlayAreaEditor
+            city={lobby.city}
+            initial={editing === 'current' ? (current?.area ?? null) : null}
+            initialName={editing === 'current' ? (current?.name ?? '') : ''}
+            ownedId={editing === 'current' && current && current.createdBy === userId ? current.id : null}
+            busy={busy}
+            canAct={canAct}
+            onSave={savePlayArea}
+            onClose={() => setEditing(null)}
+          />
+        </Suspense>
+      )}
 
       <details className="card">
         <summary>

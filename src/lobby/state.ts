@@ -1,4 +1,5 @@
 import type { GameEvent, Team } from '../sync/types'
+import { asAreaCollection, type AreaCollection } from '../map/playArea'
 
 export interface LobbyPlayer {
   userId: string
@@ -13,6 +14,8 @@ export interface StartedRound {
   startedAt: number
   hidingPeriodS: number
   playAreaName: string | null
+  /** Polygon snapshotted at start (null if the event had none). */
+  playArea: AreaCollection | null
 }
 
 export type GameStatus = 'lobby' | 'hiding' | 'seeking' | 'ended'
@@ -123,6 +126,7 @@ export function applyLobbyEvent(state: LobbyState, e: GameEvent): LobbyState {
           startedAt: Number.isNaN(startedAt) ? Date.parse(e.created_at) : startedAt,
           hidingPeriodS: typeof p.hiding_period_s === 'number' ? p.hiding_period_s : 0,
           playAreaName: str(area.name),
+          playArea: asAreaCollection(area.geojson),
         },
       }
     }

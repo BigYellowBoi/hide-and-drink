@@ -7,7 +7,9 @@ import zipfile
 from pathlib import Path
 
 import pandas as pd
-from shapely.geometry import Point
+import shapely
+from shapely.geometry import LineString, Point
+from shapely.ops import unary_union
 
 from pipeline.geo import Projector, clip, tidy
 
@@ -133,6 +135,73 @@ def build_layer(layer: dict, stops, modes, area, prepared, projector: Projector)
             "layer": layer["id"],
             "name": s["name"],
             "geometry": tidy(point, projector, 0),
+            "props": props,
+        })
+    return features
+
+
+# ---------------------------------------------------------------------------
+# Lines: one feature per route (grouped by mode + short name), from shapes.txt
+# ---------------------------------------------------------------------------
+
+def route_shapes(zip_path: Path, wanted_modes: set[str]) -> list[dict]:
+    """Routes of the wanted modes with their distinct shapes as LineStrings."""
+    with zipfile.ZipFile(zip_path) as z:
+        routes = pd.read_csv(z.open("routes.txt"), dtype=str, keep_default_na=False)
+        trips = pd.read_csv(z.open("trips.txt"), dtype=str, keep_default_na=False,
+                            usecols=lambda c: c in ("route_id", "shape_id"))
+        routes["mode"] = [_extended(int(t)) for t in routes.route_type]
+        routes = routes[routes["mode"].isin(wanted_modes)]
+        shape_ids: dict[str, set[str]] = {}
+        for r, s in zip(trips.route_id, trips.get("shape_id", pd.Series([""] * len(trips)))):
+            if s and r in set(routes.route_id):
+                shape_ids.setdefault(r, set()).add(s)
+        needed = set().union(*shape_ids.values()) if shape_ids else set()
+        pts: dict[str, list] = {}
+        for chunk in pd.read_csv(z.open("shapes.txt"), dtype=str, chunksize=1_000_000,
+                                 usecols=["shape_id", "shape_pt_lat", "shape_pt_lon", "shape_pt_sequence"]):
+            chunk = chunk[chunk.shape_id.isin(needed)]
+            for sid, lat, lon, seq in zip(chunk.shape_id, chunk.shape_pt_lat, chunk.shape_pt_lon,
+                                          chunk.shape_pt_sequence):
+                pts.setdefault(sid, []).append((int(seq), float(lon), float(lat)))
+    lines = {sid: LineString([(x, y) for _, x, y in sorted(p)]) for sid, p in pts.items() if len(p) >= 2}
+    out = []
+    for _, r in routes.iterrows():
+        geoms = [lines[s] for s in sorted(shape_ids.get(r.route_id, ())) if s in lines]
+        if geoms:
+            out.append({"route_id": r.route_id, "short": r.get("route_short_name", ""),
+                        "long": r.get("route_long_name", ""), "mode": r["mode"],
+                        "color": r.get("route_color", ""), "lines": geoms})
+    return out
+
+
+def build_line_layer(layer: dict, routes: list[dict], area, prepared, projector: Projector,
+                     simplify_m: float) -> list[dict]:
+    """Group routes by (mode, short name), union their shapes, clip to the area."""
+    groups: dict[tuple[str, str], list[dict]] = {}
+    for r in routes:
+        key = (r["mode"], r["short"] or r["long"] or r["route_id"])
+        groups.setdefault(key, []).append(r)
+    features = []
+    for (mode, short), rs in sorted(groups.items()):
+        merged = clip(shapely.line_merge(unary_union([g for r in rs for g in r["lines"]])), area, prepared)
+        if merged is None:
+            continue
+        geom = tidy(merged, projector, layer.get("simplify_m", simplify_m))
+        if geom is None:
+            continue
+        color = next((r["color"] for r in rs if re.fullmatch(r"[0-9A-Fa-f]{6}", r["color"] or "")), "")
+        long_names = sorted({r["long"] for r in rs if r["long"]})
+        props = {"mode": mode, "route_ids": sorted(r["route_id"] for r in rs)}
+        if color:
+            props["color"] = f"#{color.upper()}"
+        if long_names and long_names[0] != short:
+            props["long_names"] = long_names
+        features.append({
+            "id": f"gtfs:line/{mode}/{re.sub(r'[^A-Za-z0-9]+', '-', short).strip('-').lower()}",
+            "layer": layer["id"],
+            "name": short,
+            "geometry": geom,
             "props": props,
         })
     return features

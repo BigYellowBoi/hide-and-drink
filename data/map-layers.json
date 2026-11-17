@@ -46,6 +46,14 @@
       "merge_same_name_within_m": 300
     },
     {
+      "id": "gtfs:lines",
+      "label": "Transit lines",
+      "from": "gtfs",
+      "geometry": "line",
+      "modes": ["rail", "metro", "tram", "ferry"],
+      "simplify_m": 5
+    },
+    {
       "id": "gtfs:ferry stops",
       "label": "Ferry terminals",
       "from": "gtfs",
@@ -86,6 +94,17 @@
         }
       ],
       "none": [{ "all": { "area": ["yes"] } }]
+    },
+    {
+      "id": "osm:water",
+      "label": "Water (base map)",
+      "from": "osm",
+      "geometry": "polygon",
+      "simplify_m": 5,
+      "rules": [
+        { "all": { "natural": ["water"] } },
+        { "all": { "waterway": ["riverbank"] } }
+      ]
     },
     { "id": "osm:leisure=park", "label": "Parks", "from": "osm", "geometry": "point", "require_name": true, "rules": [{ "all": { "leisure": ["park"] } }] },
     { "id": "osm:tourism=museum", "label": "Museums", "from": "osm", "geometry": "point", "require_name": true, "rules": [{ "all": { "tourism": ["museum"] } }] },

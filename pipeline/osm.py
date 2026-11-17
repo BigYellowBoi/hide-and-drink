@@ -79,7 +79,8 @@ def overpass_query(layers: list[dict], area) -> str:
 # Sources
 # ---------------------------------------------------------------------------
 
-AREA_HINTS = {"building", "leisure", "amenity", "tourism", "landuse", "shop", "craft", "area"}
+AREA_HINTS = {"building", "leisure", "amenity", "tourism", "landuse", "shop", "craft", "area", "natural", "water",
+              "waterway"}
 
 
 def _way_is_area(tags: dict, coords) -> bool:
@@ -242,6 +243,29 @@ def build_line_layer(layer: dict, elements: list[dict], area, prepared, projecto
     return features
 
 
+def build_polygon_layer(layer: dict, elements: list[dict], area, prepared, projector: Projector,
+                        simplify_m: float) -> list[dict]:
+    """Areas (e.g. water) clipped to the pack extent; unnamed allowed unless require_name."""
+    features = []
+    for el in elements:
+        if el["kind"] != "area" or not layer_matches(el["tags"], layer):
+            continue
+        g = clip(el["geom"].buffer(0) if not el["geom"].is_valid else el["geom"], area, prepared)
+        if g is None:
+            continue
+        g = tidy(g, projector, layer.get("simplify_m", simplify_m))
+        if g is None or g.area == 0:
+            continue
+        features.append({
+            "id": f"osm:{el['id']}",
+            "layer": layer["id"],
+            "name": el["tags"].get("name", ""),
+            "geometry": g,
+            "props": {k: el["tags"][k] for k in ("natural", "water", "waterway") if k in el["tags"]},
+        })
+    return features
+
+
 def apply_venue_edits(features: list[dict], edits: dict, area, prepared) -> list[dict]:
     excluded = set(edits.get("exclude", []))
     out = [f for f in features if f["id"] not in excluded]
@@ -266,6 +290,8 @@ def build_layers(layers: list[dict], elements: list[dict], area, prepared, proje
     for layer in layers:
         if layer["geometry"] == "line":
             feats = build_line_layer(layer, elements, area, prepared, projector, simplify_m)
+        elif layer["geometry"] == "polygon":
+            feats = build_polygon_layer(layer, elements, area, prepared, projector, simplify_m)
         else:
             feats = build_point_layer(layer, elements, area, prepared, projector)
         if layer["id"] == "venues":
