@@ -443,91 +443,130 @@ button.small {
   display: block;
 }
 
-.team-picker {
+.team-hint {
+  margin: 0 0 12px;
+}
+
+.team-columns {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
 
-.team-btn {
-  min-height: 64px;
-  font-family: var(--font-display);
-  font-size: 17px;
+.team-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px 8px;
   border-radius: var(--r-card);
-  background: transparent;
-  color: var(--text);
   border: 2px solid var(--line);
 }
 
-.team-btn.selected:disabled {
-  opacity: 1;
+.team-col.team-hiders {
+  border-color: rgb(91 180 240 / 0.45);
 }
 
-.team-hiders.team-btn.selected {
-  background: var(--hider);
-  border-color: var(--hider);
-  color: var(--hider-ink);
+.team-col.team-seekers {
+  border-color: rgb(255 107 111 / 0.45);
 }
 
-.team-seekers.team-btn.selected {
-  background: var(--seeker);
-  border-color: var(--seeker);
-  color: var(--seeker-ink);
+.team-col h3,
+.team-unassigned h3 {
+  margin: 0 4px 2px;
 }
 
-.team-list ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.team-list h3::before {
-  content: '';
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  margin-right: 8px;
-  border-radius: 50%;
-  background: var(--line);
-  vertical-align: 1px;
-}
-
-.team-list.team-hiders h3 {
+.team-col.team-hiders h3 {
   color: var(--hider);
 }
 
-.team-list.team-hiders h3::before {
-  background: var(--hider);
-}
-
-.team-list.team-seekers h3 {
+.team-col.team-seekers h3 {
   color: var(--seeker-on-dark);
 }
 
-.team-list.team-seekers h3::before {
-  background: var(--seeker-on-dark);
-}
-
-.team-list h3 .muted {
+.team-col h3 .muted,
+.team-unassigned h3 .muted {
   font-weight: 600;
   margin-left: 4px;
+}
+
+.team-col ul,
+.team-unassigned ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.team-join {
+  margin-top: auto;
+  width: 100%;
+}
+
+.team-unassigned {
+  margin-top: 16px;
 }
 
 .player {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 12px;
-  margin-bottom: 4px;
+  flex-wrap: wrap;
+  row-gap: 2px;
+  column-gap: 4px;
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 10px;
   border-radius: 12px;
   background: var(--surface-2);
-  min-height: 48px;
+  color: var(--text);
+  font-weight: 600;
+  text-align: left;
+}
+
+button.player {
+  border: 2px solid transparent;
+  font-weight: 600;
+}
+
+button.player-me {
+  border-color: var(--text);
+}
+
+.team-hiders button.player-me {
+  border-color: var(--hider);
+}
+
+.team-seekers button.player-me {
+  border-color: var(--seeker-on-dark);
+}
+
+.player-badges {
+  display: flex;
+  gap: 4px;
+  flex-basis: 100%;
+  padding-left: 12px;
 }
 
 .player-name {
-  overflow-wrap: anywhere;
-  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-unassigned .player {
+  justify-content: space-between;
+}
+
+.player-who {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 4px;
+  min-width: 0;
 }
 
 .player-moves {
@@ -537,12 +576,11 @@ button.small {
 }
 
 .badge {
+  flex-shrink: 0;
   font-size: 12px;
   font-weight: 700;
   border-radius: var(--r-pill);
-  padding: 2px 8px;
-  margin-left: 6px;
-  vertical-align: middle;
+  padding: 1px 7px;
   box-shadow: inset 0 0 0 1.5px var(--line);
   color: var(--text-muted);
 }
@@ -657,6 +695,55 @@ details.card > summary h2 {
   border-radius: var(--r-input);
   padding: 12px 14px;
   margin-top: 16px;
+}
+
+/* Slide to confirm: irreversible actions. */
+.slide {
+  position: relative;
+  height: 64px;
+  margin-top: 16px;
+  border-radius: var(--r-pill);
+  background: var(--text);
+  color: var(--bg);
+  display: grid;
+  place-items: center;
+  user-select: none;
+  touch-action: none;
+}
+
+.slide-disabled {
+  opacity: 0.4;
+}
+
+.slide-label {
+  font-weight: 700;
+  font-size: 17px;
+  padding-left: 48px;
+  pointer-events: none;
+}
+
+.slide-knob {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 56px;
+  height: 56px;
+  min-height: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--text);
+  cursor: grab;
+  touch-action: none;
+  transition: transform 0.25s ease-out;
+}
+
+.slide-knob:disabled {
+  opacity: 1;
+  cursor: default;
 }
 
 .footer-actions {

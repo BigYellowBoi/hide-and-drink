@@ -9,6 +9,7 @@ import { ConfigEditor } from './ConfigEditor'
 import { JoinCode } from './JoinCode'
 import type { Presence } from '../sync/presence'
 import { PresenceDot } from './PresenceDot'
+import { SlideToConfirm } from './SlideToConfirm'
 
 const TEAMS: { id: Team; label: string }[] = [
   { id: 'hiders', label: 'Hiders' },
@@ -28,7 +29,6 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [areas, setAreas] = useState<PlayAreaSummary[] | null>(null)
-  const [confirmStart, setConfirmStart] = useState(false)
 
   const isHost = userId !== null && userId === lobby.hostId
   const me = lobby.players.find((p) => p.userId === userId)
@@ -41,12 +41,6 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
       .then(setAreas)
       .catch((e: unknown) => setErr(describeError(e)))
   }, [isHost, lobby.city, areas, canAct])
-
-  useEffect(() => {
-    if (!confirmStart) return
-    const t = setTimeout(() => setConfirmStart(false), 4000)
-    return () => clearTimeout(t)
-  }, [confirmStart])
 
   const run = async (fn: () => Promise<unknown>): Promise<boolean> => {
     setBusy(true)
@@ -69,22 +63,36 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
 
   const unassigned = lobby.players.filter((p) => !p.team)
 
-  const renderPlayer = (p: LobbyPlayer) => (
-    <li key={p.userId} className="player">
-      <span className="player-name">
-        <PresenceDot online={presence(p.userId)} />
-        {p.name}
-        {p.isHost && <span className="badge">host</span>}
-        {p.userId === userId && <span className="badge you">you</span>}
-      </span>
-      {isHost && (
-        <span className="player-moves">
-          {(p.team ? [other(p.team)] : TEAMS.map((t) => t.id)).map((t) => (
-            <button key={t} className="small secondary" disabled={disabled} onClick={() => setTeam(t, p)}>
-              → {t === 'hiders' ? 'Hiders' : 'Seekers'}
-            </button>
-          ))}
+  /** Tap a name to move that player to the other team: your own name, or anyone's if you host. */
+  const canMove = (p: LobbyPlayer) => p.userId === userId || isHost
+  const move = (p: LobbyPlayer, team: Team) => setTeam(team, p.userId === userId ? undefined : p)
+
+  const nameContent = (p: LobbyPlayer) => (
+    <>
+      <PresenceDot online={presence(p.userId)} />
+      <span className="player-name">{p.name}</span>
+      {(p.isHost || p.userId === userId) && (
+        <span className="player-badges">
+          {p.userId === userId && <span className="badge you">you</span>}
+          {p.isHost && <span className="badge">host</span>}
         </span>
+      )}
+    </>
+  )
+
+  const renderMember = (p: LobbyPlayer) => (
+    <li key={p.userId}>
+      {canMove(p) && p.team ? (
+        <button
+          className={`player player-tap${p.userId === userId ? ' player-me' : ''}`}
+          disabled={disabled}
+          aria-label={`${p.name}: move to ${p.team === 'hiders' ? 'Seekers' : 'Hiders'}`}
+          onClick={() => move(p, other(p.team!))}
+        >
+          {nameContent(p)}
+        </button>
+      ) : (
+        <span className="player">{nameContent(p)}</span>
       )}
     </li>
   )
@@ -94,41 +102,54 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
       {lobby.code && <JoinCode code={lobby.code} />}
 
       <section className="card">
-        <h2>Your team</h2>
-        <div className="team-picker">
-          {TEAMS.map((t) => (
-            <button
-              key={t.id}
-              className={`team-btn team-${t.id}${me?.team === t.id ? ' selected' : ''}`}
-              aria-pressed={me?.team === t.id}
-              disabled={disabled || me?.team === t.id}
-              onClick={() => setTeam(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
+        <h2>Teams</h2>
+        <p className="muted small-note team-hint">
+          {isHost ? 'Tap a name to switch their team.' : 'Tap your name to switch team.'}
+        </p>
+        <div className="team-columns">
+          {TEAMS.map((t) => {
+            const list = lobby.players.filter((p) => p.team === t.id)
+            return (
+              <div key={t.id} className={`team-col team-${t.id}`}>
+                <h3>
+                  {t.label} <span className="muted">{list.length}</span>
+                </h3>
+                <ul>{list.map(renderMember)}</ul>
+                {me?.team !== t.id && (
+                  <button className="small secondary team-join" disabled={disabled} onClick={() => setTeam(t.id)}>
+                    Join {t.label}
+                  </button>
+                )}
+              </div>
+            )
+          })}
         </div>
-      </section>
-
-      <section className="card">
-        <h2>Players ({lobby.players.length})</h2>
-        {TEAMS.map((t) => {
-          const list = lobby.players.filter((p) => p.team === t.id)
-          return (
-            <div key={t.id} className={`team-list team-${t.id}`}>
-              <h3>
-                {t.label} <span className="muted">{list.length}</span>
-              </h3>
-              {list.length ? <ul>{list.map(renderPlayer)}</ul> : <p className="muted">Nobody yet</p>}
-            </div>
-          )
-        })}
         {unassigned.length > 0 && (
-          <div className="team-list">
+          <div className="team-unassigned">
             <h3>
               No team <span className="muted">{unassigned.length}</span>
             </h3>
-            <ul>{unassigned.map(renderPlayer)}</ul>
+            <ul>
+              {unassigned.map((p) => (
+                <li key={p.userId} className="player">
+                  <span className="player-who">{nameContent(p)}</span>
+                  {isHost && p.userId !== userId && (
+                    <span className="player-moves">
+                      {TEAMS.map((t) => (
+                        <button
+                          key={t.id}
+                          className="small secondary"
+                          disabled={disabled}
+                          onClick={() => move(p, t.id)}
+                        >
+                          → {t.label}
+                        </button>
+                      ))}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </section>
@@ -183,17 +204,11 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
             ) : (
               <p className="muted">Teams, settings and play area lock when you start.</p>
             )}
-            <button
-              className={`wide${confirmStart ? ' danger' : ''}`}
+            <SlideToConfirm
+              label="Slide to lock and start"
               disabled={disabled || blockers.length > 0}
-              onClick={() => {
-                if (!confirmStart) return setConfirmStart(true)
-                setConfirmStart(false)
-                void run(() => sync.action('start_game'))
-              }}
-            >
-              {confirmStart ? 'Tap again to lock and start' : 'Lock and start'}
-            </button>
+              onConfirm={() => void run(() => sync.action('start_game'))}
+            />
           </>
         ) : (
           <p className="muted">Waiting for the host to start.</p>
