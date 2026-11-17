@@ -239,6 +239,9 @@ describe('GameSync', () => {
     const sync = await started(server)
     expect(sync.getSnapshot().events.map((e) => e.seq)).toEqual([1])
     server.team = 'hiders'
+    // The screen must never go blank mid-switch (it used to flash "Loading game…").
+    const seen: number[][] = []
+    sync.subscribe(() => seen.push(sync.getSnapshot().events.map((e) => e.seq)))
     server.deliver(server.append('team_changed', 'all', { user_id: ME, team: 'hiders' }))
     await flush()
     expect(server.topics.has(`game:${GAME}:hiders`)).toBe(true)
@@ -246,6 +249,9 @@ describe('GameSync', () => {
     await flush()
     expect(sync.getSnapshot().team).toBe('hiders')
     expect(sync.getSnapshot().events.map((e) => e.seq)).toEqual([1, 2, 3])
+    expect(seen.every((seqs) => seqs.length > 0)).toBe(true)
+    // Old view until the new one is complete, then one swap: no partial logs in between.
+    expect(seen.filter((seqs) => seqs.join() !== '1,3' && seqs.join() !== '1' && seqs.join() !== '1,2,3')).toEqual([])
     sync.stop()
   })
 
