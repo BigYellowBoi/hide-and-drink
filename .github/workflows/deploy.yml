@@ -27,6 +27,14 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
+      # Database: start a real local Supabase stack, apply every migration, run pgTAP tests.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start local Supabase (applies all migrations)
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta
+      - name: Database tests
+        run: supabase test db
       - run: npm run build
         env:
           # Set under Settings > Secrets and variables > Actions > Variables
