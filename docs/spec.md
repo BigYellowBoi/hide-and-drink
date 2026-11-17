@@ -4,7 +4,7 @@ Source of truth for building the app. The shared roadmap doc is a read-only over
 
 ## 1. Game flow
 
-1. Host creates a lobby and gets a 6-character join code + QR.
+1. Host creates a lobby and gets a 4-letter join code + QR.
 2. Host draws the play area (polygon) or loads a saved one (`data/play-areas/`).
 3. Host sets config (defaults in `data/config.json`) and builds the deck from the card library (+/- copies per card, presets).
 4. Players join with code + name and pick Hiders or Seekers. Host can move players.

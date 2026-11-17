@@ -78,9 +78,9 @@ export function SyncCheck() {
             </button>
           </div>
           <div className="row">
-            <input placeholder="Code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={6} size={8} />
+            <input placeholder="Code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={4} size={6} />
             <button
-              disabled={busy || !name.trim() || code.length !== 6}
+              disabled={busy || !name.trim() || code.length !== 4}
               onClick={() => run(async () => enter((await joinGame(transport, code, name)).game_id))}
             >
               Join
