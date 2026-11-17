@@ -17,9 +17,9 @@ Visual source of truth for the app. Decided 17 Nov 2026. Clickable mockups of ev
 | --- | --- | --- |
 | `public/wordmark.svg` | "hide", red plus square, "drink" in white bold lowercase | Use instead of typing "Hide + Drink" as a heading (alt text "Hide + Drink"). About 240 px wide on Home, on dark backgrounds only |
 | `public/mark.svg` | The red square with a white plus on its own | Small spaces: tab title, loading spinner, compact headers |
-| `public/logo.svg` | Navy circle, red mountain, grey ground (cropped on the circle) | App icon, favicon, Home hero. On navy always show it as its own grey tile with ~24% corner radius |
+| `public/logo.svg` | Navy bottle with a white "O" on a red label, on white with a light grey ground band | App icon, favicon, Home hero. The bottle is the same navy as the app background, so on navy always show it as its own tile with ~24% corner radius |
 
-PWA icons in `public/` are rendered from `logo.svg`.
+PWA icons in `public/` are rendered from `logo.svg` (`maskable-512.png` from a scaled-down copy so the bottle stays inside the safe zone).
 
 The wordmark's real font is **Helvetica Neue LT Pro** (bold), which is licensed and not in the repo. `wordmark.svg` is a close copy drawn as outlines in Liberation Sans Bold. Replace it with an outlined SVG export of the original artwork when available. Never set the wordmark as live text; the UI fonts below are for everything else.
 
