@@ -2,8 +2,8 @@
   "schema_version": 1,
   "game_size": "small",
   "hiding_zone": {
-    "bar_radius_m": 200,
-    "freeze_when_seeker_within_m": 200,
+    "bar_radius_m": 100,
+    "freeze_when_seeker_within_m": 100,
     "station_zone": {
       "enabled": null,
       "radius_m": 805,

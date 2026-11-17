@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { behaviours, cards, categories, copiesByCategory, deckSize, questionTypes } from './seed'
 
 describe('seed card data', () => {
-  it('has the 83-card first-game deck', () => {
-    expect(deckSize()).toBe(83)
+  it('has the 81-card first-game deck', () => {
+    expect(deckSize()).toBe(81)
   })
 
   it('splits copies across categories as in the first game', () => {
-    expect(copiesByCategory()).toEqual({ powerup: 12, time_bonus: 42, drink: 5, curse: 24 })
+    expect(copiesByCategory()).toEqual({ powerup: 12, time_bonus: 42, drink: 5, curse: 22 })
   })
 
   it('uses only known categories and behaviours', () => {
@@ -20,6 +20,12 @@ describe('seed card data', () => {
 
   it('has unique card ids', () => {
     expect(new Set(cards.map((c) => c.id)).size).toBe(cards.length)
+  })
+
+  it('has text for every card in the deck', () => {
+    for (const c of cards.filter((c) => c.active && c.copies > 0)) {
+      expect(c.text, c.id).toBeTruthy()
+    }
   })
 
   it('gives every curse a veto flag', () => {

@@ -15,8 +15,8 @@ Source of truth for building the app. The shared roadmap doc is a read-only over
 ## 2. Rules (AMB Hide & Drink 2026)
 
 - Base rules: official Jet Lag Hide and Seek, **small game** (yellow text on cards).
-- Hider picks a bar; may hide inside it or outdoors within **200 m** of it, but not in any other building.
-- Hider can't move while a seeker is inside the 200 m circle; otherwise free inside it.
+- Hider picks a bar; may hide inside it or outdoors within **100 m** of it, but not in any other building.
+- Hider can't move while a seeker is inside the 100 m circle; otherwise free inside it.
 - Curse casting costs: ignore printed costs unless inherent to the curse. Cost is **Free**, **Drink** or **Shot**.
 - Seekers can veto curses not marked Can't Veto: locked at a bar for 10 min and each seeker drinks. Each veto used adds 10 min to the next veto.
 - No reply to a reasonable request within **5 min** = one shot for that team, unless the request naturally takes longer.
@@ -28,8 +28,8 @@ Source of truth for building the app. The shared roadmap doc is a read-only over
 
 | Rule | App behaviour |
 | --- | --- |
-| 200 m bar zone | Hiding zone = 200 m circle around the chosen bar. A bar stays possible for seekers while any part of its circle overlaps the remaining area. |
-| Freeze when a seeker is within 200 m | Server compares seekers' live positions to the circle and pushes Freeze / Clear to the hider only. Guide, not referee. |
+| 100 m bar zone | Hiding zone = 100 m circle around the chosen bar. A bar stays possible for seekers while any part of its circle overlaps the remaining area. |
+| Freeze when a seeker is within 100 m | Server compares seekers' live positions to the circle and pushes Freeze / Clear to the hider only. Guide, not referee. |
 | Cast cost | Card field `cast_cost`: free / drink / shot, shown when cast. |
 | Veto | Veto button on curses with `can_veto: true`. Server counts vetoes; lock = base + step x vetoes_used (from config). |
 | 5 min reply | Default answer deadline 300 s, overridable per question type. Missed deadline logs a penalty shot event. |
@@ -63,17 +63,18 @@ Behaviours (the only card logic in code):
 | `until_cleared` | Active until seekers tap Done and the hider confirms; `params.blocks_questions` |
 | `time_bonus` | Add `params.minutes` to the hider's score |
 | `next_question_modifier` | Modify the hider's reward on the next answer (`params.reward_multiplier`) |
+| `question_ban` | Hider picks `params.count` questions (from different types if `params.distinct_types`); seekers can't ask them until `params.until` (e.g. end of run) |
 | `powerup` | Built-in action: `veto`, `randomize`, `duplicate`, `move`, `discard_draw` (`params.discard`, `params.draw`) |
 
-Utilities: die roll (Hammered), impression wheel (Impression).
+Seed deck: `data/cards.json` (81 cards: 12 powerups, 42 time bonuses, 5 drink cards, 22 curses). Curse values are the small-game values, the left-most of the `[small, medium, large]` options on the cards. Cards with `copies: 0` (Nathan, Brothel) are in the library but not the default deck.
 
-Seed deck: `data/cards.json` (83 cards).
+Utilities: `params.utility` = `dice` (with `params.dice` count) or `wheel`. Proof: `params.proof` = `photo` or `video`.
 
 ## 6. Questions
 
 - Stored as data per city (`data/questions.json`): type, prompt, options, hider reward (draw/pick), deadline override.
 - Types with auto-shading: radar, thermometer, measuring, matching, tentacles. Manual: photos, bonus (except "3+ bars within 50 m").
-- Suggested answer = computed from the hider's chosen bar (or GPS within the circle); flag when the answer differs across the 200 m circle.
+- Suggested answer = computed from the hider's chosen bar (or GPS within the circle); flag when the answer differs across the 100 m circle.
 - "Custom" distance options let seekers type a value. Tentacles allow a "none in range" answer.
 
 ## 7. Data
@@ -113,8 +114,8 @@ Latency harness (fail deploy if p95 > 1 s), leak test (seeker client never recei
 ## 11. Open questions
 
 - Is the 0.5 mi railway-station zone still a rule?
-- Small-game text for the 9 official curses.
 - Hiding period, rounds and scoring: official small-game values?
-- Copies per curse (assumed 1).
+- Copies per curse (assumed 1 each).
+- Curse of Nathan: no text yet.
 - Who clears an until_cleared curse (default: seekers tap Done, hider confirms)?
 - Curse of Prison: who draws the card?

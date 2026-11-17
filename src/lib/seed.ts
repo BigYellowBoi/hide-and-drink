@@ -8,6 +8,7 @@ export type Behaviour =
   | 'time_bonus'
   | 'next_question_modifier'
   | 'powerup'
+  | 'question_ban'
 
 export type CastCost = 'free' | 'drink' | 'shot' | null
 

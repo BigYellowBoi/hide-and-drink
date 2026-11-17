@@ -105,6 +105,10 @@
       "auto_shading": true,
       "options": [
         {
+          "id": "250m",
+          "distance_m": 250
+        },
+        {
           "id": "500m",
           "distance_m": 500
         },
@@ -115,10 +119,6 @@
         {
           "id": "2km",
           "distance_m": 2000
-        },
-        {
-          "id": "custom",
-          "distance_m": null
         }
       ]
     },
@@ -155,7 +155,7 @@
     },
     {
       "type": "tentacles",
-      "prompt": "Of all the ___ within {radius} of me, which are you closest to?",
+      "prompt": "Of all the ___ within 1 km of me, which are you closest to? (You need to be within 1 km of it, otherwise send null.)",
       "reward": {
         "draw": 4,
         "pick": 2
@@ -165,31 +165,31 @@
         {
           "id": "cinemas",
           "label": "Cinemas",
-          "radius_m": 2000,
+          "radius_m": 1000,
           "source": "osm:amenity=cinema"
         },
         {
           "id": "museums",
           "label": "Museums",
-          "radius_m": 2000,
+          "radius_m": 1000,
           "source": "osm:tourism=museum"
         },
         {
           "id": "libraries",
           "label": "Libraries",
-          "radius_m": 2000,
+          "radius_m": 1000,
           "source": "osm:amenity=library"
         },
         {
           "id": "hospitals",
           "label": "Hospitals",
-          "radius_m": 2000,
+          "radius_m": 1000,
           "source": "osm:amenity=hospital"
         },
         {
           "id": "ferries",
           "label": "Ferries",
-          "radius_m": 2000,
+          "radius_m": 1000,
           "source": "gtfs:ferry stops"
         },
         {
@@ -245,6 +245,10 @@
         {
           "id": "bar_window",
           "label": "Bar window out (from inside)"
+        },
+        {
+          "id": "bar_bathroom",
+          "label": "Bar bathroom"
         },
         {
           "id": "ferry_terminal",

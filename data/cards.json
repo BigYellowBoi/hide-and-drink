@@ -28,7 +28,8 @@
     "until_cleared",
     "time_bonus",
     "next_question_modifier",
-    "powerup"
+    "powerup",
+    "question_ban"
   ],
   "cards": [
     {
@@ -204,92 +205,107 @@
       "id": "distant_cuisine",
       "name": "Curse of Distant Cuisine",
       "category": "curse",
-      "behaviour": "text",
+      "behaviour": "until_cleared",
       "copies": 1,
-      "text": null,
-      "params": {},
+      "text": "Find a restaurant within your zone that serves food from a specific foreign country. The seekers must visit a restaurant serving food from a country that is a greater distance away before asking their next question.",
+      "params": {
+        "blocks_questions": true
+      },
       "active": true,
       "cast_cost": "free",
-      "can_veto": true,
-      "todo": "Add small-game (yellow) text from the official card, then set behaviour"
+      "can_veto": true
     },
     {
       "id": "unguided_tourist",
       "name": "Curse of Unguided Tourist",
       "category": "curse",
-      "behaviour": "text",
+      "behaviour": "until_cleared",
       "copies": 1,
-      "text": null,
-      "params": {},
+      "text": "Send the seekers an unzoomed Google Street View image from a street within 150 m of where they are now. The shot has to be parallel to the horizon and include at least one human-built structure other than a road. Without using the internet for research, they must find what you sent them in real life before asking another question. They must send a picture to the hider for verification.",
+      "params": {
+        "blocks_questions": true,
+        "proof": "photo",
+        "radius_m": 150
+      },
       "active": true,
       "cast_cost": "free",
-      "can_veto": true,
-      "todo": "Add small-game (yellow) text from the official card, then set behaviour"
+      "can_veto": true
     },
     {
       "id": "bird_guide",
       "name": "Curse of Bird Guide",
       "category": "curse",
-      "behaviour": "text",
+      "behaviour": "until_cleared",
       "copies": 1,
-      "text": null,
-      "params": {},
+      "text": "You have one chance to film a bird for as long as possible, up to 5 minutes straight. If, at any point, the bird leaves the frame, the timer is stopped. The seekers must then film a bird for the same amount of time or longer before asking another question.",
+      "params": {
+        "blocks_questions": true,
+        "proof": "video",
+        "max_s": 300
+      },
       "active": true,
       "cast_cost": "free",
-      "can_veto": true,
-      "todo": "Add small-game (yellow) text from the official card, then set behaviour"
+      "can_veto": true
     },
     {
       "id": "luxury_car",
       "name": "Curse of Luxury Car",
       "category": "curse",
-      "behaviour": "text",
+      "behaviour": "until_cleared",
       "copies": 1,
-      "text": null,
-      "params": {},
+      "text": "Take a photo of a car. The seekers must take a photo of a more expensive car before asking another question.",
+      "params": {
+        "blocks_questions": true,
+        "proof": "photo"
+      },
       "active": true,
       "cast_cost": "free",
-      "can_veto": true,
-      "todo": "Add small-game (yellow) text from the official card, then set behaviour"
+      "can_veto": true
     },
     {
       "id": "bridge",
       "name": "Curse of Bridge",
       "category": "curse",
-      "behaviour": "text",
+      "behaviour": "until_cleared",
       "copies": 1,
-      "text": null,
-      "params": {},
+      "text": "The seekers must ask their next question from under a bridge.",
+      "params": {
+        "blocks_questions": true
+      },
       "active": true,
       "cast_cost": "drink",
-      "can_veto": true,
-      "todo": "Add small-game (yellow) text from the official card, then set behaviour"
+      "can_veto": true
     },
     {
       "id": "right_turn",
       "name": "Curse of Right Turn",
       "category": "curse",
-      "behaviour": "text",
+      "behaviour": "timed",
       "copies": 1,
-      "text": null,
-      "params": {},
+      "text": "For the next 20 minutes, the seekers can only turn right at any street intersection. If at any point they find themselves in a dead end where they cannot continue, they may do a full 180.",
+      "params": {
+        "duration_s": 1200
+      },
       "active": true,
       "cast_cost": "drink",
-      "can_veto": true,
-      "todo": "Add small-game (yellow) text from the official card, then set behaviour"
+      "can_veto": true
     },
     {
       "id": "jammed_door",
       "name": "Curse of Jammed Door",
       "category": "curse",
-      "behaviour": "text",
+      "behaviour": "timed",
       "copies": 1,
-      "text": null,
-      "params": {},
+      "text": "For the next 30 minutes, whenever the seekers want to pass through a doorway into a building, they must roll two dice. If they don't roll above a 7, they cannot enter that space. Each doorway can be re-attempted after 5 minutes.",
+      "params": {
+        "duration_s": 1800,
+        "utility": "dice",
+        "dice": 2,
+        "retry_s": 300
+      },
       "active": true,
       "cast_cost": "shot",
-      "can_veto": true,
-      "todo": "Add small-game (yellow) text from the official card, then set behaviour"
+      "can_veto": true
     },
     {
       "id": "u_turn",
@@ -297,25 +313,29 @@
       "category": "curse",
       "behaviour": "text",
       "copies": 1,
-      "text": null,
-      "params": {},
+      "text": "The seekers must disembark their current mode of transportation at the next station (as long as that station is serviced by another form of transit in the next 30 minutes).",
+      "params": {
+        "window_s": 1800
+      },
       "active": true,
       "cast_cost": "shot",
-      "can_veto": false,
-      "todo": "Add small-game (yellow) text from the official card, then set behaviour"
+      "can_veto": false
     },
     {
       "id": "drained_brain",
       "name": "Curse of Drained Brain",
       "category": "curse",
-      "behaviour": "text",
+      "behaviour": "question_ban",
       "copies": 1,
-      "text": null,
-      "params": {},
+      "text": "Choose three questions in different categories. The seekers cannot ask those questions for the rest of the run.",
+      "params": {
+        "count": 3,
+        "distinct_types": true,
+        "until": "end_of_run"
+      },
       "active": true,
       "cast_cost": "shot",
-      "can_veto": false,
-      "todo": "Add small-game (yellow) text from the official card, then set behaviour"
+      "can_veto": false
     },
     {
       "id": "express_route",
@@ -337,7 +357,7 @@
       "category": "curse",
       "behaviour": "until_cleared",
       "copies": 1,
-      "text": "Hider picks a drink from their bar menu (any branded alcohol). Seekers must find the same one and drink it before asking another question.",
+      "text": "Hiders must pick a drink from their bar menu (any branded alcohol). Seekers need to find the same one and drink it before asking another question.",
       "params": {
         "blocks_questions": true,
         "proof": "photo"
@@ -359,8 +379,7 @@
       },
       "active": true,
       "cast_cost": "free",
-      "can_veto": false,
-      "todo": "Confirm who draws the card"
+      "can_veto": false
     },
     {
       "id": "pokies",
@@ -368,7 +387,7 @@
       "category": "curse",
       "behaviour": "until_cleared",
       "copies": 1,
-      "text": "Seekers must find pokies and can't ask a question until they win.",
+      "text": "Seekers cannot ask any more questions until successfully winning the pokies.",
       "params": {
         "blocks_questions": true
       },
@@ -382,7 +401,7 @@
       "category": "curse",
       "behaviour": "until_cleared",
       "copies": 1,
-      "text": "Seekers can't use any transport until they beat the hiders at Clash Royale.",
+      "text": "Seekers can't use any transport until beating the hiders at Clash Royale.",
       "params": {
         "blocks_questions": false,
         "blocks": "transport"
@@ -397,7 +416,7 @@
       "category": "curse",
       "behaviour": "until_cleared",
       "copies": 1,
-      "text": "Hiders get one chance to chug a schooner / pint and time it. Seekers can't use transport until they chug a schooner / pint quicker.",
+      "text": "Hiders get one chance to chug a schooner / pint and time it. Seekers can't use transport until they are able to chug a schooner / pint quicker.",
       "params": {
         "blocks_questions": false,
         "blocks": "transport"
@@ -412,7 +431,7 @@
       "category": "curse",
       "behaviour": "timed",
       "copies": 1,
-      "text": "Seekers have 3 minutes to exit a bar. Any drinks ordered must be finished before they leave. If they don't leave in time, they are locked in the bar for 10 minutes.",
+      "text": "Seekers have 3 minutes to exit a bar. Any drinks ordered must be finished before they can leave. If they don't leave in time, they are locked in the bar for 10 minutes.",
       "params": {
         "duration_s": 180,
         "followup_s": 600
@@ -427,7 +446,7 @@
       "category": "curse",
       "behaviour": "until_cleared",
       "copies": 1,
-      "text": "Seekers spin the impression wheel and can't ask questions until a stranger guesses the character correctly.",
+      "text": "Seekers must spin the impression wheel. They cannot ask any more questions until a stranger guesses their character correctly.",
       "params": {
         "blocks_questions": true,
         "utility": "wheel",
@@ -443,10 +462,11 @@
       "category": "curse",
       "behaviour": "until_cleared",
       "copies": 1,
-      "text": "Seekers roll a die. The number is how many shots they must drink before asking another question. Shots can be shared across the team.",
+      "text": "Seekers roll a die. The number indicates the amount of shots they must drink before asking another question. Shots can be distributed across team members.",
       "params": {
         "blocks_questions": true,
-        "utility": "die"
+        "utility": "dice",
+        "dice": 1
       },
       "active": true,
       "cast_cost": "shot",
@@ -458,7 +478,7 @@
       "category": "curse",
       "behaviour": "until_cleared",
       "copies": 1,
-      "text": "Seekers must lose at pool before asking their next question.",
+      "text": "Seekers must lose a game of pool before asking their next question.",
       "params": {
         "blocks_questions": true
       },
@@ -472,9 +492,10 @@
       "category": "curse",
       "behaviour": "until_cleared",
       "copies": 1,
-      "text": "Seekers must correctly answer 3 Harry Potter trivia questions before their next question. No Google.",
+      "text": "Seekers must correctly answer 3 Harry Potter trivia questions before using transport. No Googling.",
       "params": {
-        "blocks_questions": true
+        "blocks_questions": false,
+        "blocks": "transport"
       },
       "active": true,
       "cast_cost": "drink",
@@ -484,26 +505,15 @@
       "id": "louis",
       "name": "Curse of Louis",
       "category": "curse",
-      "behaviour": "text",
+      "behaviour": "until_cleared",
       "copies": 1,
-      "text": "If someone on the seekers' team has said the n word in the last 30 minutes, all seekers drink.",
-      "params": {},
+      "text": "Seekers must ask their next question from inside a Chinese restaurant, or from Chinatown in the Valley.",
+      "params": {
+        "blocks_questions": true
+      },
       "active": true,
-      "cast_cost": "free",
+      "cast_cost": "drink",
       "can_veto": true
-    },
-    {
-      "id": "adam",
-      "name": "Curse of Adam",
-      "category": "curse",
-      "behaviour": "text",
-      "copies": 1,
-      "text": "Adam has to drink.",
-      "params": {},
-      "active": true,
-      "cast_cost": null,
-      "can_veto": false,
-      "todo": "Confirm cast cost (none listed)"
     },
     {
       "id": "cruz",
@@ -524,13 +534,27 @@
       "name": "Curse of Nathan",
       "category": "curse",
       "behaviour": "text",
-      "copies": 1,
-      "text": "Seekers must buy Nathan's next drink.",
+      "copies": 0,
+      "text": null,
       "params": {},
       "active": true,
       "cast_cost": null,
+      "can_veto": true,
+      "todo": "No text yet; copies set to 0 so it stays out of the deck"
+    },
+    {
+      "id": "brothel",
+      "name": "Curse of Brothel",
+      "category": "curse",
+      "copies": 0,
+      "active": true,
+      "text": "The seeking team must take a shot for every 3 people in VC on the Discord at the time this card is played. @ing people to join beforehand is allowed, but the hiders can also disconnect people.",
+      "behaviour": "text",
+      "params": {},
+      "cast_cost": "shot",
       "can_veto": false,
-      "todo": "Confirm cast cost (none listed)"
+      "todo": "Idea card, not in the first-game deck; set copies above 0 to use it"
     }
-  ]
+  ],
+  "notes": "Curse values are the small-game values (left-most of [small, medium, large] on the cards)."
 }
