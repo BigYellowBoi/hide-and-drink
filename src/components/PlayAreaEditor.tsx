@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { LngLatBoundsLike, Map as MapLibreMap } from 'maplibre-gl'
 import type { Polygon } from 'geojson'
 import { TerraDraw, TerraDrawPolygonMode, TerraDrawRenderMode, TerraDrawSelectMode, type GeoJSONStoreFeatures } from 'terra-draw'
@@ -146,6 +147,12 @@ export function PlayAreaEditor({ city, initial, initialName, ownedId, busy, canA
     [load, syncFromDraw],
   )
 
+  // Freeze the page behind the editor; it's portalled out of the scroll box so touches can't reach it.
+  useEffect(() => {
+    document.documentElement.classList.add('scroll-locked')
+    return () => document.documentElement.classList.remove('scroll-locked')
+  }, [])
+
   useEffect(
     () => () => {
       drawRef.current?.stop()
@@ -204,7 +211,7 @@ export function PlayAreaEditor({ city, initial, initialName, ownedId, busy, canA
   }
   const canSave = ready && canAct && !busy && !!area && name.trim().length > 0
 
-  return (
+  return createPortal(
     <div className="editor" role="dialog" aria-modal="true" aria-label="Edit play area">
       <header className="editor-bar">
         <button className="small secondary" onClick={onClose}>
@@ -275,6 +282,7 @@ export function PlayAreaEditor({ city, initial, initialName, ownedId, busy, canA
           </button>
         </div>
       </section>
-    </div>
+    </div>,
+    document.body,
   )
 }

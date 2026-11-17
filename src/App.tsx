@@ -87,20 +87,22 @@ export default function App() {
   }
 
   return (
-    <main className="shell">
-      {!transport ? (
-        <>
-          <div className="hero">
-            <img className="wordmark" src={asset('wordmark.svg')} alt="Hide + Drink" width={240} height={35} />
-          </div>
-          <p className="bad">Backend not configured (see .env.example).</p>
-        </>
-      ) : gameId ? (
-        <GameScreen key={gameId} gameId={gameId} transport={transport} onLeave={() => enter(null)} />
-      ) : (
-        <Home transport={transport} onEnter={enter} />
-      )}
-      <p className="muted small">Build {import.meta.env.VITE_BUILD_SHA?.slice(0, 7) ?? 'local'}</p>
-    </main>
+    <div className="scroll">
+      <main className="shell">
+        {!transport ? (
+          <>
+            <div className="hero">
+              <img className="wordmark" src={asset('wordmark.svg')} alt="Hide + Drink" width={240} height={35} />
+            </div>
+            <p className="bad">Backend not configured (see .env.example).</p>
+          </>
+        ) : gameId ? (
+          <GameScreen key={gameId} gameId={gameId} transport={transport} onLeave={() => enter(null)} />
+        ) : (
+          <Home transport={transport} onEnter={enter} />
+        )}
+        <p className="muted small">Build {import.meta.env.VITE_BUILD_SHA?.slice(0, 7) ?? 'local'}</p>
+      </main>
+    </div>
   )
 }
