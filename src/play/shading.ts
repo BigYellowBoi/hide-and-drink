@@ -65,12 +65,19 @@ export function constraintOf(q: Question, ctx?: PackContext): Constraint | null 
       return a === 'closer' ? { keep: c } : { cut: c }
     }
     case 'tentacles': {
+      // The candidates are the places within radius_m of the seekers. The hider names the
+      // one closest to them, but only if they are within radius_m of it; otherwise "none".
       const r = num(p.radius_m)
       if (!a || !isLngLat(p.center) || !r) return null
-      const c = radarCircle(p.center, r)
-      if (a === NULL_ANSWER) return { cut: c }
       const cands = candidatesOf(q)
-      if (!cands.some((x) => x.feature_id === a)) return null
+      if (cands.length === 0) return null
+      if (a === NULL_ANSWER) {
+        const near = unionAll(cands.map((x) => radarCircle(x.point, r)))
+        return near ? { cut: near } : null
+      }
+      const mine = cands.find((x) => x.feature_id === a)
+      if (!mine) return null
+      const c = radarCircle(mine.point, r)
       if (cands.length === 1) return { keep: c }
       const pts: PackFeature[] = cands.map((x) => ({
         type: 'Feature',
@@ -78,7 +85,8 @@ export function constraintOf(q: Question, ctx?: PackContext): Constraint | null 
         properties: {},
         geometry: { type: 'Point', coordinates: x.point },
       }))
-      const cell = nearestRegion(pts, a, expandBoxAround(p.center, r + 500))
+      // Candidates are within r of the seekers and the hider within r of the candidate.
+      const cell = nearestRegion(pts, a, expandBoxAround(p.center, 2 * r + 500))
       return { keep: cell ? keepIn(c, cell) : c }
     }
     case 'bonus': {
@@ -246,15 +254,14 @@ export function answerAt(q: Question, p: LngLat, layer?: LayerLookup): string | 
     }
     case 'tentacles': {
       const r = num(params.radius_m)
-      if (!isLngLat(params.center) || r === null) return null
-      if (distanceM(p, params.center) > r) return NULL_ANSWER
+      if (r === null) return null
       let best: string = NULL_ANSWER
       let bestD = Infinity
       for (const c of candidatesOf(q)) {
         const d = distanceM(p, c.point)
         if (d < bestD) [best, bestD] = [c.feature_id, d]
       }
-      return best
+      return bestD <= r ? best : NULL_ANSWER
     }
     default:
       return null

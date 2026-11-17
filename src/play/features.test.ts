@@ -151,9 +151,12 @@ describe('suggestAnswer (stage 2 types)', () => {
     expect(suggestAnswer(measure(), bar([152.99, -27.5]))?.answer).toBe('further')
   })
 
-  it('tentacles: nearest candidate, or none outside the radius', () => {
+  it('tentacles: nearest candidate if the hider is within the radius of it, else none', () => {
     expect(suggestAnswer(tentacles(), bar([153.008, -27.5], 0))?.answer).toBe('east-park')
-    expect(suggestAnswer(tentacles(), bar([153.019, -27.5], 0))?.answer).toBe('none')
+    // 1.9 km from the seekers, but 0.9 km from East Park: still a valid answer.
+    expect(suggestAnswer(tentacles(), bar([153.019, -27.5], 0))?.answer).toBe('east-park')
+    // 2 km from East Park, the nearest candidate.
+    expect(suggestAnswer(tentacles(), bar([153.03, -27.5], 0))?.answer).toBe('none')
   })
 
   it('bonus count rule: counts other bars near the hider\'s bar', () => {
@@ -195,17 +198,19 @@ describe('shade (stage 2 types)', () => {
     expect(inside(remaining(measure('further')), [152.985, -27.5])).toBe(true)
   })
 
-  it('tentacles none: cuts the seekers\' circle', () => {
+  it('tentacles none: cuts the circle around every candidate', () => {
     const r = remaining(tentacles('none'))
     expect(inside(r, C)).toBe(false)
-    expect(inside(r, [153.019, -27.519])).toBe(true)
+    expect(inside(r, [153.019, -27.5])).toBe(false) // within 1.5 km of East Park
+    expect(inside(r, [153.019, -27.519])).toBe(true) // 2.3 km from both
   })
 
-  it('tentacles answer: keeps that candidate\'s cell inside the circle', () => {
+  it('tentacles answer: that candidate\'s cell within the radius of it, reaching past the seekers\' circle', () => {
     const r = remaining(tentacles('east-park'))
     expect(inside(r, [153.005, -27.5])).toBe(true)
-    expect(inside(r, [152.995, -27.5])).toBe(false)
-    expect(inside(r, [153.019, -27.519])).toBe(false) // outside 1.5 km
+    expect(inside(r, [152.995, -27.5])).toBe(false) // closer to West Park
+    expect(inside(r, [153.019, -27.5])).toBe(true) // 1.9 km from the seekers, 0.9 km from East Park
+    expect(inside(r, [153.019, -27.519])).toBe(false) // 2.3 km from East Park
   })
 
   it('bonus count rule: keeps circles around matching bars', () => {
