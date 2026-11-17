@@ -1138,3 +1138,107 @@ details.card > summary h2 {
 .editor-actions button.wide {
   margin-top: 0;
 }
+
+/* Settings (cog on Home) */
+.shell {
+  position: relative;
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.home-settings {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + var(--hdrdrop) + 8px);
+  right: 8px;
+}
+
+.settings-bar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.settings-title {
+  margin: 0;
+  font-size: 22px;
+}
+
+.map-list h3 {
+  margin: 16px 0 8px;
+}
+
+.map-list ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.map-row {
+  border-top: 1px solid var(--line);
+  padding: 8px 0;
+}
+
+.map-row-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+button.map-row-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-weight: 600;
+}
+
+.map-row-title {
+  overflow-wrap: anywhere;
+}
+
+button.map-row-delete {
+  flex-shrink: 0;
+  min-width: 72px;
+  min-height: 44px;
+}
+
+/* Small "made by" nametag on a saved map. */
+.map-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-map {
+  height: 200px;
+  margin-top: 8px;
+}
+
+.settings-bar > button {
+  justify-self: start;
+}

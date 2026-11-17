@@ -14,6 +14,8 @@ const MESSAGES: Record<string, string> = {
   play_area_too_large: 'That area is too large (over 2000 km²).',
   play_area_too_detailed: 'That shape has too many corners (5000 max). Simplify it.',
   play_area_name_taken: 'A play area with that name already exists. Pick another name.',
+  play_area_protected: 'Built-in maps can\'t be deleted.',
+  play_area_in_use: 'A lobby is using that map. Pick a different map there first.',
   play_area_not_yours: 'Only whoever saved that area can change it. Save it as a new area instead.',
   already_started: 'The game has already started.',
   players_without_team: 'Everyone needs a team.',
