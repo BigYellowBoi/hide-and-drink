@@ -246,6 +246,31 @@ describe('GameSync', () => {
     sync.stop()
   })
 
+  it('lets a removed player rejoin: an old removal followed by a rejoin is not fatal', async () => {
+    const server = new FakeServer()
+    server.append('game_created')
+    server.append('player_joined', 'all', { user_id: ME, name: 'Me' })
+    server.append('player_removed', 'all', { user_id: ME })
+    server.append('player_joined', 'all', { user_id: ME, name: 'Me' })
+    const sync = await started(server)
+    expect(sync.getSnapshot().status).toBe('live')
+    expect(sync.getSnapshot().events.map((e) => e.seq)).toEqual([1, 2, 3, 4])
+    // Removed again after rejoining: that one counts.
+    server.deliver(server.append('player_removed', 'all', { user_id: ME }))
+    await flush()
+    expect(sync.getSnapshot().error).toBe('removed_from_game')
+    sync.stop()
+  })
+
+  it('stops when the fetched log ends with our removal', async () => {
+    const server = new FakeServer()
+    server.append('game_created')
+    server.append('player_removed', 'all', { user_id: ME })
+    const sync = await started(server)
+    expect(sync.getSnapshot().error).toBe('removed_from_game')
+    sync.stop()
+  })
+
   it('starts over with the new team view when our team changes', async () => {
     const server = new FakeServer()
     server.team = null
