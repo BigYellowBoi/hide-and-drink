@@ -36,6 +36,15 @@ jobs:
         run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta
       - name: Database tests
         run: supabase test db
+      # Simulated players on the local stack; fails the build (and so the deploy) if p95 > 1 s.
+      - name: Latency harness
+        run: |
+          export SUPABASE_URL="$(supabase status -o json | jq -r .API_URL)"
+          export SUPABASE_ANON_KEY="$(supabase status -o json | jq -r .ANON_KEY)"
+          npm run latency
+        env:
+          LATENCY_PLAYERS: 10
+          LATENCY_P95_MS: 1000
       - run: npm run build
         env:
           # Set under Settings > Secrets and variables > Actions > Variables

@@ -38,8 +38,9 @@ Full spec: `docs/spec.md`. Seed data: `data/`. Read only the parts relevant to t
 - `npm run lint`: oxlint
 - `npm run build`: type-check and production build into `dist/`
 - `supabase start` then `supabase test db`: apply migrations to a local Supabase stack (Docker) and run the pgTAP tests in `supabase/tests/`
+- `npm run latency`: latency harness, 6-10 simulated players against a running Supabase (see `scripts/latency/README.md`); CI fails if p95 > 1 s
 - `scripts/test-db/run.sh`: same tests on plain Postgres with Supabase stand-ins (no Docker images needed; needs psql, pg_prove, pgTAP)
-- CI (`.github/workflows/deploy.yml`) runs lint, unit tests, database tests and build on every PR, and deploys `main` to GitHub Pages
+- CI (`.github/workflows/deploy.yml`) runs lint, unit tests, database tests, latency harness and build on every PR, and deploys `main` to GitHub Pages
 
 ## Layout
 
@@ -47,10 +48,12 @@ Full spec: `docs/spec.md`. Seed data: `data/`. Read only the parts relevant to t
 - `src/lib/seed.ts`: typed access to `data/cards.json` and `data/questions.json`
 - `src/lobby/`: lobby state derived from events (`state.ts`), data-driven config fields (`config.ts`), error messages. UI in `src/components/` (`Home`, `Lobby`, `ConfigEditor`, `JoinCode`, `Started`)
 - Join links/QR open `<base>?join=CODE`, which prefills the join form
-- `src/sync/`: client sync engine. `sequencer.ts` (pure ordering/gap logic), `engine.ts` (`GameSync`: topics, resync, status, actions), `transport.ts` (backend interface; `supabaseTransport.ts` in the app, fakes in tests), `clock.ts` (server clock offset), `useGameSync.ts` (React hook). Broadcasts carry `prev_seq` per audience so clients can skip the other team's seqs without a fetch.
+- `src/sync/`: client sync engine. `sequencer.ts` (pure ordering/gap logic), `engine.ts` (`GameSync`: topics, resync, status, actions), `transport.ts` (backend interface; `supabaseTransport.ts` in the app, fakes in tests), `clock.ts` (server clock offset), `useGameSync.ts` (React hook), `lockout.ts` (stale-state banner), `presence.ts`. Broadcasts carry `prev_seq` per audience so clients can skip the other team's seqs without a fetch.
+- Presence (who has the app open) rides on `game:{id}` only; ephemeral, never game state. Clients may insert presence, never broadcasts.
+- While not live the game screen is `inert` under a stale-state banner (`StaleBanner`)
 - Vite `base` is `/hide-and-drink/` (GitHub Pages path); keep asset paths relative to it
 - `supabase/migrations/`: schema, RLS, action functions, Realtime broadcast trigger; `supabase/tests/`: pgTAP tests
 
 ## Current phase
 
-Phase 0 done. Phase 1 in progress: core schema done (games, players, event log, team-scoped RLS and Realtime topics, lobby actions, seeded content). Client sync engine done (anonymous sign-in, topics, ordered apply, gap fetch, resync on reopen, clock offset, status dot). Lobby done (create/join by code or QR, teams, host moves, config editor, saved play area, `start_game` locks and snapshots, hiding countdown placeholder). Next: latency harness. See `docs/spec.md` for the phases and their gates.
+Phase 0 done. Phase 1 in progress: core schema done (games, players, event log, team-scoped RLS and Realtime topics, lobby actions, seeded content). Client sync engine done (anonymous sign-in, topics, ordered apply, gap fetch, resync on reopen, clock offset, status dot). Lobby done (create/join by code or QR, teams, host moves, config editor, saved play area, `start_game` locks and snapshots, hiding countdown placeholder). Presence dots, stale-state lockout banner and latency harness done. Next: run the six-phone test (`docs/six-phone-test.md`) to pass the phase 1 gate. See `docs/spec.md` for the phases and their gates.

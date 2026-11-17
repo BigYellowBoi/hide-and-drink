@@ -10,6 +10,8 @@ import { ConnectionStatus } from './components/ConnectionStatus'
 import { Home } from './components/Home'
 import { Lobby } from './components/Lobby'
 import { Started } from './components/Started'
+import { StaleBanner } from './components/StaleBanner'
+import { presenceOf } from './sync/presence'
 
 const transport = supabase ? supabaseTransport(supabase) : null
 
@@ -17,6 +19,8 @@ function GameScreen({ gameId, transport, onLeave }: { gameId: string; transport:
   const game = useGameSync(gameId, transport)
   const lobby = useMemo(() => deriveLobby(game.events), [game.events])
   const [confirmLeave, setConfirmLeave] = useState(false)
+  const presence = useMemo(() => presenceOf(game.present, game.status === 'live'), [game.present, game.status])
+  const locked = !game.canAct && game.status !== 'idle' && game.status !== 'error'
 
   return (
     <>
@@ -25,15 +29,20 @@ function GameScreen({ gameId, transport, onLeave }: { gameId: string; transport:
         <ConnectionStatus status={game.status} canAct={game.canAct} />
       </header>
 
-      {game.status === 'error' ? (
-        <p className="bad">{describeCode(game.error ?? 'error')}</p>
-      ) : !game.sync || !lobby.code ? (
-        <p className="muted">Loading game…</p>
-      ) : lobby.status === 'lobby' ? (
-        <Lobby sync={game.sync} lobby={lobby} userId={game.userId} canAct={game.canAct} />
-      ) : (
-        <Started sync={game.sync} lobby={lobby} userId={game.userId} />
-      )}
+      <StaleBanner status={game.status} staleSince={game.staleSince} />
+
+      {/* Locked: nothing on the game screen can be tapped until this phone is caught up. */}
+      <div className={`game-body${locked ? ` locked lock-${game.status}` : ''}`} inert={locked}>
+        {game.status === 'error' ? (
+          <p className="bad">{describeCode(game.error ?? 'error')}</p>
+        ) : !game.sync || !lobby.code ? (
+          <p className="muted">Loading game…</p>
+        ) : lobby.status === 'lobby' ? (
+          <Lobby sync={game.sync} lobby={lobby} userId={game.userId} canAct={game.canAct} presence={presence} />
+        ) : (
+          <Started sync={game.sync} lobby={lobby} userId={game.userId} presence={presence} />
+        )}
+      </div>
 
       <div className="row footer-actions">
         <button
