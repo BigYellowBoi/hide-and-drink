@@ -23,7 +23,9 @@ Full spec: `docs/spec.md`. Seed data: `data/`. Read only the parts relevant to t
 
 ## Conventions
 
-- Game actions: one Postgres function per action (`ask_question`, `answer_question`, `play_card`, ...), each taking `game_id`, `client_action_id` (idempotency) and `last_seen_seq`.
+- Game actions: one Postgres function per action (`ask_question`, `answer_question`, `play_card`, ...), each taking `game_id`, `client_action_id` (idempotency) and, for game-play actions, `last_seen_seq`. Pattern (see `create_game`/`update_config` in the core migration): `_require_user` → `_previous_result` → `_lock_game` → validate → `_require_fresh` → write → `_append_event` → `_record_result`. Errors are `raise exception '<snake_case_code>' using errcode = 'P0001'`.
+- Every new function: `revoke execute ... from public, anon, authenticated`, then grant only client actions to `authenticated` and add them to the allow-list in `supabase/tests/03_privileges.test.sql`.
+- Migrations live in `supabase/migrations/` and auto-deploy to production on merge to `main`. Never edit an applied migration; add a new one. Seed content ships as a migration (`scripts/seed_to_sql.py`).
 - Events table is append-only. Game state is derived from it or updated in the same transaction.
 - Channels: `game:{id}` (everyone), `game:{id}:seekers`, `game:{id}:hiders`.
 - Units: metres and seconds in data; display km/min.
@@ -35,14 +37,17 @@ Full spec: `docs/spec.md`. Seed data: `data/`. Read only the parts relevant to t
 - `npm test`: Vitest unit tests (seed data checks live in `src/lib/seed.test.ts`)
 - `npm run lint`: oxlint
 - `npm run build`: type-check and production build into `dist/`
-- CI (`.github/workflows/deploy.yml`) runs lint, test and build on every PR, and deploys `main` to GitHub Pages
+- `supabase start` then `supabase test db`: apply migrations to a local Supabase stack (Docker) and run the pgTAP tests in `supabase/tests/`
+- `scripts/test-db/run.sh`: same tests on plain Postgres with Supabase stand-ins (no Docker images needed; needs psql, pg_prove, pgTAP)
+- CI (`.github/workflows/deploy.yml`) runs lint, unit tests, database tests and build on every PR, and deploys `main` to GitHub Pages
 
 ## Layout
 
 - `src/lib/supabase.ts`: Supabase client from `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`
 - `src/lib/seed.ts`: typed access to `data/cards.json` and `data/questions.json`
 - Vite `base` is `/hide-and-drink/` (GitHub Pages path); keep asset paths relative to it
+- `supabase/migrations/`: schema, RLS, action functions, Realtime broadcast trigger; `supabase/tests/`: pgTAP tests
 
 ## Current phase
 
-Phase 0 scaffold done (PWA, Pages deploy, Supabase client, seed data tests). Next: Supabase schema and seed loader, then Phase 1 (lobby, join code, event log, broadcast). See `docs/spec.md` for the phases and their gates.
+Phase 0 done. Phase 1 in progress: core schema done (games, players, event log, team-scoped RLS and Realtime topics, lobby actions, seeded content). Next: client sync engine (anonymous sign-in, subscribe to topics, apply events in order, gap fetch, resync on reopen, server clock offset), then lobby UI and the latency harness. See `docs/spec.md` for the phases and their gates.
