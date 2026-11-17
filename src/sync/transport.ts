@@ -1,4 +1,4 @@
-import type { GameEvent, Team } from './types'
+import type { GameEvent, SeekerPosition, Team } from './types'
 
 export type ChannelState = 'subscribed' | 'error' | 'closed'
 
@@ -25,16 +25,25 @@ export interface SyncTransport {
   fetchEvents(gameId: string, afterSeq: number): Promise<GameEvent[]>
   /** Server clock in ms since epoch. */
   serverTime(): Promise<number>
-  /** Join a private topic, optionally tracking presence on it. Returns an unsubscribe function. */
+  /**
+   * Join a private topic, optionally tracking presence on it. Returns an unsubscribe function.
+   * onSignal receives ephemeral broadcasts that are not game events (SIGNAL_EVENTS).
+   */
   subscribe(
     topic: string,
     onEvent: (raw: unknown) => void,
     onState: (state: ChannelState) => void,
     presence?: PresenceOptions,
+    onSignal?: (event: string, raw: unknown) => void,
   ): () => void
+  /** Current-round positions of the caller's seeker teammates (RLS: seekers only). */
+  fetchPositions?(gameId: string): Promise<SeekerPosition[]>
   /** Call a game action database function. */
   call(fn: string, args: Record<string, unknown>): Promise<ActionResult>
 }
+
+/** Ephemeral broadcasts that are not in the event log. 'position': a seeker's GPS (seekers topic). */
+export const SIGNAL_EVENTS = ['position'] as const
 
 export const gameTopic = (gameId: string) => `game:${gameId}`
 export const teamTopic = (gameId: string, team: Team) => `game:${gameId}:${team}`

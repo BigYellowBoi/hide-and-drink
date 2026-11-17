@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { ActionResult, ChannelState, SyncTransport } from './transport'
-import type { GameEvent, Team } from './types'
+import { SIGNAL_EVENTS, type ActionResult, type ChannelState, type SyncTransport } from './transport'
+import { parsePosition, type GameEvent, type SeekerPosition, type Team } from './types'
 
 const PAGE = 500
 
@@ -62,11 +62,23 @@ export function supabaseTransport(client: SupabaseClient): SyncTransport {
       return ms
     },
 
-    subscribe(topic, onEvent, onState, presence) {
+    async fetchPositions(gameId) {
+      const { data, error } = await client
+        .from('seeker_positions')
+        .select('user_id, round, lng, lat, accuracy_m, reported_at')
+        .eq('game_id', gameId)
+      if (error) throw new Error(error.message)
+      return (data ?? []).map(parsePosition).filter((p): p is SeekerPosition => p !== null)
+    },
+
+    subscribe(topic, onEvent, onState, presence, onSignal) {
       const channel = client.channel(topic, {
         config: { private: true, ...(presence ? { presence: { key: presence.key } } : {}) },
       })
       channel.on('broadcast', { event: 'event' }, (msg) => onEvent(msg.payload))
+      if (onSignal) {
+        for (const name of SIGNAL_EVENTS) channel.on('broadcast', { event: name }, (msg) => onSignal(name, msg.payload))
+      }
       if (presence) {
         channel.on('presence', { event: 'sync' }, () => presence.onSync(Object.keys(channel.presenceState())))
       }
