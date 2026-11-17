@@ -11,6 +11,13 @@ Source of truth for building the app. The shared roadmap doc is a read-only over
 5. Host locks teams and starts. Polygon, config and deck are snapshotted; draw pile is shuffled server-side.
 6. Hiding period: hider travels and picks a bar from the in-app list (only valid venues). Seekers see only the countdown.
 7. Seeking: seekers ask questions, hider answers, cards are drawn and played, until found. Host swaps roles and repeats from step 5.
+8. Host ends the game. The app decides the winner, everyone sees the final screen, and the game can no longer be joined.
+
+### Ending a game
+
+- **Host ends it:** `end_game` action (host only) sets status `ended`, decides the winner from the round scores, and appends a `game_ended` event with the result. Every phone shows the final screen. Winner rules depend on scoring (see §11).
+- **Auto-end:** a game with no new events for 24 h is ended automatically (no winner if no round finished). Runs from the scheduled keep-alive job; no extra infrastructure.
+- **Join codes return to the pool:** a code only has to be unique among games that aren't ended (partial unique index), so ended games free their codes. Joining by code only finds games that aren't ended; old games keep their code for history.
 
 ## 2. Rules (AMB Hide & Drink 2026)
 
@@ -104,7 +111,7 @@ Reuse: taibeled/JetLagHideAndSeek (MIT) for question geometry and OSM queries; k
 | 1 Live sync core | Lobby, join code, team picking, config, events, broadcast, resync, server clock, presence, latency harness | 6 phones, p95 < 1 s, recovery < 3 s |
 | 2 Map + questions | Play-area drawing, stations, venues, bar picker, all question tools, shading, answer assist, remaining bars, freeze | CBD walk test: shading matches hand-checked answers |
 | 3 Cards + timers | Card library, deck builder, draw/keep, behaviours, veto, photos, dice/wheel, timers, push, activity log | Every MVP feature works in a 3-phone test game |
-| 4 Brisbane beta | Full game, bug bash, fixes, second game | One full game with no manual reconciliation |
+| 4 Brisbane beta | Full game, end game + winner, auto-end, code reuse, bug bash, fixes, second game | One full game with no manual reconciliation |
 | 5 Sydney + v1 | Sydney city pack, scoring/history, map-link import | First Sydney game |
 
 ## 10. Testing
