@@ -65,7 +65,7 @@ Map: ground `#1C2A37`, streets `#2A3B4C`, river `#24506E`. Ruled-out area is a g
 | --- | --- |
 | Navigation in play | Bottom tabs, map first. Hider: Map, Hand, Questions, Log. Seekers: Map, Ask, Effects, Log |
 | Card style | Playing card: tall, category colour band on top, cost badge (Free / Drink / Shot), text below |
-| Map shading | Grey hatch over ruled-out area; "N bars left" pill top right |
+| Map shading | Grey hatch over ruled-out area. No bar count until the venue list is comprehensive (the list of bars still possible stays) |
 | Timers | Ring + digits for deadlines; digits in the top bar for the main clock; thin bar for running curses |
 | Top bar (every in-game screen) | Team chip left, main timer centre with a small caps label, status dot right |
 
@@ -83,7 +83,7 @@ Flow: Home → Lobby → (host: setup) → Start round → each phone switches t
 | Hider map | Hider | Own bar circle and position, freeze banner, "New question" card with deadline |
 | Answer sheet | Hider | Question type + asker, deadline ring, mini map, suggested answer (flag if it differs across the circle), big answer buttons, reward reminder |
 | Hand | Hider | Selected card large, Cast / Discard, hand strip below, lock label |
-| Seeker map | Seekers | Hatched shading, bars left, teammates, active curse strip, Ask button |
+| Seeker map | Seekers | Hatched shading, bars still possible, teammates, active curse strip, Ask button |
 | Ask | Seekers | 7 type tiles with draw/keep, tool on the map (e.g. radar circle), option chips, Send |
 | Effects | Seekers | "Questions blocked" banner, curse cards with timer or We did it / Veto, vetoes used |
 | Log | Both (filtered) | Newest first, elapsed time, coloured dot by type, photo proof thumbnails, penalties in amber |

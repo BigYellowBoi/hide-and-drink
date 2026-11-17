@@ -185,9 +185,10 @@ export default function Play({ sync, lobby, play, userId, canAct, presence, now 
           <section className="card map-card">
             <div className="map-wrap">
               <GameMap city={lobby.city} playArea={playArea} className="play-map" overlays={mapOverlays} />
-              {shading && (
-                <span className="bars-left" aria-live="polite">
-                  {shading.remaining ? `${left.length} bars left` : 'Answers conflict'}
+              {/* No bar count: the venue data isn't complete enough for a number to be trusted. */}
+              {shading && !shading.remaining && (
+                <span className="map-pill" aria-live="polite">
+                  Answers conflict
                 </span>
               )}
             </div>
@@ -195,9 +196,7 @@ export default function Play({ sync, lobby, play, userId, canAct, presence, now 
           </section>
           <details className="card remaining">
             <summary>
-              <h2>
-                {left.length} of {inPlay.length} bars left
-              </h2>
+              <h2>Bars still possible</h2>
             </summary>
             <ul className="bar-list">
               {left.map((b) => (
