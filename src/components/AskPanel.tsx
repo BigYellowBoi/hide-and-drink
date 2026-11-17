@@ -6,9 +6,10 @@ import type { GameSync } from '../sync/engine'
 import type { AreaCollection } from '../map/playArea'
 import { describeError } from '../lobby/messages'
 import { distanceM, isLngLat, type LngLat } from '../play/geo'
-import { radarTool, thermometerTool } from '../play/overlays'
+import { measuringTool, radarTool, thermometerTool } from '../play/overlays'
 import { loadQuestionTypes, optionLabel, type QuestionType } from '../play/questionTypes'
-import { isSupportedType, km } from '../play/state'
+import { isSupportedType, km, MAP_TYPES, questionText, typeName } from '../play/state'
+import { radarCircle } from '../play/geo'
 import type { Fix, GeoError } from '../hiding/useGeolocation'
 import { formatClock } from '../hiding/state'
 import { LazyGameMap } from './lazyMap'
@@ -27,16 +28,6 @@ interface Props {
   /** This phone's GPS (the seeker view already watches it and shares it with the team). */
   fix: Fix | null
   geoError: GeoError | null
-}
-
-const NAMES: Record<string, string> = {
-  matching: 'Matching',
-  measuring: 'Measuring',
-  thermometer: 'Thermometer',
-  radar: 'Radar',
-  tentacles: 'Tentacles',
-  photos: 'Photo',
-  bonus: 'Bonus',
 }
 
 const startKey = (gameId: string) => `hd.thermometer.${gameId}`
@@ -91,8 +82,12 @@ export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingA
   const overlay = useMemo(() => {
     const at: LngLat | null = tapped ?? (fixLng !== undefined && fixLat !== undefined ? [fixLng, fixLat] : null)
     let tool: FeatureCollection | undefined
+    const target = isLngLat(option?.point) ? option.point : null
+    const radius = typeof option?.radius_m === 'number' ? option.radius_m : null
     if (type === 'radar' && at && distance) tool = radarTool(at, distance)
     else if (type === 'thermometer' && start) tool = thermometerTool(start, at)
+    else if (type === 'measuring' && target) tool = measuringTool(target, at ? distanceM(at, target) : 1, at)
+    else if (type === 'tentacles' && at && radius) tool = { type: 'FeatureCollection', features: [radarCircle(at, radius)] }
     const dots =
       fixLng !== undefined && fixLat !== undefined
         ? [{ id: 'me', lng: fixLng, lat: fixLat, team: 'seekers' as const, me: true }]
@@ -100,27 +95,32 @@ export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingA
     return { ruled, tool, dots }
     // `distance` comes from the loaded option list, which is never mutated.
     // oxlint-disable-next-line react/preserve-manual-memoization
-  }, [type, tapped, fixLng, fixLat, distance, start, ruled])
+  }, [type, tapped, fixLng, fixLat, distance, start, ruled, option])
 
   let blocker: string | null = null
   if (!qt || !isSupportedType(type)) blocker = 'Pick a question type.'
   else if (!option) blocker = 'Pick an option.'
-  else if (!distance || distance < 10) blocker = 'Type a distance.'
-  else if (!here) blocker = 'Waiting for GPS. Or tap the map to place yourself.'
+  else if ((type === 'radar' || type === 'thermometer') && (!distance || distance < 10)) blocker = 'Type a distance.'
+  else if ((MAP_TYPES.includes(type) || type === 'thermometer') && !here)
+    blocker = 'Waiting for GPS. Or tap the map to place yourself.'
   else if (type === 'thermometer' && !start) blocker = 'Mark where you start, then travel.'
-  else if (type === 'thermometer' && travelled < distance) blocker = `Travel ${km(distance - travelled)} more.`
+  else if (type === 'thermometer' && distance && travelled < distance) blocker = `Travel ${km(distance - travelled)} more.`
   if (hidingLeft > 0) blocker = `Questions open when hiding ends (${formatClock(hidingLeft)}).`
   else if (pending) blocker = 'Waiting for the answer to the last question.'
 
   const send = async () => {
-    if (blocker || !here || !option) return
+    if (blocker || !option) return
     setBusy(true)
     setErr(null)
     try {
       const params =
         type === 'radar'
           ? { center: here, ...(option.distance_m == null ? { distance_m: distance } : {}) }
-          : { start, end: here }
+          : type === 'thermometer'
+            ? { start, end: here }
+            : MAP_TYPES.includes(type)
+              ? { center: here }
+              : {}
       await sync.action('ask_question', { p_type: type, p_option_id: option.id, p_params: params })
       if (type === 'thermometer') saveStart(null)
       setSent(true)
@@ -149,7 +149,7 @@ export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingA
                 setOptionId(null)
               }}
             >
-              <strong>{NAMES[t.type] ?? t.type}</strong>
+              <strong>{typeName(t.type)}</strong>
               <span className="small">{ok ? `Draw ${t.reward_draw}, keep ${t.reward_pick}` : 'Soon'}</span>
             </button>
           )
@@ -159,7 +159,11 @@ export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingA
 
       {qt && (
         <>
-          <p className="muted">{qt.prompt}</p>
+          <p className={option ? 'question-preview' : 'muted'}>
+            {option && type !== 'radar' && type !== 'thermometer'
+              ? questionText({ type, prompt: qt.prompt, params: { label: optionLabel(option) } })
+              : qt.prompt}
+          </p>
           <div className="chips" role="radiogroup" aria-label="Option">
             {qt.options.map((o) => (
               <button
@@ -210,6 +214,8 @@ export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingA
         </div>
       )}
 
+      {(MAP_TYPES.includes(type) || type === 'thermometer') && (
+        <>
       <Suspense fallback={<div className="game-map ask-map" />}>
         <LazyGameMap city={city} playArea={playArea} className="ask-map" overlay={overlay} onTap={setTapped} tapNames={false} />
       </Suspense>
@@ -227,6 +233,12 @@ export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingA
           `${geoError === 'denied' ? 'Location is blocked.' : 'Waiting for GPS.'} Tap the map to place yourself.`
         )}
       </p>
+
+        </>
+      )}
+      {option && MAP_TYPES.includes(type) && type !== 'radar' && (
+        <p className="muted small">Sends where you are with the question.</p>
+      )}
 
       <button className="wide" disabled={!!blocker || busy || !canAct} onClick={() => void send()}>
         {sent ? 'Sent' : 'Send question'}
