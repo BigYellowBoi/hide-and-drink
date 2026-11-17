@@ -16,6 +16,9 @@ Options (env): `LATENCY_PLAYERS` (6-10, default 8), `LATENCY_ROUNDS` (sequential
 
 Notes:
 
+- It first sends unmeasured warm-up events until one reaches every phone by broadcast. A freshly started stack (as in CI) can take a few seconds before broadcasts from the database flow, which says nothing about a running server.
+- If a phone misses a broadcast, the harness fetches it (as the app's safety-net poll would) and carries on. The late arrival counts in the results, so it can still fail the run.
+
 - The local stack has no real network in the way, so CI mostly guards against regressions in the sync path. Real-network numbers come from the six-phone test (`docs/six-phone-test.md`).
 - It can point at production, but each run signs in new anonymous users and leaves a lobby game behind.
 - Local Supabase allows 30 anonymous sign-ins per hour per IP (`supabase/config.toml`), so about three runs an hour.

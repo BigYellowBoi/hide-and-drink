@@ -57,4 +57,4 @@ Full spec: `docs/spec.md`. Design (colours, fonts, logos, screens): `docs/design
 
 ## Current phase
 
-Phase 0 done. Phase 1 in progress: core schema done (games, players, event log, team-scoped RLS and Realtime topics, lobby actions, seeded content). Client sync engine done (anonymous sign-in, topics, ordered apply, gap fetch, resync on reopen, clock offset, status dot). Lobby done (create/join by code or QR, teams, host moves, config editor, saved play area, `start_game` locks and snapshots, hiding countdown placeholder). Presence dots, stale-state lockout banner and latency harness done. Next: run the six-phone test (`docs/six-phone-test.md`) to pass the phase 1 gate. See `docs/spec.md` for the phases and their gates.
+Phases 0 and 1 done. Phase 1 gate passed (six-phone test, no issues): core schema, sync engine, lobby, presence, stale-state lockout, latency harness. Next: phase 2 (map + questions). See `docs/spec.md` for the phases and their gates.
