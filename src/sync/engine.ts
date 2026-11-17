@@ -67,6 +67,12 @@ export class GameSync {
    * keeps showing the old log, so it never blanks. Swapped in once the rebuild is caught up.
    */
   private rebuilding: GameEvent[] | null = null
+  /**
+   * Our latest membership event is a removal. Checked once a batch is applied, not per event:
+   * a player who was removed and then rejoined replays the old removal on the way to the
+   * newer player_joined, and must not be thrown out by it.
+   */
+  private removed = false
   private team: Team | null = null
   private userId: string | null = null
   private status: SyncStatus = 'idle'
@@ -270,6 +276,7 @@ export class GameSync {
         return
       }
       this.sequencer.applyFetched(after, events)
+      if (this.checkRemoved()) return
     } while (this.syncAgain)
     this.stale = false
     if (this.rebuilding) {
@@ -329,7 +336,15 @@ export class GameSync {
     // During a fetch the sequencer keeps ordering live events; the fetch result merges
     // with anything buffered.
     if (this.sequencer.receive(raw) === 'buffered') this.scheduleGapFetch()
+    if (this.checkRemoved()) return
     this.settle()
+  }
+
+  /** The host removed us (and we haven't rejoined since): access is already revoked, so stop. */
+  private checkRemoved(): boolean {
+    if (!this.removed) return false
+    this.fail('removed_from_game')
+    return true
   }
 
   private scheduleGapFetch(): void {
@@ -341,16 +356,15 @@ export class GameSync {
   }
 
   private onApplied(event: GameEvent): void {
+    if (event.payload.user_id === this.userId) {
+      if (event.type === 'player_removed') this.removed = true
+      else if (event.type === 'player_joined') this.removed = false
+    }
     if (this.rebuilding) {
       this.rebuilding.push(event)
       return
     }
     this.events = [...this.events, event]
-    if (event.type === 'player_removed' && event.payload.user_id === this.userId) {
-      // The host removed us. The server has already revoked access; stop listening.
-      this.fail('removed_from_game')
-      return
-    }
     if (event.type === 'team_changed' && event.payload.user_id === this.userId && event.payload.team !== this.team) {
       // Our own visibility changed. resync() picks up the new team from the server.
       void this.resync()

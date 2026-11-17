@@ -5,7 +5,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(11);
+select plan(13);
 
 insert into auth.users (id) values
   ('11111111-1111-1111-1111-111111111111'),
@@ -76,6 +76,16 @@ select pg_temp.as_user('22222222-2222-2222-2222-222222222222');
 select is((select count(*)::int from public.events where game_id = current_setting('test.game_id')::uuid), 0,
   'a removed player can no longer read the game');
 select ok(not public.can_join_topic('game:' || current_setting('test.game_id')), 'nor join its live topic');
+
+-- She can join again with the code (removal is not a ban).
+select lives_ok(
+  $$ select public.join_game(current_setting('test.code'), 'Amy', 'dddddddd-0000-0000-0000-000000000016') $$,
+  'a removed player can rejoin with the code'
+);
+select is(
+  (select type from public.events where game_id = current_setting('test.game_id')::uuid order by seq desc limit 1),
+  'player_joined', 'rejoining appends player_joined (clients use it to cancel the old removal)'
+);
 
 -- Teams lock at start.
 select pg_temp.as_user('11111111-1111-1111-1111-111111111111');
