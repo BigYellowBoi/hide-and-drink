@@ -112,7 +112,7 @@ Reuse: taibeled/JetLagHideAndSeek (MIT) for question geometry and OSM queries; k
 | 2 Map + questions | Play-area drawing, stations, venues, bar picker, all question tools, shading, answer assist, remaining bars, freeze | CBD walk test: shading matches hand-checked answers |
 | 3 Cards + timers | Card library, deck builder, draw/keep, behaviours, veto, photos, dice/wheel, timers, push, activity log | Every MVP feature works in a 3-phone test game |
 | 4 Brisbane beta | Full game, end game + winner, auto-end, code reuse, bug bash, fixes, second game | One full game with no manual reconciliation |
-| 5 Sydney + v1 | Sydney city pack, scoring/history, map-link import | First Sydney game |
+| 5 Sydney + v1 | Sydney city pack, scoring/history | First Sydney game |
 
 ## 10. Testing
 

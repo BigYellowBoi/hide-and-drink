@@ -37,7 +37,12 @@ def build(city: City, *, osm_source: str = "auto", offline: bool = False, log=pr
         log("gtfs: reading stops and stop_times")
         stops, modes = gtfs.stop_modes(cache / "gtfs.zip")
         for layer in gtfs_layers:
-            features += gtfs.build_layer(layer, stops, modes, area, prepared, projector)
+            if layer["geometry"] == "line":
+                log(f"gtfs: reading shapes for {layer['id']}")
+                routes = gtfs.route_shapes(cache / "gtfs.zip", set(layer["modes"]))
+                features += gtfs.build_line_layer(layer, routes, area, prepared, projector, simplify_m)
+            else:
+                features += gtfs.build_layer(layer, stops, modes, area, prepared, projector)
 
     # OSM venues and categories
     osm_layers = city.layers_from("osm")

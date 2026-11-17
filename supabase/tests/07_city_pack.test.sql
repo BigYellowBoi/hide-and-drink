@@ -4,7 +4,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(14);
+select plan(16);
 
 select is((select count(*)::int from public.city_packs where city = 'brisbane'), 1, 'Brisbane pack is loaded');
 select ok((select count(*) from public.map_features where city = 'brisbane' and layer = 'venues') > 100,
@@ -13,6 +13,12 @@ select ok((select count(*) from public.map_features where city = 'brisbane' and 
   'Brisbane pack has stations');
 select ok((select count(*) from public.map_features where city = 'brisbane' and layer = 'abs:suburbs_localities') > 10,
   'Brisbane pack has suburbs');
+select ok((select count(*) from public.map_features where city = 'brisbane' and layer = 'gtfs:lines'
+           and props ->> 'mode' = 'rail') > 5,
+  'Brisbane pack has rail lines');
+select ok((select count(*) from public.map_features where city = 'brisbane' and layer = 'osm:water'
+           and name = 'Brisbane River') > 0,
+  'Brisbane pack has the river');
 
 select is(
   (select count(*)::int from public.map_features f join public.city_packs p using (city)

@@ -31,13 +31,14 @@ Sources for Brisbane:
 - **Transit**: TransLink SEQ GTFS. Platforms are grouped into their parent station; a station's
   modes come from the routes that actually call there. Same-name stations within 300 m merge
   (Roma Street rail + busway). Plain bus stops are not stations. `gtfs:ferry stops` keeps ferry
-  terminals unmerged for matching/tentacles.
+  terminals unmerged for matching/tentacles. `gtfs:lines` draws rail, metro, tram and ferry routes
+  from `shapes.txt`, one feature per route short name with its TransLink colour.
 - **Venues**: OSM, anywhere serving alcohol: bars, pubs, beer gardens, nightclubs, casinos,
   strip clubs, breweries/wineries/distilleries, plus restaurants, cafes, clubs and hotels tagged
   with `bar=yes`, `alcohol=*` or `drink:*`. Shops are excluded. Each venue carries `kind` and
   address tags. Hosts curate per game in the lobby.
 - **Categories**: OSM layers for matching and tentacles (parks, museums, cinemas, ...), as points;
-  named streets as lines merged by name.
+  named streets as lines merged by name. `osm:water` (rivers, lakes) as polygons, for the base map.
 - **Boundaries**: ABS suburbs and localities (ASGS 2021) and LGAs (ASGS 2025), from the ABS
   ArcGIS services. Names drop ABS disambiguation (`Albion (Brisbane - Qld)` becomes `Albion`).
 

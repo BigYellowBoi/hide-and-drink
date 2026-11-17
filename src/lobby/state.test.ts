@@ -59,7 +59,11 @@ describe('deriveLobby', () => {
         started_at: '2026-11-17T10:05:00Z',
         hiding_period_s: 1800,
         config: { hiding_period_s: 1800 },
-        play_area: { id: 'p1', name: 'Inner' },
+        play_area: {
+          id: 'p1',
+          name: 'Inner',
+          geojson: { type: 'Polygon', coordinates: [[[153, -27], [153.1, -27], [153.1, -27.1], [153, -27]]] },
+        },
         players: [
           { user_id: 'h', name: 'Hana', team: 'hiders' },
           { user_id: 'a', name: 'Amy', team: 'hiders' },
@@ -73,6 +77,16 @@ describe('deriveLobby', () => {
       startedAt: Date.parse('2026-11-17T10:05:00Z'),
       hidingPeriodS: 1800,
       playAreaName: 'Inner',
+      playArea: {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: {},
+            geometry: { type: 'Polygon', coordinates: [[[153, -27], [153.1, -27], [153.1, -27.1], [153, -27]]] },
+          },
+        ],
+      },
     })
     expect(s.players.map((p) => p.team)).toEqual(['hiders', 'hiders', 'seekers'])
   })

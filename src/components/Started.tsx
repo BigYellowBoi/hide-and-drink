@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import type { GameSync } from '../sync/engine'
 import type { LobbyState } from '../lobby/state'
 import type { Presence } from '../sync/presence'
 import { PresenceDot } from './PresenceDot'
+import { LazyGameMap } from './lazyMap'
 
 const mmss = (ms: number) => {
   const s = Math.max(0, Math.ceil(ms / 1000))
@@ -31,6 +32,7 @@ export function Started({ sync, lobby, userId, presence }: Props) {
   const me = lobby.players.find((p) => p.userId === userId)
 
   return (
+    <>
     <section className="card started">
       <p className="eyebrow">{left > 0 ? 'Hiding period' : 'Hiding period over'}</p>
       <p className="countdown">{mmss(left)}</p>
@@ -64,5 +66,11 @@ export function Started({ sync, lobby, userId, presence }: Props) {
         </ul>
       )}
     </section>
+    <section className="card map-card">
+      <Suspense fallback={<div className="game-map play-map" />}>
+        <LazyGameMap city={lobby.city} playArea={started.playArea} className="play-map" />
+      </Suspense>
+    </section>
+    </>
   )
 }

@@ -134,6 +134,38 @@ def test_stations_from_parents_and_merge_across_modes():
     assert gtfs.merge_stations(cands, 0, PROJ).__len__() == 3
 
 
+def test_route_lines_group_by_short_name_and_clip():
+    a = LineString([(152.99, -27.47), (153.02, -27.47)])
+    b = LineString([(153.02, -27.47), (153.04, -27.47)])
+    routes = [
+        {"route_id": "R1", "short": "BRIP", "long": "Brisbane City - Ipswich", "mode": "rail", "color": "27855a",
+         "lines": [a]},
+        {"route_id": "R2", "short": "BRIP", "long": "Brisbane City - Ipswich", "mode": "rail", "color": "",
+         "lines": [b]},
+        {"route_id": "F1", "short": "F1", "long": "", "mode": "ferry", "color": "zz", "lines": [b]},
+    ]
+    feats = gtfs.build_line_layer(LAYERS["gtfs:lines"], routes, SQUARE, prep(SQUARE), PROJ, 0)
+    by_id = {f["id"]: f for f in feats}
+    assert sorted(by_id) == ["gtfs:line/ferry/f1", "gtfs:line/rail/brip"]
+    rail = by_id["gtfs:line/rail/brip"]
+    assert rail["props"]["color"] == "#27855A" and rail["props"]["route_ids"] == ["R1", "R2"]
+    assert rail["geometry"].bounds[0] >= 153.0  # clipped to the square
+    assert "color" not in by_id["gtfs:line/ferry/f1"]["props"]
+
+
+def test_water_polygons_from_areas_only():
+    river = Polygon([(152.99, -27.48), (153.06, -27.48), (153.06, -27.47), (152.99, -27.47)])
+    elements = [
+        {"id": "relation/1", "kind": "area", "tags": {"natural": "water", "water": "river", "name": "River"},
+         "geom": river},
+        {"id": "way/2", "kind": "way", "tags": {"natural": "water"}, "geom": LineString([(153.0, -27.46), (153.01, -27.46)])},
+        {"id": "way/3", "kind": "area", "tags": {"leisure": "park"}, "geom": river},
+    ]
+    feats = osm.build_polygon_layer(LAYERS["osm:water"], elements, SQUARE, prep(SQUARE), PROJ, 0)
+    assert [f["id"] for f in feats] == ["osm:relation/1"]
+    assert feats[0]["geometry"].bounds[0] >= 153.0 and feats[0]["props"] == {"natural": "water", "water": "river"}
+
+
 # --- ABS --------------------------------------------------------------------------
 
 def test_abs_names_drop_state_disambiguation():

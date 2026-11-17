@@ -54,9 +54,11 @@ Full spec: `docs/spec.md`. Design (colours, fonts, logos, screens): `docs/design
 - While not live the game screen is `inert` under a stale-state banner (`StaleBanner`)
 - Styling: design tokens are CSS variables in `src/index.css` (names match `docs/design.md`); fonts are bundled via `@fontsource` (Space Grotesk, Inter) and precached by the PWA
 - Vite `base` is `/hide-and-drink/` (GitHub Pages path); keep asset paths relative to it
+- `src/map/`: map logic. `style.ts` (MapLibre style built entirely from the city pack: no tile server, no glyphs, so no text labels; tap shows names), `cityPack.ts` (`get_city_pack`, cached per session), `playArea.ts` (polygons, area, outside mask), `mapLink.ts` (Hide and Seek Map Generator `hzc`/`hz`/`pb`/`url` link import). UI: `GameMap`, `PlayAreaEditor` (Terra Draw), loaded lazily via `lazyMap.ts`. `GameMap` sets MapLibre's worker URL explicitly (bundling breaks its default)
+- Play areas: host draws/edits/imports in the lobby and calls `save_play_area` (server unions, repairs and validates; only the creator can overwrite; seeded areas are saved as new)
 - `pipeline/`: Python city-pack builder (GTFS stations, OSM venues/categories, ABS suburbs/LGAs, clipped to play areas + buffer). Layer rules in `data/map-layers.json` (layer id = question option `source`), city sources in `data/cities/`, hand venue edits in `data/venues/`. Output `data/city-packs/<city>.geojson`, loaded by migration into `city_packs`/`map_features`; clients call `get_city_pack`
 - `supabase/migrations/`: schema, RLS, action functions, Realtime broadcast trigger; `supabase/tests/`: pgTAP tests
 
 ## Current phase
 
-Phases 0 and 1 done. Phase 1 gate passed (six-phone test, no issues): core schema, sync engine, lobby, presence, stale-state lockout, latency harness. Phase 2 started: Brisbane city pack built and loaded. Next: map + questions UI. See `docs/spec.md` for the phases and their gates.
+Phases 0 and 1 done. Phase 1 gate passed (six-phone test, no issues): core schema, sync engine, lobby, presence, stale-state lockout, latency harness. Phase 2 started: Brisbane city pack built and loaded (with transit lines and water); map, play-area drawing and map-link import done. Next: bar picker and questions UI. See `docs/spec.md` for the phases and their gates.
