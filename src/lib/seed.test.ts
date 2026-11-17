@@ -49,3 +49,12 @@ describe('seed question data', () => {
     for (const q of questionTypes) expect(q.reward.draw).toBeGreaterThanOrEqual(q.reward.pick)
   })
 })
+
+describe('seed question options', () => {
+  it('every measuring target has a [lon, lat] point', () => {
+    const measuring = questionTypes.find((q) => q.type === 'measuring')!
+    for (const o of measuring.options as { id: string; point: unknown }[]) {
+      expect(Array.isArray(o.point) && o.point.length === 2, o.id).toBe(true)
+    }
+  })
+})

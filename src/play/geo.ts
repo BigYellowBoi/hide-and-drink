@@ -73,8 +73,8 @@ export function areaFeature(fc: AreaCollection): Area {
     : { type: 'Feature', properties: {}, geometry: { type: 'MultiPolygon', coordinates: polys.map((p) => p.coordinates) } }
 }
 
-/** What an answered question says about where the hider is. */
-export type Constraint = { keep: Feature<Polygon> } | { cut: Feature<Polygon> }
+/** What an answered question says about where the hider is. keep null: nowhere. */
+export type Constraint = { keep: Area | null } | { cut: Area }
 
 export const keepIn = (a: Area | null, f: Area): Area | null =>
   a ? (intersect(featureCollection([a, f])) as Area | null) : null
@@ -84,7 +84,14 @@ export const cutOut = (a: Area | null, f: Area): Area | null =>
 /** Play area narrowed by every constraint. null: nothing left (answers contradict). */
 export function applyConstraints(area: Area, constraints: readonly Constraint[]): Area | null {
   let out: Area | null = area
-  for (const c of constraints) out = 'keep' in c ? keepIn(out, c.keep) : cutOut(out, c.cut)
+  for (const c of constraints) {
+    if ('keep' in c && !c.keep) return null
+    try {
+      out = 'keep' in c ? keepIn(out, c.keep!) : cutOut(out, c.cut)
+    } catch {
+      // Degenerate geometry from one answer shouldn't break the whole map: skip it.
+    }
+  }
   return out
 }
 

@@ -65,35 +65,35 @@
         {
           "id": "airport",
           "label": "The Airport",
-          "point": null
+          "point": [153.1175, -27.3842]
         },
         {
           "id": "star_casino",
           "label": "The Star Casino",
-          "point": null
+          "point": [153.0222, -27.4727]
         },
         {
           "id": "felons",
           "label": "Felons Brewing Co",
-          "point": null
+          "point": [153.036264, -27.462408]
         },
         {
           "id": "el_camino",
           "label": "El Camino Southbank",
-          "point": null
+          "point": [153.0236, -27.4789]
         },
         {
           "id": "gabba",
           "label": "The Gabba",
-          "point": null
+          "point": [153.0381, -27.4858]
         },
         {
           "id": "powerhouse",
           "label": "The Powerhouse",
-          "point": null
+          "point": [153.0532, -27.4683]
         }
       ],
-      "todo": "Fill each option's point (lon, lat) from OSM"
+      "note": "Points are [lon, lat]. Felons is from the city pack; the rest are approximate, check them on the CBD walk test."
     },
     {
       "type": "thermometer",
@@ -302,7 +302,8 @@
         {
           "id": "bars_50m",
           "label": "Are there at least 3 other bars within 50 m?",
-          "answer": "yes_no"
+          "answer": "yes_no",
+          "count": { "layer": "venues", "within_m": 50, "at_least": 3 }
         },
         {
           "id": "pokies",
@@ -315,7 +316,7 @@
           "answer": "yes_no"
         }
       ],
-      "note": "bars_50m can be auto-shaded from the venue list"
+      "note": "Options with a count rule (layer, within_m, at_least) are auto-shaded from the city pack: the hider's bar is a venue with at least at_least others of that layer within within_m."
     }
   ]
 }
