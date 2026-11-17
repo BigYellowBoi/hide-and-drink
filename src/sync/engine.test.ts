@@ -422,14 +422,16 @@ describe('GameSync', () => {
       sync.stop()
     })
 
-    it('hiders never listen for positions', async () => {
+    it('hiders see seekers but never report their own position', async () => {
       const server = new FakeServer()
       server.team = 'hiders'
       server.storedPositions = [{ userId: 'amy', round: 1, lng: 153, lat: -27.4, accuracyM: 5, at: 0 }]
       const sync = await started(server)
       await flush()
-      expect(server.topics.get(`game:${GAME}:hiders`)?.onSignal).toBeUndefined()
-      expect(sync.getSnapshot().positions).toEqual([])
+      expect(sync.getSnapshot().positions.map((p) => p.userId)).toEqual(['amy'])
+      server.topics.get(`game:${GAME}:hiders`)?.onSignal?.('position', pos('sam', 153.3, '2026-11-17T10:00:15Z'))
+      expect(sync.getSnapshot().positions.map((p) => p.userId).sort()).toEqual(['amy', 'sam'])
+      expect(server.topics.get(`game:${GAME}`)?.onSignal).toBeUndefined()
       expect((await sync.reportPosition(153, -27, 5)).ok).toBe(false)
       expect(server.calls).toEqual([])
       sync.stop()

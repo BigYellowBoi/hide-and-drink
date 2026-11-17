@@ -22,6 +22,16 @@ function GameScreen({ gameId, transport, onLeave }: { gameId: string; transport:
   const game = useGameSync(gameId, transport)
   const lobby = useMemo(() => deriveLobby(game.events), [game.events])
   const [confirmLeave, setConfirmLeave] = useState(false)
+
+  // In a lobby, leaving removes you on the server too (the last one out deletes the lobby).
+  // A running game has locked teams, so there it only forgets the game on this phone. If the
+  // server call fails (offline), leave anyway: the 24 h sweep clears abandoned lobbies.
+  const leave = async () => {
+    if (game.sync && game.canAct && lobby.status === 'lobby') {
+      await game.sync.action('leave_game', {}, { fresh: false }).catch(() => {})
+    }
+    onLeave()
+  }
   const presence = useMemo(() => presenceOf(game.present, game.status === 'live'), [game.present, game.status])
   const locked = !game.canAct && game.status !== 'idle' && game.status !== 'error'
   const myTeam = lobby.players.find((p) => p.userId === game.userId)?.team ?? null
@@ -65,7 +75,7 @@ function GameScreen({ gameId, transport, onLeave }: { gameId: string; transport:
       <div className="row footer-actions">
         <button
           className={`secondary${confirmLeave ? ' danger' : ''}`}
-          onClick={() => (confirmLeave ? onLeave() : setConfirmLeave(true))}
+          onClick={() => (confirmLeave ? void leave() : setConfirmLeave(true))}
           onBlur={() => setConfirmLeave(false)}
         >
           {confirmLeave ? 'Tap again to leave' : 'Leave game'}

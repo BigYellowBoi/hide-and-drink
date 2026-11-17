@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '../sync/types'
-import { deriveHiding, formatClock, hidingZone, roundClock } from './state'
+import { deriveHiding, formatClock, hidingZone, positionAge, roundClock } from './state'
 
 let seq = 0
 const ev = (type: string, payload: Record<string, unknown>): GameEvent => ({
@@ -71,5 +71,13 @@ describe('formatClock', () => {
     expect(formatClock(3_600_000)).toBe('1:00:00')
     expect(formatClock(61_999, { up: true })).toBe('1:01')
     expect(formatClock(-5)).toBe('0:00')
+  })
+})
+
+describe('positionAge', () => {
+  it('is null while fresh and labels stale positions', () => {
+    expect(positionAge(0, 50_000, 20)).toBeNull()
+    expect(positionAge(0, 55_000, 20)).toBe('55 s')
+    expect(positionAge(0, 200_000, 20)).toBe('3 min')
   })
 })

@@ -8,6 +8,7 @@ import type { Fix } from '../hiding/useGeolocation'
 import { loadCityPack, type CityPack } from '../map/cityPack'
 import { formatDistance } from '../map/geo'
 import type { GameSync } from '../sync/engine'
+import type { MapDot } from './GameMap'
 import { LazyGameMap } from './lazyMap'
 import { SlideToConfirm } from './SlideToConfirm'
 
@@ -21,10 +22,14 @@ interface Props {
   /** Countdown text for the header, e.g. "42:10 left". */
   timeNote: string
   late: boolean
+  /** Seekers' positions, with name tags. */
+  seekers?: readonly MapDot[]
 }
 
+const NO_DOTS: readonly MapDot[] = []
+
 /** Hider: pick a bar from the valid ones (nearest first), preview its circle, slide to lock in. */
-export function BarPicker({ sync, city, started, zone, canAct, fix, timeNote, late }: Props) {
+export function BarPicker({ sync, city, started, zone, canAct, fix, timeNote, late, seekers = NO_DOTS }: Props) {
   const [pack, setPack] = useState<CityPack | null>(null)
   const [validIds, setValidIds] = useState<string[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -60,9 +65,9 @@ export function BarPicker({ sync, city, started, zone, canAct, fix, timeNote, la
       bars: all,
       selectedBar: selected,
       zone: chosen ? { lng: chosen.lng, lat: chosen.lat, radiusM: zone.barRadiusM, team: 'hiders' as const } : null,
-      dots: fix ? [{ id: 'me', lng: fix.lng, lat: fix.lat, team: 'hiders' as const, me: true }] : [],
+      dots: [...seekers, ...(fix ? [{ id: 'me', lng: fix.lng, lat: fix.lat, team: 'hiders' as const, me: true }] : [])],
     }),
-    [all, selected, chosen, zone.barRadiusM, fix],
+    [all, selected, chosen, zone.barRadiusM, fix, seekers],
   )
 
   const lockIn = async () => {

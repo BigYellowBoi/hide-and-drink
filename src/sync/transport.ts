@@ -36,13 +36,13 @@ export interface SyncTransport {
     presence?: PresenceOptions,
     onSignal?: (event: string, raw: unknown) => void,
   ): () => void
-  /** Current-round positions of the caller's seeker teammates (RLS: seekers only). */
+  /** Current-round positions of the seekers (RLS: players on a team). */
   fetchPositions?(gameId: string): Promise<SeekerPosition[]>
   /** Call a game action database function. */
   call(fn: string, args: Record<string, unknown>): Promise<ActionResult>
 }
 
-/** Ephemeral broadcasts that are not in the event log. 'position': a seeker's GPS (seekers topic). */
+/** Ephemeral broadcasts that are not in the event log. 'position': a seeker's GPS (both team topics). */
 export const SIGNAL_EVENTS = ['position'] as const
 
 export const gameTopic = (gameId: string) => `game:${gameId}`

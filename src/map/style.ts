@@ -14,7 +14,26 @@ export const MAP_COLORS = {
   areaOutline: '#F0F0F0',
   hider: '#5BB4F0',
   seeker: '#FF6B6F', // --seeker-on-dark
+  hatchFill: '#2C3E50',
+  hatchLine: '#5C6B7A',
 } as const
+
+/** 45° hatch tile for the ruled-out area (docs/design.md): fill colour with lighter lines. */
+export function hatchImage(size = 16): { width: number; height: number; data: Uint8Array } {
+  const data = new Uint8Array(size * size * 4)
+  const hex = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))
+  const fill = hex(MAP_COLORS.hatchFill)
+  const line = hex(MAP_COLORS.hatchLine)
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      // Lines run bottom-left to top-right and wrap seamlessly across tiles.
+      const on = (x + y) % size < 2
+      const [r, g, b] = on ? line : fill
+      data.set([r, g, b, on ? 230 : 150], (y * size + x) * 4)
+    }
+  }
+  return { width: size, height: size, data }
+}
 
 /** Pack layers each map source draws from (ids from data/map-layers.json). */
 export const PACK_SOURCES = {
@@ -26,7 +45,7 @@ export const PACK_SOURCES = {
 } as const
 
 /** Layers that answer a tap with the feature's name. */
-export const TAPPABLE_LAYERS = ['bars', 'venues', 'stations', 'lines', 'lines-ferry']
+export const TAPPABLE_LAYERS = ['dots', 'bars', 'venues', 'stations', 'lines', 'lines-ferry']
 
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] }
 
@@ -53,6 +72,9 @@ export function mapStyle(pack: CityPack): StyleSpecification {
       zone: { type: 'geojson', data: EMPTY },
       bars: { type: 'geojson', data: EMPTY },
       dots: { type: 'geojson', data: EMPTY },
+      ruled: { type: 'geojson', data: EMPTY },
+      remaining: { type: 'geojson', data: EMPTY },
+      tool: { type: 'geojson', data: EMPTY },
     },
     layers: [
       { id: 'ground', type: 'background', paint: { 'background-color': MAP_COLORS.ground } },
@@ -72,6 +94,16 @@ export function mapStyle(pack: CityPack): StyleSpecification {
         type: 'fill',
         source: 'mask',
         paint: { 'fill-color': MAP_COLORS.bg, 'fill-opacity': 0.6 },
+      },
+      // Ruled-out area: hatch (image added by GameMap on load) so streets show through.
+      { id: 'ruled', type: 'fill', source: 'ruled', paint: { 'fill-pattern': 'hatch' } },
+      // Where the hider can still be: a white edge inside the hatch, so it reads at a glance.
+      {
+        id: 'remaining',
+        type: 'line',
+        source: 'remaining',
+        layout: { 'line-join': 'round' },
+        paint: { 'line-color': MAP_COLORS.text, 'line-width': 2.5 },
       },
       {
         id: 'lines',
@@ -103,6 +135,33 @@ export function mapStyle(pack: CityPack): StyleSpecification {
         source: 'area',
         layout: { 'line-join': 'round' },
         paint: { 'line-color': MAP_COLORS.areaOutline, 'line-width': 2.5 },
+      },
+      // The seekers' question tool: radar circle, or thermometer path and dividing line.
+      {
+        id: 'tool-fill',
+        type: 'fill',
+        source: 'tool',
+        filter: ['==', ['geometry-type'], 'Polygon'],
+        paint: { 'fill-color': MAP_COLORS.seeker, 'fill-opacity': 0.12 },
+      },
+      {
+        id: 'tool-line',
+        type: 'line',
+        source: 'tool',
+        layout: { 'line-cap': 'round' },
+        paint: { 'line-color': MAP_COLORS.seeker, 'line-width': 2, 'line-dasharray': [2, 1.5] },
+      },
+      {
+        id: 'tool-points',
+        type: 'circle',
+        source: 'tool',
+        filter: ['==', ['geometry-type'], 'Point'],
+        paint: {
+          'circle-color': MAP_COLORS.seeker,
+          'circle-radius': 5,
+          'circle-stroke-color': MAP_COLORS.bg,
+          'circle-stroke-width': 2,
+        },
       },
       {
         id: 'zone-fill',

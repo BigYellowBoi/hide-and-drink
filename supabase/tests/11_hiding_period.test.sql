@@ -5,7 +5,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(37);
+select plan(38);
 
 insert into auth.users (id) values
   ('11111111-1111-1111-1111-111111111111'),
@@ -191,7 +191,7 @@ select pg_temp.as_user('33333333-3333-3333-3333-333333333333');
 select is((select count(*)::int from public.seeker_positions), 1, 'a seeker sees teammates'' positions');
 
 select pg_temp.as_user('11111111-1111-1111-1111-111111111111');
-select is((select count(*)::int from public.seeker_positions), 0, 'the hider sees no seeker positions');
+select is((select count(*)::int from public.seeker_positions), 1, 'the hider sees the seekers'' positions too');
 select throws_ok($$ select * from public.hider_bars $$, '42501', null, 'not even hiders read hider_bars directly');
 select is(
   (select count(*)::int from public.events
@@ -263,7 +263,7 @@ select is(
   false, 'a stale position no longer freezes the hider'
 );
 
--- Broadcasts: positions go to the seekers topic only, never into the event log.
+-- Broadcasts: positions go to both team topics, never into the event log.
 select ok(
   (select count(*) from realtime.messages
     where topic = 'game:' || current_setting('test.game_id') || ':seekers' and event = 'position') >= 4,
@@ -271,7 +271,15 @@ select ok(
 );
 select is(
   (select count(*)::int from realtime.messages
-    where event = 'position' and topic <> 'game:' || current_setting('test.game_id') || ':seekers'),
+    where event = 'position' and topic = 'game:' || current_setting('test.game_id') || ':hiders'),
+  (select count(*)::int from realtime.messages
+    where event = 'position' and topic = 'game:' || current_setting('test.game_id') || ':seekers'),
+  'every position also goes to the hiders topic (and nowhere else, below)'
+);
+select is(
+  (select count(*)::int from realtime.messages
+    where event = 'position' and topic not in ('game:' || current_setting('test.game_id') || ':seekers',
+                                                'game:' || current_setting('test.game_id') || ':hiders')),
   0, 'positions go nowhere else'
 );
 select is(
