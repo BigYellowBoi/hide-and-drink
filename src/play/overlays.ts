@@ -1,6 +1,7 @@
 import type { Feature, FeatureCollection } from 'geojson'
 import { projector, radarCircle, type LngLat } from './geo'
-import { radarParams, thermometerParams, type Question } from './state'
+import { candidatesOf, radarParams, thermometerParams, type Question } from './state'
+import { isLngLat } from './geo'
 
 const fc = (features: Feature[]): FeatureCollection => ({ type: 'FeatureCollection', features })
 const point = (p: LngLat): Feature => ({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: p } })
@@ -33,5 +34,18 @@ export function questionTool(q: Question): FeatureCollection {
   if (r) return radarTool(r.center, r.distance_m)
   const t = thermometerParams(q)
   if (t) return thermometerTool(t.start, t.end)
-  return fc([])
+  const p = q.params
+  const at = isLngLat(p.center) ? [point(p.center)] : []
+  if (q.type === 'measuring' && isLngLat(p.target) && typeof p.distance_m === 'number') {
+    return measuringTool(p.target, p.distance_m, isLngLat(p.center) ? p.center : null)
+  }
+  if (q.type === 'tentacles' && isLngLat(p.center) && typeof p.radius_m === 'number') {
+    return fc([radarCircle(p.center, p.radius_m), ...at, ...candidatesOf(q).map((c) => point(c.point))])
+  }
+  return fc(at)
+}
+
+/** Measuring: the target and a circle through the seekers (closer = inside it). */
+export function measuringTool(target: LngLat, distanceM: number, from: LngLat | null): FeatureCollection {
+  return fc([radarCircle(target, Math.max(distanceM, 1)), point(target), ...(from ? [point(from)] : [])])
 }

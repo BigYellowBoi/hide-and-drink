@@ -1,11 +1,15 @@
-import { Suspense, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import type { FeatureCollection } from 'geojson'
 import type { GameSync } from '../sync/engine'
 import type { AreaCollection } from '../map/playArea'
 import { describeError } from '../lobby/messages'
 import { questionTool } from '../play/overlays'
+import { isLngLat } from '../play/geo'
 import { suggestAnswer, type HiderZone } from '../play/shading'
-import { ANSWERS, answerLabel, isSupportedType, km, questionLabel, type Question } from '../play/state'
+import type { LayerLookup } from '../play/features'
+import { photoPath, shrinkPhoto, uploadPhoto } from '../play/photos'
+import { supabase } from '../lib/supabase'
+import { ANSWERS, answerText, candidatesOf, km, NULL_ANSWER, optionText, questionLabel, questionText, type Question } from '../play/state'
 import { LockIcon } from './BarPicker'
 import { DeadlineRing } from './DeadlineRing'
 import type { MapDot } from './GameMap'
@@ -23,23 +27,63 @@ interface Props {
   seekers: readonly MapDot[]
   canAct: boolean
   now: number
+  /** City pack features, for suggestions that need them (matching, bonus count rules). */
+  layer?: LayerLookup
 }
 
-/** Fill the prompt's blank with the question's distance. */
-const promptText = (q: Question) =>
-  q.prompt.replace('___', typeof q.params.distance_m === 'number' ? km(q.params.distance_m) : '___')
+interface Photo {
+  blob: Blob
+  url: string
+  path: string
+}
 
 /**
  * Hider's answer sheet: sits at the top until answered. The suggestion is only a
  * suggestion; nothing is sent until the hider picks an answer and taps Send.
  */
-export function AnswerSheet({ sync, question: q, askerName, city, playArea, zone, ruled, seekers, canAct, now }: Props) {
+export function AnswerSheet({ sync, question: q, askerName, city, playArea, zone, ruled, seekers, canAct, now, layer }: Props) {
   const [choice, setChoice] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [text, setText] = useState('')
+  const [photo, setPhoto] = useState<Photo | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
-  const suggestion = useMemo(() => suggestAnswer(q, zone), [q, zone])
+  const fileRef = useRef<HTMLInputElement>(null)
+  const suggestion = useMemo(() => suggestAnswer(q, zone, layer), [q, zone, layer])
   const late = now > q.deadlineAt
-  const answers = isSupportedType(q.type) ? ANSWERS[q.type] : []
+  const kind = q.type === 'bonus' ? String(q.params.answer_kind ?? 'text') : q.type
+  const nullLabel = typeof q.params.null_answer === 'string' ? q.params.null_answer : null
+
+  // Every way to answer this question, as [answer, label] buttons (typed answers aside).
+  const buttons: [string, string][] = [
+    ...(ANSWERS[q.type] ?? (kind === 'yes_no' ? ['yes', 'no'] : [])).map((a): [string, string] => [a, answerText(q, a)]),
+    ...(q.type === 'tentacles' ? candidatesOf(q).map((c): [string, string] => [c.feature_id, c.name]) : []),
+    ...(nullLabel ? [[NULL_ANSWER, nullLabel] as [string, string]] : []),
+  ]
+  const typed = kind === 'text' || kind === 'number'
+  const typedAnswer = typed && text.trim() && (kind === 'text' || /^\d{1,4}$/.test(text.trim())) ? text.trim() : null
+  const answer = choice ?? typedAnswer
+
+  useEffect(
+    () => () => {
+      if (photo) URL.revokeObjectURL(photo.url)
+    },
+    [photo],
+  )
+
+  const pickPhoto = async (file: File | undefined) => {
+    if (!file) return
+    setErr(null)
+    setBusy('Preparing photo…')
+    try {
+      const blob = await shrinkPhoto(file)
+      setPhoto({ blob, url: URL.createObjectURL(blob), path: photoPath(sync.gameId, q.id) })
+      setChoice(null)
+    } catch (e) {
+      setErr(describeError(e))
+    } finally {
+      setBusy(null)
+    }
+  }
 
   const overlay = useMemo(
     () => ({
@@ -55,17 +99,26 @@ export function AnswerSheet({ sync, question: q, askerName, city, playArea, zone
   )
 
   const send = async () => {
-    if (!choice) return
-    setBusy(true)
     setErr(null)
     try {
-      await sync.action('answer_question', { p_question_id: q.id, p_answer: choice })
+      let a = answer
+      if (!a && photo && supabase) {
+        setBusy('Uploading photo…')
+        a = await uploadPhoto(supabase, photo.path, photo.blob)
+      }
+      if (!a) return
+      setBusy('Sending…')
+      await sync.action('answer_question', { p_question_id: q.id, p_answer: a })
     } catch (e) {
       setErr(describeError(e))
     } finally {
-      setBusy(false)
+      setBusy(null)
     }
   }
+  const ready = answer !== null || photo !== null
+  const sendLabel =
+    busy ?? (answer ? `Send “${answerText(q, answer)}”` : photo ? 'Send photo' : typed ? 'Type an answer' : 'Pick an answer')
+  const ref = q.params
 
   return (
     <section className="card answer-sheet" aria-live="polite">
@@ -73,14 +126,33 @@ export function AnswerSheet({ sync, question: q, askerName, city, playArea, zone
         <div>
           <p className="eyebrow">New question · from {askerName}</p>
           <h2>{questionLabel(q)}</h2>
-          <p className="muted">{promptText(q)}</p>
+          <p className="muted">{questionText(q)}</p>
+          {q.type === 'matching' && typeof ref.name === 'string' && (
+            <p className="ref-note">
+              Their nearest {(optionText(q) ?? '').toLowerCase()}: <strong>{ref.name}</strong>
+            </p>
+          )}
+          {q.type === 'measuring' && typeof ref.distance_m === 'number' && (
+            <p className="ref-note">
+              They are <strong>{km(ref.distance_m)}</strong> from {optionText(q)}.
+            </p>
+          )}
+          {q.type === 'tentacles' && typeof ref.radius_m === 'number' && (
+            <p className="ref-note">
+              {candidatesOf(q).length
+                ? `${candidatesOf(q).length} within ${km(ref.radius_m)} of them.`
+                : `Nothing of this kind within ${km(ref.radius_m)} of them.`}
+            </p>
+          )}
         </div>
         <DeadlineRing endsAt={q.deadlineAt} totalS={q.deadlineS} now={now} />
       </div>
 
-      <Suspense fallback={<div className="game-map mini-map" />}>
-        <LazyGameMap city={city} playArea={playArea} className="mini-map" overlay={overlay} tapNames={false} />
-      </Suspense>
+      {(isLngLat(q.params.center) || isLngLat(q.params.start)) && (
+        <Suspense fallback={<div className="game-map mini-map" />}>
+          <LazyGameMap city={city} playArea={playArea} className="mini-map" overlay={overlay} tapNames={false} />
+        </Suspense>
+      )}
 
       <div className="suggestion">
         <p className="eyebrow">
@@ -89,7 +161,7 @@ export function AnswerSheet({ sync, question: q, askerName, city, playArea, zone
         {suggestion ? (
           <>
             <p>
-              Suggested: <strong>{answerLabel(suggestion.answer)}</strong>{' '}
+              Suggested: <strong>{answerText(q, suggestion.answer)}</strong>{' '}
               <span className="muted small">
                 (from your {suggestion.from === 'bar' ? 'bar' : 'GPS position'})
               </span>
@@ -102,25 +174,63 @@ export function AnswerSheet({ sync, question: q, askerName, city, playArea, zone
             )}
           </>
         ) : (
-          <p className="muted">No suggestion: lock in a bar or allow location.</p>
+          <p className="muted">
+            {q.type === 'photos' || (q.type === 'bonus' && !q.params.count)
+              ? 'No suggestion for this one: answer it yourself.'
+              : 'No suggestion: lock in a bar or allow location.'}
+          </p>
         )}
       </div>
 
-      <div className="answer-buttons">
-        {answers.map((a) => (
+      <div className={`answer-buttons${buttons.length > 2 ? ' answer-list' : ''}`}>
+        {buttons.map(([a, label]) => (
           <button
             key={a}
             className={`answer${choice === a ? ' on' : ''}`}
             aria-pressed={choice === a}
-            disabled={busy || !canAct}
-            onClick={() => setChoice(a)}
+            disabled={!!busy || !canAct}
+            onClick={() => {
+              setChoice(choice === a ? null : a)
+              setPhoto(null)
+            }}
           >
-            {answerLabel(a)}
+            {label}
+            {suggestion?.answer === a && <span className="suggested-tag">Suggested</span>}
           </button>
         ))}
       </div>
-      <button className="wide" disabled={!choice || busy || !canAct} onClick={() => void send()}>
-        {choice ? `Send “${answerLabel(choice)}”` : 'Pick an answer'}
+      {typed && (
+        <input
+          className="answer-input"
+          inputMode={kind === 'number' ? 'numeric' : 'text'}
+          maxLength={200}
+          value={text}
+          aria-label="Your answer"
+          placeholder={kind === 'number' ? 'A number' : 'Your answer'}
+          onChange={(e) => {
+            setText(e.target.value)
+            setChoice(null)
+          }}
+        />
+      )}
+      {q.type === 'photos' && (
+        <div className="photo-answer">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+            onChange={(e) => void pickPhoto(e.target.files?.[0])}
+          />
+          {photo && <img className="photo-preview" src={photo.url} alt="Your photo" />}
+          <button className="secondary wide" disabled={!!busy || !canAct} onClick={() => fileRef.current?.click()}>
+            {photo ? 'Retake photo' : 'Take photo'}
+          </button>
+        </div>
+      )}
+      <button className="wide" disabled={!ready || !!busy || !canAct} onClick={() => void send()}>
+        {sendLabel}
       </button>
       {late && <p className="flag">Deadline passed: a shot for your team is logged. You still need to answer.</p>}
       <p className="muted small">

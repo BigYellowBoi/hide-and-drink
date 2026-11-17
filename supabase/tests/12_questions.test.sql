@@ -82,7 +82,7 @@ select pg_temp.as_user('33333333-3333-3333-3333-333333333333');
 select throws_ok(
   $$ select public.ask_question(pg_temp.gid(), 'matching', 'suburb', '{}',
        'dddddddd-0000-0000-0000-000000000022', pg_temp.seq()) $$,
-  'P0001', 'question_type_not_supported', 'types without a tool yet are refused'
+  'P0001', 'invalid_position', 'map questions need the asker''s position'
 );
 select throws_ok(
   $$ select public.ask_question(pg_temp.gid(), 'radar', '7km', '{"center":[153.025,-27.47]}',
