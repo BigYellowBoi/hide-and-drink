@@ -77,7 +77,7 @@ Flow: Home → Lobby → (host: setup) → Start round → each phone switches t
 | --- | --- | --- |
 | Home | Everyone | Logo tile, wordmark (no typed title), name field, Create game, inline 4-letter code + Join (no separate join screen). No resume banner: reopening the app goes straight back into the saved game |
 | Join via QR | Anyone scanning | Code prefilled from `?join=`, name, Join |
-| Lobby | Everyone | Big join code + QR, Hiders / Seekers columns (tap your name to switch; the host can tap anyone's; "Join" button under a column you're not in; unassigned players listed below), host setup checklist, slide to start |
+| Lobby | Everyone | Big join code + QR. Hiders and Seekers as full-width lists, one above the other (not side-by-side columns: names get cut off on phones). Tap your name to switch team; the host can tap anyone's. "Join" button under the team you're not in; unassigned players listed below. Host setup checklist, slide to start |
 | Deck builder | Host | Presets, category tabs with live totals, -/count/+ per card (0 greys out), "+ New card" |
 | Pick a bar | Hider | Hiding countdown, map + list of valid bars by distance, 100 m circle preview, slide to lock in |
 | Hider map | Hider | Own bar circle and position, freeze banner, "New question" card with deadline |

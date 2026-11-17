@@ -447,10 +447,9 @@ button.small {
   margin: 0 0 12px;
 }
 
-.team-columns {
+.team-lists {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 12px;
 }
 
 .team-col {
@@ -458,7 +457,7 @@ button.small {
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-  padding: 12px 8px;
+  padding: 12px;
   border-radius: var(--r-card);
   border: 2px solid var(--line);
 }
@@ -545,8 +544,7 @@ button.player-me {
 .player-badges {
   display: flex;
   gap: 4px;
-  flex-basis: 100%;
-  padding-left: 12px;
+  flex-shrink: 0;
 }
 
 .player-name {
