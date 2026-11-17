@@ -37,7 +37,7 @@ select set_config('test.code', current_setting('test.created')::jsonb ->> 'code'
 
 select is((select count(*)::int from public.games where host_id = '11111111-1111-1111-1111-111111111111'), 1,
   'the retry did not create a second game');
-select matches(current_setting('test.code'), '^[A-Z2-9]{6}$', 'join code is 6 unambiguous characters');
+select matches(current_setting('test.code'), '^[A-HJ-NP-Z]{4}$', 'join code is 4 unambiguous letters');
 
 select set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}', true);
 set local role authenticated;
