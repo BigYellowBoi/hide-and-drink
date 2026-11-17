@@ -97,6 +97,15 @@ export function applyLobbyEvent(state: LobbyState, e: GameEvent): LobbyState {
       const userId = str(p.user_id)
       return { ...state, players: state.players.filter((x) => x.userId !== userId) }
     }
+    case 'player_left': {
+      const userId = str(p.user_id)
+      const hostId = str(p.new_host_id) ?? state.hostId
+      return {
+        ...state,
+        hostId,
+        players: state.players.filter((x) => x.userId !== userId).map((x) => ({ ...x, isHost: x.userId === hostId })),
+      }
+    }
     case 'config_changed':
       return isObject(p.config) ? { ...state, config: p.config } : state
     case 'play_area_changed':

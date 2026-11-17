@@ -18,6 +18,7 @@ import { AnswerSheet } from './AnswerSheet'
 import { AskPanel } from './AskPanel'
 import { BarPicker, LockIcon } from './BarPicker'
 import { DeadlineRing } from './DeadlineRing'
+import type { MapDot } from './GameMap'
 import { LazyGameMap } from './lazyMap'
 import { PlayLog } from './PlayLog'
 import { PresenceDot } from './PresenceDot'
@@ -52,7 +53,12 @@ interface Props {
 interface Shared {
   play: PlayState
   ruled: FeatureCollection
-  /** The pending question's tool, else the last answered one's. */
+  /** Outline of where the hider can still be, once anything is ruled out. */
+  remaining: FeatureCollection | undefined
+  /** Every seeker but this phone, with name tags (both teams see them). */
+  seekerDots: MapDot[]
+  goMap: () => void
+  /** The open question's tool (radar circle, thermometer line). */
   tool: FeatureCollection | undefined
   tab: Tab
   now: number
@@ -79,34 +85,47 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
     () => (playArea && shading ? remainingBars(venues, playArea, shading.remaining, zone.barRadiusM) : []),
     [venues, playArea, shading, zone.barRadiusM],
   )
-  const tool = useMemo(() => {
-    const q = play.pending ?? answered[answered.length - 1]
-    return q ? questionTool(q) : undefined
-  }, [play.pending, answered])
+  // Only while a question is open: once answered, the white outline of what's left says it all.
+  const tool = useMemo(() => (play.pending ? questionTool(play.pending) : undefined), [play.pending])
+
+  const remaining = useMemo<FeatureCollection | undefined>(
+    () =>
+      shading?.remaining && shading.ruledOut.features.length
+        ? { type: 'FeatureCollection', features: [shading.remaining] }
+        : undefined,
+    [shading],
+  )
+  const round = started?.round
+  const seekerDots = useMemo<MapDot[]>(() => {
+    const seekers = new Map(lobby.players.filter((p) => p.team === 'seekers').map((p) => [p.userId, p.name]))
+    return positions
+      .filter((p) => p.userId !== userId && p.round === round && seekers.has(p.userId))
+      .map((p) => ({ id: p.userId, lng: p.lng, lat: p.lat, team: 'seekers' as const, name: seekers.get(p.userId) }))
+  }, [positions, userId, round, lobby.players])
 
   if (!started) return null
   const clock = roundClock(started.startedAt, started.hidingPeriodS, now)
   const team = lobby.players.find((p) => p.userId === userId)?.team ?? null
   const tabs = team ? TABS[team] : TABS.seekers
   const nameOf = (id: string | null) => lobby.players.find((p) => p.userId === id)?.name ?? 'a seeker'
-  const shared: Shared = { play, ruled: shading?.ruledOut ?? EMPTY, tool, tab, now, nameOf }
+  const shared: Shared = {
+    play,
+    ruled: shading?.ruledOut ?? EMPTY,
+    remaining,
+    seekerDots,
+    goMap: () => setTab('map'),
+    tool,
+    tab,
+    now,
+    nameOf,
+  }
 
   return (
     <>
       {team === 'hiders' ? (
         <HiderView sync={sync} lobby={lobby} started={started} zone={zone} canAct={canAct} events={events} clock={clock} {...shared} />
       ) : team === 'seekers' ? (
-        <SeekerView
-          sync={sync}
-          lobby={lobby}
-          started={started}
-          zone={zone}
-          canAct={canAct}
-          userId={userId}
-          positions={positions}
-          clock={clock}
-          {...shared}
-        />
+        <SeekerView sync={sync} lobby={lobby} started={started} zone={zone} canAct={canAct} clock={clock} {...shared} />
       ) : (
         <section className="card">
           <p className="muted">You are not on a team this round.</p>
@@ -224,7 +243,24 @@ interface HiderProps extends Shared {
   clock: Clock
 }
 
-function HiderView({ sync, lobby, started, zone, canAct, events, clock, play, ruled, tool, tab, now, nameOf }: HiderProps) {
+function HiderView({
+  sync,
+  lobby,
+  started,
+  zone,
+  canAct,
+  events,
+  clock,
+  play,
+  ruled,
+  remaining,
+  seekerDots,
+  goMap,
+  tool,
+  tab,
+  now,
+  nameOf,
+}: HiderProps) {
   // Hider GPS stays on this phone: it sorts bars, suggests answers and draws "you" on the map.
   const { fix, error } = useGeolocation(true)
   const hiding = useMemo(() => deriveHiding(events, started.round), [events, started.round])
@@ -232,11 +268,12 @@ function HiderView({ sync, lobby, started, zone, canAct, events, clock, play, ru
   const overlay = useMemo(
     () => ({
       zone: bar ? { lng: bar.lng, lat: bar.lat, radiusM: bar.radiusM, team: 'hiders' as const } : null,
-      dots: fix ? [{ id: 'me', lng: fix.lng, lat: fix.lat, team: 'hiders' as const, me: true }] : [],
+      dots: [...seekerDots, ...(fix ? [{ id: 'me', lng: fix.lng, lat: fix.lat, team: 'hiders' as const, me: true }] : [])],
       ruled,
+      remaining,
       tool,
     }),
-    [bar, fix, ruled, tool],
+    [bar, fix, seekerDots, ruled, remaining, tool],
   )
   const focus = useMemo(() => (bar ? { lng: bar.lng, lat: bar.lat } : null), [bar])
   // For suggested answers. Computed here, never sent anywhere.
@@ -267,14 +304,33 @@ function HiderView({ sync, lobby, started, zone, canAct, events, clock, play, ru
           playArea={started.playArea}
           zone={answerZone}
           ruled={ruled}
+          seekers={seekerDots}
           canAct={canAct}
           now={now}
         />
       )}
+      {!bar && tab !== 'map' && (
+        <section className="card pick-prompt">
+          <div>
+            <p className="eyebrow">
+              <LockIcon /> Only you see this
+            </p>
+            <h2>Pick your bar</h2>
+            <p className="muted small">
+              {clock.phase === 'hiding' ? `${formatClock(clock.ms)} left to hide` : 'Hiding is over. Lock one in now.'}
+            </p>
+          </div>
+          <button className="small" onClick={goMap}>
+            Pick
+          </button>
+        </section>
+      )}
 
+      {tab === 'map' && !bar && <GeoNote error={error} waiting={!fix} />}
       {tab === 'map' &&
         (!bar ? (
           <BarPicker
+            seekers={seekerDots}
             sync={sync}
             city={lobby.city}
             started={started}
@@ -305,7 +361,7 @@ function HiderView({ sync, lobby, started, zone, canAct, events, clock, play, ru
               {!hiding.frozen && (
                 <p className="ok small-note">Clear: no seeker within {formatDistance(zone.freezeRadiusM)}.</p>
               )}
-              <GeoNote error={error} />
+              <GeoNote error={error} waiting={!fix} />
             </section>
             <section className="card map-card">
               <Suspense fallback={<div className="game-map play-map" />}>
@@ -317,7 +373,10 @@ function HiderView({ sync, lobby, started, zone, canAct, events, clock, play, ru
                   focus={focus}
                 />
               </Suspense>
-              <p className="muted small">Hatched: ruled out by answers.</p>
+              <p className="muted small">
+                {seekerDots.length ? 'Tap a seeker for their distance. ' : 'No seeker positions yet. '}
+                Hatched: ruled out by answers.
+              </p>
             </section>
           </>
         ))}
@@ -333,8 +392,6 @@ interface SeekerProps extends Shared {
   started: StartedRound
   zone: HidingZoneConfig
   canAct: boolean
-  userId: string | null
-  positions: readonly SeekerPosition[]
   clock: Clock
 }
 
@@ -344,36 +401,27 @@ function SeekerView({
   started,
   zone,
   canAct,
-  userId,
-  positions,
   clock,
   play,
   ruled,
+  remaining,
+  seekerDots,
   tool,
   tab,
   now,
   nameOf,
 }: SeekerProps) {
-  // Mounted for the whole round, whatever the tab, so the team keeps getting this phone's position.
+  // Mounted for the whole round, whatever the tab, so everyone keeps getting this phone's position.
   const { fix, error } = useGeolocation(true)
   const lastSent = usePositionReporter(sync, fix, canAct, zone.locationIntervalS, true)
-  const names = useMemo(() => new Map(lobby.players.map((p) => [p.userId, p.name])), [lobby.players])
-
-  // Teammates from the server; this phone from its own GPS (fresher than its last report).
-  const mates = useMemo(
-    () => positions.filter((p) => p.userId !== userId && p.round === started.round && names.has(p.userId)),
-    [positions, userId, started.round, names],
-  )
   const overlay = useMemo(
     () => ({
-      dots: [
-        ...mates.map((p) => ({ id: p.userId, lng: p.lng, lat: p.lat, team: 'seekers' as const })),
-        ...(fix ? [{ id: 'me', lng: fix.lng, lat: fix.lat, team: 'seekers' as const, me: true }] : []),
-      ],
+      dots: [...seekerDots, ...(fix ? [{ id: 'me', lng: fix.lng, lat: fix.lat, team: 'seekers' as const, me: true }] : [])],
       ruled,
+      remaining,
       tool,
     }),
-    [mates, fix, ruled, tool],
+    [seekerDots, fix, ruled, remaining, tool],
   )
   const pending = play.pending
 
@@ -392,42 +440,17 @@ function SeekerView({
       )}
 
       {tab === 'map' && (
-        <>
-          {clock.phase === 'hiding' && (
-            <section className="card started">
-              <p className="eyebrow">Hiding period</p>
-              <p className="countdown">{formatClock(clock.ms)}</p>
-              <p className="muted">The hider is picking a bar. Questions open when the clock hits zero.</p>
-            </section>
-          )}
-          <section className="card map-card">
-            <Suspense fallback={<div className="game-map play-map" />}>
-              <LazyGameMap city={lobby.city} playArea={started.playArea} className="play-map" overlay={overlay} />
-            </Suspense>
-            <p className="muted small">Hatched: ruled out by answers. Suggestions, not rulings.</p>
-          </section>
-          <section className="card">
-            <p className="eyebrow">Your team</p>
-            <ul className="mate-list">
-              {mates.map((p) => (
-                <li key={p.userId}>
-                  <span className="mate-dot" aria-hidden="true" />
-                  {names.get(p.userId)}
-                  <span className="muted"> · {ago(now - p.at)}</span>
-                </li>
-              ))}
-              {mates.length === 0 && <li className="muted">No teammate positions yet.</li>}
-            </ul>
-            <p className="muted small-note">
-              {fix
-                ? lastSent
-                  ? `Sharing your location with your team every ${Math.round(zone.locationIntervalS)} s.`
-                  : 'Sharing your location once connected.'
-                : null}
-            </p>
-            <GeoNote error={error} seeker />
-          </section>
-        </>
+        <section className="card map-card">
+          <Suspense fallback={<div className="game-map play-map" />}>
+            <LazyGameMap city={lobby.city} playArea={started.playArea} className="play-map" overlay={overlay} />
+          </Suspense>
+          <p className="muted small">
+            {clock.phase === 'hiding' ? 'Questions open when the clock hits zero. ' : ''}
+            Hatched: ruled out by answers. Suggestions, not rulings.
+            {fix && lastSent ? ` Sharing your location every ${Math.round(zone.locationIntervalS)} s.` : ''}
+          </p>
+          <GeoNote error={error} seeker />
+        </section>
       )}
 
       {tab === 'ask' && (
@@ -449,14 +472,14 @@ function SeekerView({
   )
 }
 
-function ago(ms: number): string {
-  const s = Math.max(0, Math.round(ms / 1000))
-  return s < 60 ? `${s} s ago` : `${Math.floor(s / 60)} min ago`
-}
 
-function GeoNote({ error, seeker = false }: { error: GeoError | null; seeker?: boolean }) {
-  if (!error) return null
-  const why = seeker ? " Your team can't see you and the hider's freeze alert can't use your position." : ''
+function GeoNote({ error, seeker = false, waiting = false }: { error: GeoError | null; seeker?: boolean; waiting?: boolean }) {
+  if (!error) {
+    return waiting ? <p className="muted small-note">Waiting for GPS: you'll appear on the map once it has a fix.</p> : null
+  }
+  const why = seeker
+    ? " Nobody can see you and the hider's freeze alert can't use your position."
+    : " You won't appear on the map and answer suggestions can't use your position."
   const text =
     error === 'denied'
       ? `Location is blocked. Allow it for this app in your browser settings.${why}`

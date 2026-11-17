@@ -45,7 +45,7 @@ export const PACK_SOURCES = {
 } as const
 
 /** Layers that answer a tap with the feature's name. */
-export const TAPPABLE_LAYERS = ['bars', 'venues', 'stations', 'lines', 'lines-ferry']
+export const TAPPABLE_LAYERS = ['dots', 'bars', 'venues', 'stations', 'lines', 'lines-ferry']
 
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] }
 
@@ -73,6 +73,7 @@ export function mapStyle(pack: CityPack): StyleSpecification {
       bars: { type: 'geojson', data: EMPTY },
       dots: { type: 'geojson', data: EMPTY },
       ruled: { type: 'geojson', data: EMPTY },
+      remaining: { type: 'geojson', data: EMPTY },
       tool: { type: 'geojson', data: EMPTY },
     },
     layers: [
@@ -96,6 +97,14 @@ export function mapStyle(pack: CityPack): StyleSpecification {
       },
       // Ruled-out area: hatch (image added by GameMap on load) so streets show through.
       { id: 'ruled', type: 'fill', source: 'ruled', paint: { 'fill-pattern': 'hatch' } },
+      // Where the hider can still be: a white edge inside the hatch, so it reads at a glance.
+      {
+        id: 'remaining',
+        type: 'line',
+        source: 'remaining',
+        layout: { 'line-join': 'round' },
+        paint: { 'line-color': MAP_COLORS.text, 'line-width': 2.5 },
+      },
       {
         id: 'lines',
         type: 'line',

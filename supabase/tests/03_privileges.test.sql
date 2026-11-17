@@ -28,7 +28,7 @@ select is(
   ),
   array[
     'answer_question', 'ask_question', 'can_join_topic', 'can_see', 'can_see_seeker_position', 'can_use_presence',
-    'choose_bar', 'create_game', 'delete_play_area', 'get_city_pack', 'hiding_bars', 'is_player', 'join_game',
+    'choose_bar', 'create_game', 'delete_play_area', 'get_city_pack', 'hiding_bars', 'is_player', 'join_game', 'leave_game',
     'my_team', 'remove_player', 'report_position', 'save_play_area', 'server_time', 'set_play_area', 'set_team',
     'settle_timers', 'start_game', 'topic_for', 'update_config'
   ],
