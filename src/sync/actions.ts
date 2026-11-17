@@ -44,10 +44,15 @@ export interface JoinResult {
 }
 
 /** Lobby entry points: these run before there is a game to sync, so no freshness check. */
-export async function createGame(transport: SyncTransport, name: string): Promise<JoinResult> {
+export async function createGame(
+  transport: SyncTransport,
+  name: string,
+  config: Record<string, unknown> = {},
+): Promise<JoinResult> {
   await transport.signIn()
   return (await callWithRetry(transport, 'create_game', {
     p_name: name,
+    p_config: config,
     p_client_action_id: crypto.randomUUID(),
   })) as JoinResult
 }

@@ -45,10 +45,12 @@ Full spec: `docs/spec.md`. Seed data: `data/`. Read only the parts relevant to t
 
 - `src/lib/supabase.ts`: Supabase client from `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`
 - `src/lib/seed.ts`: typed access to `data/cards.json` and `data/questions.json`
+- `src/lobby/`: lobby state derived from events (`state.ts`), data-driven config fields (`config.ts`), error messages. UI in `src/components/` (`Home`, `Lobby`, `ConfigEditor`, `JoinCode`, `Started`)
+- Join links/QR open `<base>?join=CODE`, which prefills the join form
 - `src/sync/`: client sync engine. `sequencer.ts` (pure ordering/gap logic), `engine.ts` (`GameSync`: topics, resync, status, actions), `transport.ts` (backend interface; `supabaseTransport.ts` in the app, fakes in tests), `clock.ts` (server clock offset), `useGameSync.ts` (React hook). Broadcasts carry `prev_seq` per audience so clients can skip the other team's seqs without a fetch.
 - Vite `base` is `/hide-and-drink/` (GitHub Pages path); keep asset paths relative to it
 - `supabase/migrations/`: schema, RLS, action functions, Realtime broadcast trigger; `supabase/tests/`: pgTAP tests
 
 ## Current phase
 
-Phase 0 done. Phase 1 in progress: core schema done (games, players, event log, team-scoped RLS and Realtime topics, lobby actions, seeded content). Client sync engine done (anonymous sign-in, topics, ordered apply, gap fetch, resync on reopen, clock offset, status dot; temporary Sync check panel in `App.tsx`). Next: lobby UI and the latency harness. See `docs/spec.md` for the phases and their gates.
+Phase 0 done. Phase 1 in progress: core schema done (games, players, event log, team-scoped RLS and Realtime topics, lobby actions, seeded content). Client sync engine done (anonymous sign-in, topics, ordered apply, gap fetch, resync on reopen, clock offset, status dot). Lobby done (create/join by code or QR, teams, host moves, config editor, saved play area, `start_game` locks and snapshots, hiding countdown placeholder). Next: latency harness. See `docs/spec.md` for the phases and their gates.
