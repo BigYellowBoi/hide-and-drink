@@ -1,8 +1,8 @@
 import { ActionError, callWithRetry } from './actions'
 import { ServerClock } from './clock'
 import { EventSequencer } from './sequencer'
-import { gameTopic, teamTopic, type ChannelState, type SyncTransport } from './transport'
-import { audienceFor, isGameEvent, type GameEvent, type Team } from './types'
+import { gameTopic, teamTopic, type ActionResult, type ChannelState, type SyncTransport } from './transport'
+import { audienceFor, isGameEvent, parsePosition, type GameEvent, type SeekerPosition, type Team } from './types'
 
 /**
  * connecting: joining topics. syncing: fetching missed events. live: up to date.
@@ -24,6 +24,8 @@ export interface SyncSnapshot {
   present: readonly string[]
   /** Local time (ms) the status last left 'live', or null while live or before the first sync. */
   staleSince: number | null
+  /** Seekers only: latest position per seeker teammate (ephemeral, never in the event log). */
+  positions: readonly SeekerPosition[]
 }
 
 export { ActionError }
@@ -78,6 +80,7 @@ export class GameSync {
   private status: SyncStatus = 'idle'
   private error: string | null = null
   private present: readonly string[] = []
+  private positions = new Map<string, SeekerPosition>()
   private staleSince: number | null = null
   private wasLive = false
 
@@ -213,6 +216,22 @@ export class GameSync {
   }
 
   /**
+   * Send this seeker's GPS fix. Ephemeral and latest-wins: sent once, only while live, never
+   * queued or retried (the next fix replaces it).
+   */
+  async reportPosition(lng: number, lat: number, accuracyM: number | null): Promise<ActionResult> {
+    if (!this.snapshot.canAct || this.team !== 'seekers') {
+      return { ok: false, code: 'not_live', message: 'Not connected.', retryable: false }
+    }
+    return this.transport.call('report_position', {
+      p_game_id: this.gameId,
+      p_lng: lng,
+      p_lat: lat,
+      p_accuracy_m: accuracyM,
+    })
+  }
+
+  /**
    * Fetch every event after the last applied one. Single-flight: a request made while a
    * fetch is running triggers one more pass. quiet: a background check that doesn't
    * block actions.
@@ -269,6 +288,7 @@ export class GameSync {
       if (member.team !== this.team) {
         // Visibility changed: start over with the new team's view of the log.
         this.team = member.team
+        this.positions.clear()
         this.sequencer.reset(audienceFor(this.team))
         this.rebuilding = []
         this.stale = true
@@ -283,6 +303,38 @@ export class GameSync {
       this.events = this.rebuilding
       this.rebuilding = null
     }
+    if (this.team === 'seekers') void this.refreshPositions()
+  }
+
+  /** Teammates' latest positions, for a fresh view after (re)joining. Best effort. */
+  private async refreshPositions(): Promise<void> {
+    if (!this.transport.fetchPositions) return
+    try {
+      const rows = await this.transport.fetchPositions(this.gameId)
+      if (this.stopped || this.team !== 'seekers') return
+      for (const p of rows) this.mergePosition(p)
+      this.emit()
+    } catch {
+      // The next broadcast or resync fills them in.
+    }
+  }
+
+  private mergePosition(p: SeekerPosition): boolean {
+    const cur = this.positions.get(p.userId)
+    if (cur && (cur.round > p.round || (cur.round === p.round && cur.at >= p.at))) return false
+    // A new round's report drops everyone's positions from earlier rounds.
+    if (cur === undefined || p.round > cur.round) {
+      for (const [k, v] of this.positions) if (v.round < p.round) this.positions.delete(k)
+    }
+    this.positions.set(p.userId, p)
+    return true
+  }
+
+  private onSignal(event: string, raw: unknown): void {
+    if (this.stopped || event !== 'position' || this.team !== 'seekers') return
+    const p = parsePosition(raw)
+    if (!p || (raw as { game_id?: unknown }).game_id !== this.gameId) return
+    if (this.mergePosition(p)) this.emit()
   }
 
   private joinTopics(): void {
@@ -319,6 +371,7 @@ export class GameSync {
           this.settle()
         },
         presence,
+        topic === teamTopic(this.gameId, 'seekers') ? (event, raw) => this.onSignal(event, raw) : undefined,
       )
     }
     this.settle()
@@ -437,6 +490,7 @@ export class GameSync {
       error: this.error,
       present: this.present,
       staleSince: this.staleSince,
+      positions: [...this.positions.values()],
     }
   }
 }

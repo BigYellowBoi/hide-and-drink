@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ActionError, GameSync } from './engine'
 import type { ActionResult, ChannelState, PresenceOptions, SyncTransport } from './transport'
-import type { GameEvent, Team, Visibility } from './types'
+import type { GameEvent, SeekerPosition, Team, Visibility } from './types'
 
 const GAME = 'game-1'
 const ME = 'user-me'
@@ -12,8 +12,14 @@ class FakeServer implements SyncTransport {
   team: Team | null = 'seekers'
   topics = new Map<
     string,
-    { onEvent: (raw: unknown) => void; onState: (s: ChannelState) => void; presence?: PresenceOptions }
+    {
+      onEvent: (raw: unknown) => void
+      onState: (s: ChannelState) => void
+      presence?: PresenceOptions
+      onSignal?: (event: string, raw: unknown) => void
+    }
   >()
+  storedPositions: SeekerPosition[] = []
   fetchCount = 0
   failFetch = false
   serverOffset = 5000
@@ -39,9 +45,13 @@ class FakeServer implements SyncTransport {
     onEvent: (raw: unknown) => void,
     onState: (s: ChannelState) => void,
     presence?: PresenceOptions,
+    onSignal?: (event: string, raw: unknown) => void,
   ) {
-    this.topics.set(topic, { onEvent, onState, presence })
+    this.topics.set(topic, { onEvent, onState, presence, onSignal })
     return () => this.topics.delete(topic)
+  }
+  async fetchPositions() {
+    return this.storedPositions
   }
   async call(fn: string, args: Record<string, unknown>) {
     this.calls.push({ fn, args })
@@ -380,5 +390,65 @@ describe('GameSync', () => {
     expect(sync.getSnapshot().status).toBe('live')
     expect(sync.getSnapshot().staleSince).toBeNull()
     sync.stop()
+  })
+
+  describe('seeker positions', () => {
+    const pos = (user: string, lng: number, at: string, round = 1) => ({
+      game_id: GAME,
+      user_id: user,
+      round,
+      lng,
+      lat: -27.4,
+      accuracy_m: 5,
+      at,
+    })
+
+    it('loads teammates on sync and keeps the newest broadcast per seeker', async () => {
+      const server = new FakeServer()
+      server.storedPositions = [{ userId: 'amy', round: 1, lng: 153, lat: -27.4, accuracyM: 5, at: Date.parse('2026-11-17T10:00:00Z') }]
+      const sync = await started(server)
+      await flush()
+      expect(sync.getSnapshot().positions.map((p) => p.userId)).toEqual(['amy'])
+      const signal = server.topics.get(`game:${GAME}:seekers`)?.onSignal
+      signal?.('position', pos('amy', 153.1, '2026-11-17T10:00:20Z'))
+      signal?.('position', pos('amy', 153.2, '2026-11-17T10:00:10Z')) // older, arrives late
+      signal?.('position', pos('sam', 153.3, '2026-11-17T10:00:15Z'))
+      signal?.('position', { ...pos('eve', 1, '2026-11-17T10:00:15Z'), game_id: 'other' })
+      const byUser = Object.fromEntries(sync.getSnapshot().positions.map((p) => [p.userId, p.lng]))
+      expect(byUser).toEqual({ amy: 153.1, sam: 153.3 })
+      // A new round drops last round's positions.
+      signal?.('position', pos('sam', 153.4, '2026-11-17T11:00:00Z', 2))
+      expect(sync.getSnapshot().positions.map((p) => p.userId)).toEqual(['sam'])
+      sync.stop()
+    })
+
+    it('hiders never listen for positions', async () => {
+      const server = new FakeServer()
+      server.team = 'hiders'
+      server.storedPositions = [{ userId: 'amy', round: 1, lng: 153, lat: -27.4, accuracyM: 5, at: 0 }]
+      const sync = await started(server)
+      await flush()
+      expect(server.topics.get(`game:${GAME}:hiders`)?.onSignal).toBeUndefined()
+      expect(sync.getSnapshot().positions).toEqual([])
+      expect((await sync.reportPosition(153, -27, 5)).ok).toBe(false)
+      expect(server.calls).toEqual([])
+      sync.stop()
+    })
+
+    it('reports only while live, once, without queueing', async () => {
+      const server = new FakeServer()
+      const sync = await started(server)
+      expect((await sync.reportPosition(153, -27.4, 8)).ok).toBe(true)
+      expect(server.calls).toEqual([
+        { fn: 'report_position', args: { p_game_id: GAME, p_lng: 153, p_lat: -27.4, p_accuracy_m: 8 } },
+      ])
+      sync.setOnline(false)
+      expect((await sync.reportPosition(153, -27.4, 8)).ok).toBe(false)
+      sync.setOnline(true)
+      server.ackAll()
+      await flush()
+      expect(server.calls).toHaveLength(1)
+      sync.stop()
+    })
   })
 })

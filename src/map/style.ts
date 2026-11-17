@@ -12,15 +12,11 @@ export const MAP_COLORS = {
   muted: '#A9B4BF',
   venue: '#F2B705', // drink category colour
   areaOutline: '#F0F0F0',
+  hider: '#5BB4F0',
+  seeker: '#FF6B6F', // --seeker-on-dark
   hatchFill: '#2C3E50',
   hatchLine: '#5C6B7A',
-  seeker: '#FF6B6F', // --seeker-on-dark
-  hider: '#5BB4F0',
 } as const
-
-/** Overlay sources every GameMap has (empty until set): see GameMap's overlays prop. */
-export const OVERLAY_SOURCES = ['ruled', 'tool', 'zone', 'me'] as const
-export type OverlaySource = (typeof OVERLAY_SOURCES)[number]
 
 /** 45° hatch tile for the ruled-out area (docs/design.md): fill colour with lighter lines. */
 export function hatchImage(size = 16): { width: number; height: number; data: Uint8Array } {
@@ -49,7 +45,7 @@ export const PACK_SOURCES = {
 } as const
 
 /** Layers that answer a tap with the feature's name. */
-export const TAPPABLE_LAYERS = ['venues', 'stations', 'lines', 'lines-ferry']
+export const TAPPABLE_LAYERS = ['bars', 'venues', 'stations', 'lines', 'lines-ferry']
 
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] }
 
@@ -73,7 +69,11 @@ export function mapStyle(pack: CityPack): StyleSpecification {
       venues: src(PACK_SOURCES.venues),
       mask: { type: 'geojson', data: EMPTY },
       area: { type: 'geojson', data: EMPTY },
-      ...Object.fromEntries(OVERLAY_SOURCES.map((id) => [id, { type: 'geojson' as const, data: EMPTY }])),
+      zone: { type: 'geojson', data: EMPTY },
+      bars: { type: 'geojson', data: EMPTY },
+      dots: { type: 'geojson', data: EMPTY },
+      ruled: { type: 'geojson', data: EMPTY },
+      tool: { type: 'geojson', data: EMPTY },
     },
     layers: [
       { id: 'ground', type: 'background', paint: { 'background-color': MAP_COLORS.ground } },
@@ -94,7 +94,7 @@ export function mapStyle(pack: CityPack): StyleSpecification {
         source: 'mask',
         paint: { 'fill-color': MAP_COLORS.bg, 'fill-opacity': 0.6 },
       },
-      // Ruled-out area: hatch (pattern added by GameMap on load) so streets show through.
+      // Ruled-out area: hatch (image added by GameMap on load) so streets show through.
       { id: 'ruled', type: 'fill', source: 'ruled', paint: { 'fill-pattern': 'hatch' } },
       {
         id: 'lines',
@@ -127,9 +127,7 @@ export function mapStyle(pack: CityPack): StyleSpecification {
         layout: { 'line-join': 'round' },
         paint: { 'line-color': MAP_COLORS.areaOutline, 'line-width': 2.5 },
       },
-      // Hider's zone (bar circle, hiders' phones only) and the seekers' question tool.
-      { id: 'zone-fill', type: 'fill', source: 'zone', paint: { 'fill-color': MAP_COLORS.hider, 'fill-opacity': 0.18 } },
-      { id: 'zone-line', type: 'line', source: 'zone', paint: { 'line-color': MAP_COLORS.hider, 'line-width': 2 } },
+      // The seekers' question tool: radar circle, or thermometer path and dividing line.
       {
         id: 'tool-fill',
         type: 'fill',
@@ -149,7 +147,24 @@ export function mapStyle(pack: CityPack): StyleSpecification {
         type: 'circle',
         source: 'tool',
         filter: ['==', ['geometry-type'], 'Point'],
-        paint: { 'circle-color': MAP_COLORS.seeker, 'circle-radius': 5, 'circle-stroke-color': MAP_COLORS.bg, 'circle-stroke-width': 2 },
+        paint: {
+          'circle-color': MAP_COLORS.seeker,
+          'circle-radius': 5,
+          'circle-stroke-color': MAP_COLORS.bg,
+          'circle-stroke-width': 2,
+        },
+      },
+      {
+        id: 'zone-fill',
+        type: 'fill',
+        source: 'zone',
+        paint: { 'fill-color': ['coalesce', ['get', 'color'], MAP_COLORS.hider], 'fill-opacity': 0.18 },
+      },
+      {
+        id: 'zone-line',
+        type: 'line',
+        source: 'zone',
+        paint: { 'line-color': ['coalesce', ['get', 'color'], MAP_COLORS.hider], 'line-width': 2 },
       },
       {
         id: 'venues',
@@ -174,14 +189,31 @@ export function mapStyle(pack: CityPack): StyleSpecification {
         },
       },
       {
-        id: 'me',
+        // Bars the hider may pick; the selected one in hider blue.
+        id: 'bars',
         type: 'circle',
-        source: 'me',
+        source: 'bars',
         paint: {
-          'circle-color': ['coalesce', ['get', 'color'], MAP_COLORS.hider],
-          'circle-radius': 7,
-          'circle-stroke-color': MAP_COLORS.text,
-          'circle-stroke-width': 2,
+          'circle-color': ['case', ['boolean', ['get', 'selected'], false], MAP_COLORS.hider, MAP_COLORS.venue],
+          'circle-radius': [
+            'interpolate', ['linear'], ['zoom'],
+            11, ['case', ['boolean', ['get', 'selected'], false], 6, 3],
+            15, ['case', ['boolean', ['get', 'selected'], false], 10, 6],
+          ],
+          'circle-stroke-color': ['case', ['boolean', ['get', 'selected'], false], MAP_COLORS.text, MAP_COLORS.bg],
+          'circle-stroke-width': ['case', ['boolean', ['get', 'selected'], false], 2.5, 1],
+        },
+      },
+      {
+        // People: you (white centre) and teammates, in team colour.
+        id: 'dots',
+        type: 'circle',
+        source: 'dots',
+        paint: {
+          'circle-color': ['case', ['boolean', ['get', 'me'], false], MAP_COLORS.text, ['get', 'color']],
+          'circle-radius': ['case', ['boolean', ['get', 'me'], false], 7, 6],
+          'circle-stroke-color': ['case', ['boolean', ['get', 'me'], false], ['get', 'color'], MAP_COLORS.text],
+          'circle-stroke-width': ['case', ['boolean', ['get', 'me'], false], 4, 2],
         },
       },
     ],

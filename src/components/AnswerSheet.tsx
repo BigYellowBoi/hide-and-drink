@@ -3,9 +3,10 @@ import type { FeatureCollection } from 'geojson'
 import type { GameSync } from '../sync/engine'
 import type { AreaCollection } from '../map/playArea'
 import { describeError } from '../lobby/messages'
-import { questionTool, circleOverlay, meOverlay } from '../play/overlays'
+import { questionTool } from '../play/overlays'
 import { suggestAnswer, type HiderZone } from '../play/shading'
 import { ANSWERS, answerLabel, isSupportedType, km, questionLabel, type Question } from '../play/state'
+import { LockIcon } from './BarPicker'
 import { DeadlineRing } from './DeadlineRing'
 import { LazyGameMap } from './lazyMap'
 
@@ -37,12 +38,14 @@ export function AnswerSheet({ sync, question: q, askerName, city, playArea, zone
   const late = now > q.deadlineAt
   const answers = isSupportedType(q.type) ? ANSWERS[q.type] : []
 
-  const overlays = useMemo(
+  const overlay = useMemo(
     () => ({
       tool: questionTool(q),
       ruled,
-      zone: zone.bar ? circleOverlay(zone.bar.point, zone.bar.radiusM) : undefined,
-      me: meOverlay(zone.gps?.point ?? null),
+      zone: zone.bar ? { lng: zone.bar.point[0], lat: zone.bar.point[1], radiusM: zone.bar.radiusM, team: 'hiders' as const } : null,
+      dots: zone.gps
+        ? [{ id: 'me', lng: zone.gps.point[0], lat: zone.gps.point[1], team: 'hiders' as const, me: true }]
+        : [],
     }),
     [q, ruled, zone],
   )
@@ -72,11 +75,13 @@ export function AnswerSheet({ sync, question: q, askerName, city, playArea, zone
       </div>
 
       <Suspense fallback={<div className="game-map mini-map" />}>
-        <LazyGameMap city={city} playArea={playArea} className="mini-map" overlays={overlays} tapNames={false} />
+        <LazyGameMap city={city} playArea={playArea} className="mini-map" overlay={overlay} tapNames={false} />
       </Suspense>
 
       <div className="suggestion">
-        <p className="lock-label">🔒 Only you see this</p>
+        <p className="eyebrow">
+          <LockIcon /> Only you see this
+        </p>
         {suggestion ? (
           <>
             <p>

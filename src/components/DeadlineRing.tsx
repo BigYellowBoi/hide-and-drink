@@ -1,4 +1,4 @@
-import { mmss } from '../play/useServerNow'
+import { formatClock } from '../hiding/state'
 
 interface Props {
   /** Server ms. */
@@ -29,7 +29,7 @@ export function DeadlineRing({ endsAt, totalS, now, size = 64 }: Props) {
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
       </svg>
-      <span className="ring-digits">{left > 0 ? mmss(left) : 'Late'}</span>
+      <span className="ring-digits">{left > 0 ? formatClock(left) : 'Late'}</span>
     </div>
   )
 }

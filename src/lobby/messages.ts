@@ -27,11 +27,14 @@ const MESSAGES: Record<string, string> = {
   removed_from_game: 'The host removed you from this game.',
   cannot_remove_host: 'The host can\'t be removed.',
   player_not_found: 'That player has already left.',
-  network: 'Network problem. Try again.',
-  round_not_running: 'No round is running.',
-  still_hiding: 'Questions open when the hiding period ends.',
+  hiders_only: 'Only the hider can do that.',
   seekers_only: 'Only seekers can do that.',
-  hiders_only: 'Only hiders can do that.',
+  round_not_running: 'No round is running.',
+  bar_already_chosen: 'Your team has already locked in a bar this round.',
+  venue_not_found: 'That bar is not on the map.',
+  venue_not_allowed: 'That bar is outside the hiding zone. Pick another.',
+  network: 'Network problem. Try again.',
+  still_hiding: 'Questions open when the hiding period ends.',
   question_pending: 'Wait for the answer to the last question first.',
   question_type_not_found: 'That question type is not available in this city.',
   question_type_not_supported: 'That question type is not in the app yet.',
@@ -42,9 +45,6 @@ const MESSAGES: Record<string, string> = {
   not_far_enough: 'You haven\'t travelled far enough yet.',
   question_not_pending: 'That question has already been answered.',
   invalid_answer: 'That answer doesn\'t fit this question.',
-  bar_already_chosen: 'Your bar is already locked in for this round.',
-  venue_not_found: 'That bar is not in the map data.',
-  venue_outside_play_area: 'That bar is outside the play area.',
 }
 
 export const describeCode = (code: string) => MESSAGES[code] ?? code.replace(/_/g, ' ')

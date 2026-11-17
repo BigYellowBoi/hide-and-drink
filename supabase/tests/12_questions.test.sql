@@ -1,4 +1,4 @@
--- Questions: ask, answer, deadlines and late penalties; the hider's bar lock-in.
+-- Questions: ask, answer, deadlines and late penalties.
 -- Players: H = host (seeker), A = hider, S = seeker.
 -- now() is fixed inside this transaction, so the clock is "moved" by backdating rows.
 
@@ -6,7 +6,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(44);
+select plan(34);
 
 insert into auth.users (id) values
   ('11111111-1111-1111-1111-111111111111'),
@@ -15,17 +15,6 @@ insert into auth.users (id) values
 
 select set_config('test.area_id',
   (select id::text from public.play_areas where city = 'brisbane' and created_by is null order by name limit 1), true);
-select set_config('test.venue_in', (
-  select f.feature_id from public.map_features f, public.play_areas a
-  where a.id = current_setting('test.area_id')::uuid and f.city = 'brisbane' and f.layer = 'venues'
-    and st_intersects(f.geom, st_setsrid(public._play_area_geom(a.geojson), 4326))
-  order by f.feature_id limit 1), true);
-select set_config('test.venue_out', (
-  select f.feature_id from public.map_features f, public.play_areas a
-  where a.id = current_setting('test.area_id')::uuid and f.city = 'brisbane' and f.layer = 'venues'
-    and not st_intersects(f.geom, st_setsrid(public._play_area_geom(a.geojson), 4326))
-  order by f.feature_id limit 1), true);
-
 create function pg_temp.as_user(p uuid) returns void language plpgsql as $$
 begin
   perform set_config('request.jwt.claims', json_build_object('sub', p, 'role', 'authenticated')::text, true);
@@ -68,58 +57,7 @@ select throws_ok(
 select pg_temp.as_user('11111111-1111-1111-1111-111111111111');
 select public.start_game(pg_temp.gid(), 'dddddddd-0000-0000-0000-000000000009', pg_temp.seq());
 
--- ---------------------------------------------------------------- choose_bar
-
 select pg_temp.as_user('33333333-3333-3333-3333-333333333333');
-select throws_ok(
-  format($$ select public.choose_bar(pg_temp.gid(), %L, 'dddddddd-0000-0000-0000-000000000010', pg_temp.seq()) $$,
-    current_setting('test.venue_in')),
-  'P0001', 'hiders_only', 'seekers cannot choose the bar'
-);
-
-select pg_temp.as_user('22222222-2222-2222-2222-222222222222');
-select throws_ok(
-  $$ select public.choose_bar(pg_temp.gid(), 'osm:node/0', 'dddddddd-0000-0000-0000-000000000011', pg_temp.seq()) $$,
-  'P0001', 'venue_not_found', 'unknown venue refused'
-);
-select throws_ok(
-  format($$ select public.choose_bar(pg_temp.gid(), %L, 'dddddddd-0000-0000-0000-000000000012', pg_temp.seq()) $$,
-    current_setting('test.venue_out')),
-  'P0001', 'venue_outside_play_area', 'venue outside the play area refused'
-);
-select throws_ok(
-  format($$ select public.choose_bar(pg_temp.gid(), %L, 'dddddddd-0000-0000-0000-000000000013', 1) $$,
-    current_setting('test.venue_in')),
-  'P0001', 'stale_state', 'choosing a bar needs an up-to-date view'
-);
-select lives_ok(
-  format($$ select public.choose_bar(pg_temp.gid(), %L, 'dddddddd-0000-0000-0000-000000000014', pg_temp.seq()) $$,
-    current_setting('test.venue_in')),
-  'hider locks in a bar'
-);
-select is(
-  (select visibility::text from public.events where game_id = pg_temp.gid() and type = 'bar_chosen'),
-  'hiders', 'bar_chosen goes to hiders only'
-);
-select is(
-  (select count(*)::int from public.events where game_id = pg_temp.gid() and type = 'bar_chosen'),
-  1, 'the hider can read their bar'
-);
-select throws_ok(
-  format($$ select public.choose_bar(pg_temp.gid(), %L, 'dddddddd-0000-0000-0000-000000000015', pg_temp.seq()) $$,
-    current_setting('test.venue_in')),
-  'P0001', 'bar_already_chosen', 'the bar is locked in for the round'
-);
-select throws_ok(
-  $$ select * from public.hider_bars $$,
-  '42501', null, 'clients cannot read the hider_bars table'
-);
-
-select pg_temp.as_user('33333333-3333-3333-3333-333333333333');
-select is(
-  (select count(*)::int from public.events where game_id = pg_temp.gid() and type = 'bar_chosen'),
-  0, 'seekers cannot read bar_chosen'
-);
 
 -- ---------------------------------------------------------------- ask: refusals
 

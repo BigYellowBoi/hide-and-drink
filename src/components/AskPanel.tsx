@@ -6,11 +6,11 @@ import type { GameSync } from '../sync/engine'
 import type { AreaCollection } from '../map/playArea'
 import { describeError } from '../lobby/messages'
 import { distanceM, isLngLat, type LngLat } from '../play/geo'
-import { meOverlay, radarTool, thermometerTool } from '../play/overlays'
+import { radarTool, thermometerTool } from '../play/overlays'
 import { loadQuestionTypes, optionLabel, type QuestionType } from '../play/questionTypes'
 import { isSupportedType, km } from '../play/state'
-import { usePosition } from '../play/usePosition'
-import { mmss } from '../play/useServerNow'
+import type { Fix, GeoError } from '../hiding/useGeolocation'
+import { formatClock } from '../hiding/state'
 import { LazyGameMap } from './lazyMap'
 
 interface Props {
@@ -24,6 +24,9 @@ interface Props {
   seekingAt: number | null
   pending: boolean
   now: number
+  /** This phone's GPS (the seeker view already watches it and shares it with the team). */
+  fix: Fix | null
+  geoError: GeoError | null
 }
 
 const NAMES: Record<string, string> = {
@@ -39,7 +42,7 @@ const NAMES: Record<string, string> = {
 const startKey = (gameId: string) => `hd.thermometer.${gameId}`
 
 /** Seekers: pick a question type and option, place the tool, send. */
-export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingAt, pending, now }: Props) {
+export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingAt, pending, now, fix, geoError }: Props) {
   const [types, setTypes] = useState<QuestionType[] | null>(null)
   const [type, setType] = useState<string>('radar')
   const [optionId, setOptionId] = useState<string | null>(null)
@@ -57,7 +60,6 @@ export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingA
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [sent, setSent] = useState(false)
-  const { position, error: gpsError } = usePosition()
 
   useEffect(() => {
     if (!supabase) return
@@ -73,7 +75,8 @@ export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingA
 
   const qt = types?.find((t) => t.type === type) ?? null
   const option = qt?.options.find((o) => o.id === optionId) ?? null
-  const here: LngLat | null = tapped ?? position?.point ?? null
+  const gpsPoint: LngLat | null = fix ? [fix.lng, fix.lat] : null
+  const here: LngLat | null = tapped ?? gpsPoint
   const distance =
     option && typeof option.distance_m === 'number'
       ? option.distance_m
@@ -83,16 +86,21 @@ export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingA
   const travelled = start && here ? distanceM(start, here) : 0
   const hidingLeft = seekingAt === null ? 0 : seekingAt - now
 
-  const gpsPoint = position?.point ?? null
-  const overlays = useMemo(() => {
-    const at = tapped ?? gpsPoint
+  const fixLng = fix?.lng
+  const fixLat = fix?.lat
+  const overlay = useMemo(() => {
+    const at: LngLat | null = tapped ?? (fixLng !== undefined && fixLat !== undefined ? [fixLng, fixLat] : null)
     let tool: FeatureCollection | undefined
     if (type === 'radar' && at && distance) tool = radarTool(at, distance)
     else if (type === 'thermometer' && start) tool = thermometerTool(start, at)
-    return { ruled, tool, me: meOverlay(gpsPoint, '#FF6B6F') }
+    const dots =
+      fixLng !== undefined && fixLat !== undefined
+        ? [{ id: 'me', lng: fixLng, lat: fixLat, team: 'seekers' as const, me: true }]
+        : []
+    return { ruled, tool, dots }
     // `distance` comes from the loaded option list, which is never mutated.
     // oxlint-disable-next-line react/preserve-manual-memoization
-  }, [type, tapped, gpsPoint, distance, start, ruled])
+  }, [type, tapped, fixLng, fixLat, distance, start, ruled])
 
   let blocker: string | null = null
   if (!qt || !isSupportedType(type)) blocker = 'Pick a question type.'
@@ -101,7 +109,7 @@ export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingA
   else if (!here) blocker = 'Waiting for GPS. Or tap the map to place yourself.'
   else if (type === 'thermometer' && !start) blocker = 'Mark where you start, then travel.'
   else if (type === 'thermometer' && travelled < distance) blocker = `Travel ${km(distance - travelled)} more.`
-  if (hidingLeft > 0) blocker = `Questions open when hiding ends (${mmss(hidingLeft)}).`
+  if (hidingLeft > 0) blocker = `Questions open when hiding ends (${formatClock(hidingLeft)}).`
   else if (pending) blocker = 'Waiting for the answer to the last question.'
 
   const send = async () => {
@@ -203,7 +211,7 @@ export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingA
       )}
 
       <Suspense fallback={<div className="game-map ask-map" />}>
-        <LazyGameMap city={city} playArea={playArea} className="ask-map" overlays={overlays} onTap={setTapped} tapNames={false} />
+        <LazyGameMap city={city} playArea={playArea} className="ask-map" overlay={overlay} onTap={setTapped} tapNames={false} />
       </Suspense>
       <p className="muted small">
         {tapped ? (
@@ -213,10 +221,10 @@ export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingA
               Use GPS
             </button>
           </>
-        ) : position ? (
-          `Using GPS (±${Math.round(position.accuracyM)} m). Tap the map to place it by hand.`
+        ) : fix ? (
+          `Using GPS${fix.accuracyM !== null ? ` (±${Math.round(fix.accuracyM)} m)` : ''}. Tap the map to place it by hand.`
         ) : (
-          `${gpsError ?? 'Waiting for GPS.'} Tap the map to place yourself.`
+          `${geoError === 'denied' ? 'Location is blocked.' : 'Waiting for GPS.'} Tap the map to place yourself.`
         )}
       </p>
 

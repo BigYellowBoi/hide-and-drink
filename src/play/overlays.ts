@@ -35,8 +35,3 @@ export function questionTool(q: Question): FeatureCollection {
   if (t) return thermometerTool(t.start, t.end)
   return fc([])
 }
-
-export const circleOverlay = (center: LngLat, radiusM: number) => fc([radarCircle(center, radiusM)])
-
-export const meOverlay = (p: LngLat | null, color?: string): FeatureCollection =>
-  fc(p ? [{ type: 'Feature', properties: color ? { color } : {}, geometry: { type: 'Point', coordinates: p } }] : [])

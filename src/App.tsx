@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { supabase } from './lib/supabase'
 import { GAME_KEY, readLocal, writeLocal } from './lib/storage'
 import { deriveLobby } from './lobby/state'
@@ -10,13 +10,9 @@ import { ConnectionStatus } from './components/ConnectionStatus'
 import { Home } from './components/Home'
 import { Settings } from './components/Settings'
 import { Lobby } from './components/Lobby'
+import { Round, TopbarClock } from './components/Round'
 import { StaleBanner } from './components/StaleBanner'
 import { presenceOf } from './sync/presence'
-import { derivePlay } from './play/state'
-import { mmss, useServerNow } from './play/useServerNow'
-
-// Map, geometry and question tools: loaded once a round starts.
-const Play = lazy(() => import('./components/Play'))
 
 const transport = supabase ? supabaseTransport(supabase) : null
 const asset = (f: string) => `${import.meta.env.BASE_URL}${f}`
@@ -25,8 +21,6 @@ const TEAM_CHIP = { hiders: 'Hider', seekers: 'Seeker' } as const
 function GameScreen({ gameId, transport, onLeave }: { gameId: string; transport: SyncTransport; onLeave: () => void }) {
   const game = useGameSync(gameId, transport)
   const lobby = useMemo(() => deriveLobby(game.events), [game.events])
-  const play = useMemo(() => derivePlay(game.events), [game.events])
-  const now = useServerNow(game.sync)
   const [confirmLeave, setConfirmLeave] = useState(false)
   const presence = useMemo(() => presenceOf(game.present, game.status === 'live'), [game.present, game.status])
   const locked = !game.canAct && game.status !== 'idle' && game.status !== 'error'
@@ -37,11 +31,8 @@ function GameScreen({ gameId, transport, onLeave }: { gameId: string; transport:
       {/* Top bar: team chip left, screen label centre, status dot right (docs/design.md). */}
       <header className="topbar">
         <span className={`chip chip-${myTeam ?? 'none'}`}>{myTeam ? TEAM_CHIP[myTeam] : 'No team'}</span>
-        {lobby.started && play.seekingAt !== null ? (
-          <span className="topbar-timer">
-            <small>{play.seekingStarted || now >= play.seekingAt ? 'Seeking' : 'Hiding'}</small>
-            {mmss(Math.abs(now - play.seekingAt))}
-          </span>
+        {lobby.started && game.sync ? (
+          <TopbarClock sync={game.sync} started={lobby.started} />
         ) : (
           <span className="topbar-label">{lobby.code ? 'Lobby' : ''}</span>
         )}
@@ -59,17 +50,15 @@ function GameScreen({ gameId, transport, onLeave }: { gameId: string; transport:
         ) : lobby.status === 'lobby' ? (
           <Lobby sync={game.sync} lobby={lobby} userId={game.userId} canAct={game.canAct} presence={presence} />
         ) : (
-          <Suspense fallback={<p className="muted">Loading map…</p>}>
-            <Play
-              sync={game.sync}
-              lobby={lobby}
-              play={play}
-              userId={game.userId}
-              canAct={game.canAct}
-              presence={presence}
-              now={now}
-            />
-          </Suspense>
+          <Round
+            sync={game.sync}
+            lobby={lobby}
+            userId={game.userId}
+            canAct={game.canAct}
+            events={game.events}
+            positions={game.positions}
+            presence={presence}
+          />
         )}
       </div>
 

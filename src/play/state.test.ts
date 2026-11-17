@@ -62,10 +62,9 @@ describe('derivePlay', () => {
     expect(s.log.map((l) => l.kind)).toEqual(['asked', 'penalty', 'answered'])
   })
 
-  it('reads the hider-only bar', () => {
-    const s = derivePlay([started, ev('bar_chosen', { venue_id: 'v', name: 'Pub', point: [153, -27] }, 'hiders')])
-    expect(s.bar).toEqual({ venueId: 'v', name: 'Pub', point: [153, -27] })
-    expect(s.log[0].private).toBe(true)
+  it('logs the hider-only bar lock-in as private', () => {
+    const s = derivePlay([started, ev('bar_chosen', { venue_id: 'v', name: 'Pub', lng: 153, lat: -27 }, 'hiders')])
+    expect(s.log[0]).toMatchObject({ kind: 'bar', text: 'Locked in Pub', private: true })
   })
 })
 

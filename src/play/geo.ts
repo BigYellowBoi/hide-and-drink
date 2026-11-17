@@ -1,12 +1,11 @@
-import circle from '@turf/circle'
 import difference from '@turf/difference'
 import intersect from '@turf/intersect'
 import { featureCollection } from '@turf/helpers'
 import type { Feature, MultiPolygon, Polygon, Position } from 'geojson'
+import { circlePolygon, distanceM, type LngLat } from '../map/geo'
 import { polygonsOf, type AreaCollection } from '../map/playArea'
 
-/** [lon, lat] */
-export type LngLat = [number, number]
+export { distanceM, type LngLat }
 export type Area = Feature<Polygon | MultiPolygon>
 
 const R = 6_371_008.8
@@ -14,14 +13,6 @@ const RAD = Math.PI / 180
 
 export const isLngLat = (v: unknown): v is LngLat =>
   Array.isArray(v) && v.length === 2 && typeof v[0] === 'number' && typeof v[1] === 'number'
-
-/** Great-circle distance in metres. */
-export function distanceM(a: LngLat, b: LngLat): number {
-  const dLat = (b[1] - a[1]) * RAD
-  const dLon = (b[0] - a[0]) * RAD
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * RAD) * Math.cos(b[1] * RAD) * Math.sin(dLon / 2) ** 2
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)))
-}
 
 /**
  * Local flat projection in metres around an origin. Accurate to well under 1% across a
@@ -36,8 +27,7 @@ export function projector(origin: LngLat) {
   }
 }
 
-export const radarCircle = (center: LngLat, radiusM: number): Feature<Polygon> =>
-  circle(center, radiusM, { steps: 96, units: 'meters' })
+export const radarCircle = (center: LngLat, radiusM: number): Feature<Polygon> => circlePolygon(center, radiusM, 96)
 
 /**
  * Everywhere closer to `toward` than to the other end of a thermometer, as a big polygon

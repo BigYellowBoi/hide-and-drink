@@ -1,5 +1,4 @@
 -- Questions: seekers ask, the hider answers within a deadline, late answers log a penalty.
--- Also the hider's bar lock-in, which the hider's phone needs to suggest answers.
 --
 -- * ask_question: seekers only, once the hiding period is over, one pending question at a
 --   time. Radar and thermometer only for now (the other types need their own tools; they
@@ -13,8 +12,7 @@
 --   settle_timers, which every phone calls when a timer it shows runs out. Whichever comes
 --   first appends one answer_overdue event (a shot for the hiders). It also moves the game
 --   from hiding to seeking once the hiding period is over. No scheduler needed.
--- * choose_bar: the hider locks in a venue from the city pack inside the play area, once per
---   round. Stored in a hider-only table and announced on the hiders' channel only.
+-- The hider's bar (hider_bars, choose_bar) comes from the hiding-period migration.
 
 -- ---------------------------------------------------------------------------
 -- Tables (no client grants: clients derive state from events)
@@ -41,22 +39,9 @@ create table public.questions (
 -- At most one unanswered question per game, whatever the code does.
 create unique index questions_one_pending on public.questions (game_id) where answered_at is null;
 
-create table public.hider_bars (
-  game_id uuid not null references public.games (id) on delete cascade,
-  round integer not null,
-  venue_id text not null,
-  name text not null,
-  geom extensions.geometry(Point, 4326) not null,
-  chosen_by uuid not null,
-  chosen_at timestamptz not null default now(),
-  primary key (game_id, round)
-);
-
 alter table public.questions enable row level security;
-alter table public.hider_bars enable row level security;
-revoke all on public.questions, public.hider_bars from anon, authenticated;
--- RLS on with no policies = no client access. The hider learns their bar from the
--- hiders-only bar_chosen event.
+revoke all on public.questions from anon, authenticated;
+-- RLS on with no policies = no client access.
 
 -- ---------------------------------------------------------------------------
 -- Helpers
@@ -218,68 +203,6 @@ begin
     'seq', (select last_seq from public.games where id = p_game_id),
     'settled', v_n
   ));
-end;
-$$;
-
-create function public.choose_bar(
-  p_game_id uuid,
-  p_venue_id text,
-  p_client_action_id uuid,
-  p_last_seen_seq bigint
-)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_uid uuid := public._require_user();
-  v_prev jsonb := public._previous_result(p_client_action_id, v_uid);
-  v_game public.games;
-  v_venue public.map_features;
-  v_seq bigint;
-begin
-  if v_prev is not null then
-    return v_prev;
-  end if;
-
-  v_game := public._lock_game(p_game_id);
-  perform public._require_team(p_game_id, v_uid, 'hiders');
-  if v_game.status not in ('hiding', 'seeking') then
-    raise exception 'round_not_running' using errcode = 'P0001';
-  end if;
-  perform public._require_fresh(p_game_id, v_uid, p_last_seen_seq);
-
-  if exists (select 1 from public.hider_bars where game_id = p_game_id and round = v_game.round) then
-    raise exception 'bar_already_chosen' using errcode = 'P0001';
-  end if;
-
-  select * into v_venue from public.map_features
-   where city = v_game.city and layer = 'venues' and feature_id = p_venue_id
-     and extensions.geometrytype(geom) = 'POINT';
-  if not found then
-    raise exception 'venue_not_found' using errcode = 'P0001';
-  end if;
-  if v_game.play_area_snapshot is null
-     -- _play_area_geom can come back without an SRID (st_union on some PostGIS versions).
-     or not extensions.st_intersects(v_venue.geom,
-          extensions.st_setsrid(public._play_area_geom(v_game.play_area_snapshot), 4326)) then
-    raise exception 'venue_outside_play_area' using errcode = 'P0001';
-  end if;
-
-  insert into public.hider_bars (game_id, round, venue_id, name, geom, chosen_by)
-  values (p_game_id, v_game.round, v_venue.feature_id, v_venue.name, v_venue.geom, v_uid);
-
-  -- Hiders only: seekers must never learn the bar.
-  v_seq := public._append_event(p_game_id, 'bar_chosen', jsonb_build_object(
-    'round', v_game.round,
-    'venue_id', v_venue.feature_id,
-    'name', v_venue.name,
-    'point', public._lonlat_json(v_venue.geom)
-  ), 'hiders');
-
-  return public._record_result(p_client_action_id, v_uid, p_game_id,
-    jsonb_build_object('game_id', p_game_id, 'seq', v_seq));
 end;
 $$;
 
@@ -471,14 +394,12 @@ revoke execute on function
   public._settle_timers(uuid),
   public._require_team(uuid, uuid, public.team),
   public.settle_timers(uuid, uuid),
-  public.choose_bar(uuid, text, uuid, bigint),
   public.ask_question(uuid, text, text, jsonb, uuid, bigint),
   public.answer_question(uuid, uuid, text, uuid, bigint)
 from public, anon, authenticated;
 
 grant execute on function
   public.settle_timers(uuid, uuid),
-  public.choose_bar(uuid, text, uuid, bigint),
   public.ask_question(uuid, text, text, jsonb, uuid, bigint),
   public.answer_question(uuid, uuid, text, uuid, bigint)
 to authenticated;

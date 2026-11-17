@@ -43,12 +43,6 @@ export interface Question {
   overdue: boolean
 }
 
-export interface ChosenBar {
-  venueId: string
-  name: string
-  point: LngLat
-}
-
 export type LogKind = 'seeking' | 'asked' | 'answered' | 'penalty' | 'bar'
 export interface LogEntry {
   seq: number
@@ -66,8 +60,6 @@ export interface PlayState {
   seekingStarted: boolean
   questions: Question[]
   pending: Question | null
-  /** Only ever set on the hiders' phones (the event is hiders-only). */
-  bar: ChosenBar | null
   penalties: number
   log: LogEntry[]
 }
@@ -78,7 +70,6 @@ export const emptyPlay: PlayState = {
   seekingStarted: false,
   questions: [],
   pending: null,
-  bar: null,
   penalties: 0,
   log: [],
 }
@@ -134,16 +125,12 @@ export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
         seekingStarted: true,
         log: [...state.log, { seq: e.seq, kind: 'seeking', at: time(p.at, e.created_at), text: 'Seeking started' }],
       }
-    case 'bar_chosen': {
-      const point = p.point
-      if (!isLngLat(point)) return state
-      const bar = { venueId: str(p.venue_id) ?? '', name: str(p.name) ?? 'Bar', point }
+    case 'bar_chosen':
+      // Hiders-only event; the bar itself comes from src/hiding/state.ts.
       return {
         ...state,
-        bar,
-        log: [...state.log, { seq: e.seq, kind: 'bar', at, text: `Locked in ${bar.name}`, private: true }],
+        log: [...state.log, { seq: e.seq, kind: 'bar', at, text: `Locked in ${str(p.name) ?? 'a bar'}`, private: true }],
       }
-    }
     case 'question_asked': {
       const id = str(p.question_id)
       if (!id) return state
