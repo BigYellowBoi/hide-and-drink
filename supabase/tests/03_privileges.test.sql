@@ -28,7 +28,8 @@ select is(
   ),
   array[
     'can_join_topic', 'can_see', 'create_game', 'is_player', 'join_game',
-    'my_team', 'server_time', 'set_team', 'topic_for', 'update_config'
+    'my_team', 'server_time', 'set_play_area', 'set_team', 'start_game',
+    'topic_for', 'update_config'
   ],
   'signed-in clients can call only the allow-listed functions'
 );

@@ -130,3 +130,308 @@ button:disabled {
   padding-left: 0;
   list-style: none;
 }
+
+/* ------------------------------------------------------------------ lobby */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+h3 {
+  font-size: 0.9rem;
+  margin: 12px 0 4px;
+}
+
+input,
+select,
+button {
+  min-height: 44px;
+}
+
+select {
+  font: inherit;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #404040;
+  background: #1a1a1a;
+  color: inherit;
+  width: 100%;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.field > span {
+  font-size: 0.85rem;
+  color: #d4d4d4;
+}
+
+.field input {
+  width: 100%;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  min-height: 44px;
+}
+
+.toggle input {
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  accent-color: #f2b705;
+}
+
+button.wide {
+  width: 100%;
+  margin-top: 12px;
+}
+
+button.secondary {
+  background: #3a3a3a;
+  color: #f4f4f4;
+}
+
+button.danger {
+  background: #f87171;
+  color: #1a1a1a;
+}
+
+button.small {
+  min-height: 36px;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+}
+
+.row.center {
+  justify-content: center;
+}
+
+.small-note {
+  font-size: 0.85rem;
+  margin-top: 8px;
+}
+
+.code-input {
+  font-size: 1.6rem;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.join-card {
+  text-align: center;
+}
+
+.join-code {
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: 0.25em;
+  margin: 4px 0 8px;
+  padding-left: 0.25em;
+  color: #f2b705;
+  font-family: ui-monospace, monospace;
+}
+
+.qr {
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px;
+  margin: 0 auto 8px;
+  width: min(100%, 260px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  color: #1a1a1a;
+}
+
+.qr img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.team-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.team-btn {
+  min-height: 64px;
+  font-size: 1.1rem;
+  background: #333;
+  color: #f4f4f4;
+  border: 2px solid transparent;
+}
+
+.team-btn.selected {
+  border-color: currentColor;
+}
+
+.team-btn.selected:disabled {
+  opacity: 1;
+}
+
+.team-hiders.team-btn.selected {
+  background: #3b2f0a;
+  color: #f2b705;
+}
+
+.team-seekers.team-btn.selected {
+  background: #0f2a3d;
+  color: #60a5fa;
+}
+
+.team-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.team-list.team-hiders h3 {
+  color: #f2b705;
+}
+
+.team-list.team-seekers h3 {
+  color: #60a5fa;
+}
+
+.player {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #333;
+  min-height: 44px;
+}
+
+.player-name {
+  overflow-wrap: anywhere;
+}
+
+.player-moves {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.badge {
+  font-size: 0.7rem;
+  background: #404040;
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.badge.you {
+  background: #f2b705;
+  color: #1a1a1a;
+}
+
+details.card > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+}
+
+details.card > summary::after {
+  content: '▾';
+  color: #a3a3a3;
+}
+
+details[open].card > summary::after {
+  content: '▴';
+}
+
+details.card > summary h2 {
+  margin: 0;
+}
+
+.config-group {
+  border: none;
+  padding: 0;
+  margin: 16px 0 0;
+}
+
+.config-group legend {
+  font-weight: 600;
+  color: #f2b705;
+  padding: 0;
+}
+
+.note {
+  font-size: 0.8rem;
+  color: #fbbf24;
+  margin: 4px 0;
+}
+
+.config-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 6px 0;
+}
+
+.config-row span:last-child {
+  color: #a3a3a3;
+  text-align: right;
+}
+
+.checklist {
+  margin: 0;
+  padding-left: 20px;
+  color: #fbbf24;
+}
+
+.sticky-error {
+  position: sticky;
+  bottom: calc(8px + env(safe-area-inset-bottom));
+  background: #2a1414;
+  border: 1px solid #7f1d1d;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.footer-actions {
+  margin-top: 16px;
+}
+
+.started {
+  text-align: center;
+}
+
+.countdown {
+  font-size: 3.5rem;
+  font-weight: 800;
+  font-family: ui-monospace, monospace;
+  margin: 8px 0;
+  color: #f2b705;
+}
+
+.started-teams {
+  list-style: none;
+  padding: 0;
+  text-align: left;
+}
+
+.debug {
+  margin-top: 16px;
+  color: #a3a3a3;
+  font-size: 0.85rem;
+}
