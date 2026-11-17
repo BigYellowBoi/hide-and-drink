@@ -40,7 +40,7 @@ Full spec: `docs/spec.md`. Seed data: `data/`. Read only the parts relevant to t
 - `supabase start` then `supabase test db`: apply migrations to a local Supabase stack (Docker) and run the pgTAP tests in `supabase/tests/`
 - `npm run latency`: latency harness, 6-10 simulated players against a running Supabase (see `scripts/latency/README.md`); CI fails if p95 > 1 s
 - `scripts/test-db/run.sh`: same tests on plain Postgres with Supabase stand-ins (no Docker images needed; needs psql, pg_prove, pgTAP)
-- CI (`.github/workflows/deploy.yml`) runs lint, unit tests, database tests, latency harness and build on every PR, and deploys `main` to GitHub Pages
+- CI (`.github/workflows/deploy.yml`) runs lint, unit tests, database tests, latency harness and build on every PR, and deploys `main` to GitHub Pages. `keep-alive.yml` queries Supabase every 3 days so the free project never pauses
 
 ## Layout
 
