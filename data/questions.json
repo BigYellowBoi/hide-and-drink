@@ -1,0 +1,317 @@
+{
+  "schema_version": 1,
+  "city": "brisbane",
+  "types": [
+    {
+      "type": "matching",
+      "prompt": "Is your nearest ___ the same as mine?",
+      "reward": {
+        "draw": 3,
+        "pick": 1
+      },
+      "auto_shading": true,
+      "options": [
+        {
+          "id": "suburb",
+          "label": "Suburb",
+          "source": "abs:suburbs_localities"
+        },
+        {
+          "id": "street",
+          "label": "Street",
+          "source": "osm:highway (named)"
+        },
+        {
+          "id": "park",
+          "label": "Park",
+          "source": "osm:leisure=park"
+        },
+        {
+          "id": "museum",
+          "label": "Museum",
+          "source": "osm:tourism=museum"
+        },
+        {
+          "id": "cinema",
+          "label": "Cinema",
+          "source": "osm:amenity=cinema"
+        },
+        {
+          "id": "library",
+          "label": "Library",
+          "source": "osm:amenity=library"
+        },
+        {
+          "id": "hospital",
+          "label": "Hospital",
+          "source": "osm:amenity=hospital"
+        },
+        {
+          "id": "ferry",
+          "label": "Ferry terminal",
+          "source": "gtfs:ferry stops"
+        }
+      ]
+    },
+    {
+      "type": "measuring",
+      "prompt": "Compared to me, are you closer to or further from ___?",
+      "reward": {
+        "draw": 3,
+        "pick": 1
+      },
+      "auto_shading": true,
+      "options": [
+        {
+          "id": "airport",
+          "label": "The Airport",
+          "point": null
+        },
+        {
+          "id": "star_casino",
+          "label": "The Star Casino",
+          "point": null
+        },
+        {
+          "id": "felons",
+          "label": "Felons Brewing Co",
+          "point": null
+        },
+        {
+          "id": "el_camino",
+          "label": "El Camino Southbank",
+          "point": null
+        },
+        {
+          "id": "gabba",
+          "label": "The Gabba",
+          "point": null
+        },
+        {
+          "id": "powerhouse",
+          "label": "The Powerhouse",
+          "point": null
+        }
+      ],
+      "todo": "Fill each option's point (lon, lat) from OSM"
+    },
+    {
+      "type": "thermometer",
+      "prompt": "I travelled ___, am I hotter or colder?",
+      "reward": {
+        "draw": 2,
+        "pick": 1
+      },
+      "auto_shading": true,
+      "options": [
+        {
+          "id": "500m",
+          "distance_m": 500
+        },
+        {
+          "id": "1km",
+          "distance_m": 1000
+        },
+        {
+          "id": "2km",
+          "distance_m": 2000
+        },
+        {
+          "id": "custom",
+          "distance_m": null
+        }
+      ]
+    },
+    {
+      "type": "radar",
+      "prompt": "Are you within ___ of me?",
+      "reward": {
+        "draw": 2,
+        "pick": 1
+      },
+      "auto_shading": true,
+      "options": [
+        {
+          "id": "500m",
+          "distance_m": 500
+        },
+        {
+          "id": "1km",
+          "distance_m": 1000
+        },
+        {
+          "id": "2km",
+          "distance_m": 2000
+        },
+        {
+          "id": "3km",
+          "distance_m": 3000
+        },
+        {
+          "id": "custom",
+          "distance_m": null
+        }
+      ]
+    },
+    {
+      "type": "tentacles",
+      "prompt": "Of all the ___ within {radius} of me, which are you closest to?",
+      "reward": {
+        "draw": 4,
+        "pick": 2
+      },
+      "auto_shading": true,
+      "options": [
+        {
+          "id": "cinemas",
+          "label": "Cinemas",
+          "radius_m": 2000,
+          "source": "osm:amenity=cinema"
+        },
+        {
+          "id": "museums",
+          "label": "Museums",
+          "radius_m": 2000,
+          "source": "osm:tourism=museum"
+        },
+        {
+          "id": "libraries",
+          "label": "Libraries",
+          "radius_m": 2000,
+          "source": "osm:amenity=library"
+        },
+        {
+          "id": "hospitals",
+          "label": "Hospitals",
+          "radius_m": 2000,
+          "source": "osm:amenity=hospital"
+        },
+        {
+          "id": "ferries",
+          "label": "Ferries",
+          "radius_m": 2000,
+          "source": "gtfs:ferry stops"
+        },
+        {
+          "id": "strip_clubs",
+          "label": "Strip clubs",
+          "radius_m": 1000,
+          "source": "osm:amenity=stripclub"
+        },
+        {
+          "id": "kebab_shops",
+          "label": "Kebab shops",
+          "radius_m": 1000,
+          "source": "osm:cuisine=kebab"
+        },
+        {
+          "id": "convenience",
+          "label": "Convenience stores",
+          "radius_m": 1000,
+          "source": "osm:shop=convenience"
+        }
+      ],
+      "null_answer": "None within range"
+    },
+    {
+      "type": "photos",
+      "prompt": "Send a photo of ___ (must be possible within your zone, otherwise send null).",
+      "reward": {
+        "draw": 1,
+        "pick": 1
+      },
+      "auto_shading": false,
+      "options": [
+        {
+          "id": "selfie",
+          "label": "Selfie"
+        },
+        {
+          "id": "tree",
+          "label": "A tree"
+        },
+        {
+          "id": "sky",
+          "label": "The sky"
+        },
+        {
+          "id": "bar_counter",
+          "label": "Bar counter"
+        },
+        {
+          "id": "bar_door",
+          "label": "Bar entrance door (from outside)"
+        },
+        {
+          "id": "bar_window",
+          "label": "Bar window out (from inside)"
+        },
+        {
+          "id": "ferry_terminal",
+          "label": "Ferry terminal"
+        },
+        {
+          "id": "two_buildings",
+          "label": "Two buildings"
+        },
+        {
+          "id": "tallest_structure",
+          "label": "Tallest structure in sight"
+        },
+        {
+          "id": "water",
+          "label": "Biggest body of water"
+        }
+      ],
+      "answer": "photo",
+      "null_answer": "Not possible in my zone"
+    },
+    {
+      "type": "bonus",
+      "prompt": "Bonus question",
+      "reward": {
+        "draw": 2,
+        "pick": 1
+      },
+      "auto_shading": false,
+      "options": [
+        {
+          "id": "letters",
+          "label": "Send 3 letters, one must be the first letter of your bar's name",
+          "answer": "text"
+        },
+        {
+          "id": "rhyme",
+          "label": "Send 3 words, one must rhyme with your bar's street",
+          "answer": "text"
+        },
+        {
+          "id": "last_beer",
+          "label": "What is the name of the last beer you drank?",
+          "answer": "text"
+        },
+        {
+          "id": "syllables",
+          "label": "How many syllables are in your bar's name?",
+          "answer": "number"
+        },
+        {
+          "id": "bars_50m",
+          "label": "Are there at least 3 other bars within 50 m?",
+          "answer": "yes_no"
+        },
+        {
+          "id": "pokies",
+          "label": "Does your bar have pokies?",
+          "answer": "yes_no"
+        },
+        {
+          "id": "pool",
+          "label": "Does your bar have pool?",
+          "answer": "yes_no"
+        }
+      ],
+      "note": "bars_50m can be auto-shaded from the venue list"
+    }
+  ]
+}

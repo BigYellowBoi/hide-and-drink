@@ -1,0 +1,536 @@
+{
+  "schema_version": 1,
+  "categories": [
+    {
+      "id": "powerup",
+      "name": "Powerup",
+      "colour": "#4F7BE8"
+    },
+    {
+      "id": "time_bonus",
+      "name": "Time bonus",
+      "colour": "#3FA34D"
+    },
+    {
+      "id": "drink",
+      "name": "Drink",
+      "colour": "#E8A33F"
+    },
+    {
+      "id": "curse",
+      "name": "Curse",
+      "colour": "#C9423A"
+    }
+  ],
+  "behaviours": [
+    "text",
+    "timed",
+    "until_cleared",
+    "time_bonus",
+    "next_question_modifier",
+    "powerup"
+  ],
+  "cards": [
+    {
+      "id": "veto",
+      "name": "Veto",
+      "category": "powerup",
+      "behaviour": "powerup",
+      "copies": 2,
+      "text": "Veto a question.",
+      "params": {
+        "action": "veto"
+      },
+      "active": true
+    },
+    {
+      "id": "randomize",
+      "name": "Randomize",
+      "category": "powerup",
+      "behaviour": "powerup",
+      "copies": 2,
+      "text": "Randomize a question.",
+      "params": {
+        "action": "randomize"
+      },
+      "active": true
+    },
+    {
+      "id": "duplicate",
+      "name": "Duplicate",
+      "category": "powerup",
+      "behaviour": "powerup",
+      "copies": 1,
+      "text": "Duplicate another card in your hand.",
+      "params": {
+        "action": "duplicate"
+      },
+      "active": true
+    },
+    {
+      "id": "move",
+      "name": "Move",
+      "category": "powerup",
+      "behaviour": "powerup",
+      "copies": 1,
+      "text": "Move to a new hiding bar.",
+      "params": {
+        "action": "move"
+      },
+      "active": true
+    },
+    {
+      "id": "discard1_draw2",
+      "name": "Discard 1, Draw 2",
+      "category": "powerup",
+      "behaviour": "powerup",
+      "copies": 3,
+      "text": "Discard 1 card, draw 2.",
+      "params": {
+        "action": "discard_draw",
+        "discard": 1,
+        "draw": 2
+      },
+      "active": true
+    },
+    {
+      "id": "discard2_draw3",
+      "name": "Discard 2, Draw 3",
+      "category": "powerup",
+      "behaviour": "powerup",
+      "copies": 3,
+      "text": "Discard 2 cards, draw 3.",
+      "params": {
+        "action": "discard_draw",
+        "discard": 2,
+        "draw": 3
+      },
+      "active": true
+    },
+    {
+      "id": "bonus_red",
+      "name": "Red Bonus (2 min)",
+      "category": "time_bonus",
+      "behaviour": "time_bonus",
+      "copies": 20,
+      "text": "+2 minutes to the hider's time.",
+      "params": {
+        "minutes": 2
+      },
+      "active": true
+    },
+    {
+      "id": "bonus_orange",
+      "name": "Orange Bonus (4 min)",
+      "category": "time_bonus",
+      "behaviour": "time_bonus",
+      "copies": 10,
+      "text": "+4 minutes to the hider's time.",
+      "params": {
+        "minutes": 4
+      },
+      "active": true
+    },
+    {
+      "id": "bonus_yellow",
+      "name": "Yellow Bonus (6 min)",
+      "category": "time_bonus",
+      "behaviour": "time_bonus",
+      "copies": 7,
+      "text": "+6 minutes to the hider's time.",
+      "params": {
+        "minutes": 6
+      },
+      "active": true
+    },
+    {
+      "id": "bonus_green",
+      "name": "Green Bonus (8 min)",
+      "category": "time_bonus",
+      "behaviour": "time_bonus",
+      "copies": 3,
+      "text": "+8 minutes to the hider's time.",
+      "params": {
+        "minutes": 8
+      },
+      "active": true
+    },
+    {
+      "id": "bonus_blue",
+      "name": "Blue Bonus (12 min)",
+      "category": "time_bonus",
+      "behaviour": "time_bonus",
+      "copies": 2,
+      "text": "+12 minutes to the hider's time.",
+      "params": {
+        "minutes": 12
+      },
+      "active": true
+    },
+    {
+      "id": "double_next_rewards",
+      "name": "Take a Shot to Double Next Question Rewards",
+      "category": "drink",
+      "behaviour": "next_question_modifier",
+      "copies": 2,
+      "text": "Take a shot to double the rewards from the next question.",
+      "params": {
+        "reward_multiplier": 2,
+        "cost": "shot"
+      },
+      "active": true
+    },
+    {
+      "id": "cheers",
+      "name": "Cheers",
+      "category": "drink",
+      "behaviour": "text",
+      "copies": 2,
+      "text": "One team member from each team must drink asap.",
+      "params": {},
+      "active": true
+    },
+    {
+      "id": "drinks_all_round",
+      "name": "Drinks All Round",
+      "category": "drink",
+      "behaviour": "text",
+      "copies": 1,
+      "text": "Everyone on both teams must drink asap.",
+      "params": {},
+      "active": true
+    },
+    {
+      "id": "distant_cuisine",
+      "name": "Curse of Distant Cuisine",
+      "category": "curse",
+      "behaviour": "text",
+      "copies": 1,
+      "text": null,
+      "params": {},
+      "active": true,
+      "cast_cost": "free",
+      "can_veto": true,
+      "todo": "Add small-game (yellow) text from the official card, then set behaviour"
+    },
+    {
+      "id": "unguided_tourist",
+      "name": "Curse of Unguided Tourist",
+      "category": "curse",
+      "behaviour": "text",
+      "copies": 1,
+      "text": null,
+      "params": {},
+      "active": true,
+      "cast_cost": "free",
+      "can_veto": true,
+      "todo": "Add small-game (yellow) text from the official card, then set behaviour"
+    },
+    {
+      "id": "bird_guide",
+      "name": "Curse of Bird Guide",
+      "category": "curse",
+      "behaviour": "text",
+      "copies": 1,
+      "text": null,
+      "params": {},
+      "active": true,
+      "cast_cost": "free",
+      "can_veto": true,
+      "todo": "Add small-game (yellow) text from the official card, then set behaviour"
+    },
+    {
+      "id": "luxury_car",
+      "name": "Curse of Luxury Car",
+      "category": "curse",
+      "behaviour": "text",
+      "copies": 1,
+      "text": null,
+      "params": {},
+      "active": true,
+      "cast_cost": "free",
+      "can_veto": true,
+      "todo": "Add small-game (yellow) text from the official card, then set behaviour"
+    },
+    {
+      "id": "bridge",
+      "name": "Curse of Bridge",
+      "category": "curse",
+      "behaviour": "text",
+      "copies": 1,
+      "text": null,
+      "params": {},
+      "active": true,
+      "cast_cost": "drink",
+      "can_veto": true,
+      "todo": "Add small-game (yellow) text from the official card, then set behaviour"
+    },
+    {
+      "id": "right_turn",
+      "name": "Curse of Right Turn",
+      "category": "curse",
+      "behaviour": "text",
+      "copies": 1,
+      "text": null,
+      "params": {},
+      "active": true,
+      "cast_cost": "drink",
+      "can_veto": true,
+      "todo": "Add small-game (yellow) text from the official card, then set behaviour"
+    },
+    {
+      "id": "jammed_door",
+      "name": "Curse of Jammed Door",
+      "category": "curse",
+      "behaviour": "text",
+      "copies": 1,
+      "text": null,
+      "params": {},
+      "active": true,
+      "cast_cost": "shot",
+      "can_veto": true,
+      "todo": "Add small-game (yellow) text from the official card, then set behaviour"
+    },
+    {
+      "id": "u_turn",
+      "name": "Curse of U-Turn",
+      "category": "curse",
+      "behaviour": "text",
+      "copies": 1,
+      "text": null,
+      "params": {},
+      "active": true,
+      "cast_cost": "shot",
+      "can_veto": false,
+      "todo": "Add small-game (yellow) text from the official card, then set behaviour"
+    },
+    {
+      "id": "drained_brain",
+      "name": "Curse of Drained Brain",
+      "category": "curse",
+      "behaviour": "text",
+      "copies": 1,
+      "text": null,
+      "params": {},
+      "active": true,
+      "cast_cost": "shot",
+      "can_veto": false,
+      "todo": "Add small-game (yellow) text from the official card, then set behaviour"
+    },
+    {
+      "id": "express_route",
+      "name": "Curse of Express Route",
+      "category": "curse",
+      "behaviour": "timed",
+      "copies": 1,
+      "text": "Seekers can't disembark transport for 5 minutes.",
+      "params": {
+        "duration_s": 300
+      },
+      "active": true,
+      "cast_cost": "shot",
+      "can_veto": false
+    },
+    {
+      "id": "menu",
+      "name": "Curse of Menu",
+      "category": "curse",
+      "behaviour": "until_cleared",
+      "copies": 1,
+      "text": "Hider picks a drink from their bar menu (any branded alcohol). Seekers must find the same one and drink it before asking another question.",
+      "params": {
+        "blocks_questions": true,
+        "proof": "photo"
+      },
+      "active": true,
+      "cast_cost": "free",
+      "can_veto": true
+    },
+    {
+      "id": "prison",
+      "name": "Curse of Prison",
+      "category": "curse",
+      "behaviour": "timed",
+      "copies": 1,
+      "text": "If seekers are in your chosen hiding bar when this is played, they are locked there for 10 minutes and draw a card. You must tell them they are at your bar.",
+      "params": {
+        "duration_s": 600,
+        "condition": "seekers_in_hider_bar"
+      },
+      "active": true,
+      "cast_cost": "free",
+      "can_veto": false,
+      "todo": "Confirm who draws the card"
+    },
+    {
+      "id": "pokies",
+      "name": "Curse of Pokies",
+      "category": "curse",
+      "behaviour": "until_cleared",
+      "copies": 1,
+      "text": "Seekers must find pokies and can't ask a question until they win.",
+      "params": {
+        "blocks_questions": true
+      },
+      "active": true,
+      "cast_cost": "drink",
+      "can_veto": true
+    },
+    {
+      "id": "clash",
+      "name": "Curse of Clash",
+      "category": "curse",
+      "behaviour": "until_cleared",
+      "copies": 1,
+      "text": "Seekers can't use any transport until they beat the hiders at Clash Royale.",
+      "params": {
+        "blocks_questions": false,
+        "blocks": "transport"
+      },
+      "active": true,
+      "cast_cost": "drink",
+      "can_veto": true
+    },
+    {
+      "id": "sculling",
+      "name": "Curse of Sculling",
+      "category": "curse",
+      "behaviour": "until_cleared",
+      "copies": 1,
+      "text": "Hiders get one chance to chug a schooner / pint and time it. Seekers can't use transport until they chug a schooner / pint quicker.",
+      "params": {
+        "blocks_questions": false,
+        "blocks": "transport"
+      },
+      "active": true,
+      "cast_cost": "drink",
+      "can_veto": true
+    },
+    {
+      "id": "escape",
+      "name": "Curse of Escape",
+      "category": "curse",
+      "behaviour": "timed",
+      "copies": 1,
+      "text": "Seekers have 3 minutes to exit a bar. Any drinks ordered must be finished before they leave. If they don't leave in time, they are locked in the bar for 10 minutes.",
+      "params": {
+        "duration_s": 180,
+        "followup_s": 600
+      },
+      "active": true,
+      "cast_cost": "drink",
+      "can_veto": false
+    },
+    {
+      "id": "impression",
+      "name": "Curse of Impression",
+      "category": "curse",
+      "behaviour": "until_cleared",
+      "copies": 1,
+      "text": "Seekers spin the impression wheel and can't ask questions until a stranger guesses the character correctly.",
+      "params": {
+        "blocks_questions": true,
+        "utility": "wheel",
+        "wheel_url": "https://wheelofnames.com/wf2-fd2"
+      },
+      "active": true,
+      "cast_cost": "shot",
+      "can_veto": true
+    },
+    {
+      "id": "hammered",
+      "name": "Curse of Hammered",
+      "category": "curse",
+      "behaviour": "until_cleared",
+      "copies": 1,
+      "text": "Seekers roll a die. The number is how many shots they must drink before asking another question. Shots can be shared across the team.",
+      "params": {
+        "blocks_questions": true,
+        "utility": "die"
+      },
+      "active": true,
+      "cast_cost": "shot",
+      "can_veto": false
+    },
+    {
+      "id": "quan",
+      "name": "Curse of Quan",
+      "category": "curse",
+      "behaviour": "until_cleared",
+      "copies": 1,
+      "text": "Seekers must lose at pool before asking their next question.",
+      "params": {
+        "blocks_questions": true
+      },
+      "active": true,
+      "cast_cost": "shot",
+      "can_veto": true
+    },
+    {
+      "id": "moll",
+      "name": "Curse of Moll",
+      "category": "curse",
+      "behaviour": "until_cleared",
+      "copies": 1,
+      "text": "Seekers must correctly answer 3 Harry Potter trivia questions before their next question. No Google.",
+      "params": {
+        "blocks_questions": true
+      },
+      "active": true,
+      "cast_cost": "drink",
+      "can_veto": true
+    },
+    {
+      "id": "louis",
+      "name": "Curse of Louis",
+      "category": "curse",
+      "behaviour": "text",
+      "copies": 1,
+      "text": "If someone on the seekers' team has said the n word in the last 30 minutes, all seekers drink.",
+      "params": {},
+      "active": true,
+      "cast_cost": "free",
+      "can_veto": true
+    },
+    {
+      "id": "adam",
+      "name": "Curse of Adam",
+      "category": "curse",
+      "behaviour": "text",
+      "copies": 1,
+      "text": "Adam has to drink.",
+      "params": {},
+      "active": true,
+      "cast_cost": null,
+      "can_veto": false,
+      "todo": "Confirm cast cost (none listed)"
+    },
+    {
+      "id": "cruz",
+      "name": "Curse of Cruz",
+      "category": "curse",
+      "behaviour": "until_cleared",
+      "copies": 1,
+      "text": "Seekers must ask their next question from inside a KFC, or after eating something watermelon flavoured.",
+      "params": {
+        "blocks_questions": true
+      },
+      "active": true,
+      "cast_cost": "shot",
+      "can_veto": true
+    },
+    {
+      "id": "nathan",
+      "name": "Curse of Nathan",
+      "category": "curse",
+      "behaviour": "text",
+      "copies": 1,
+      "text": "Seekers must buy Nathan's next drink.",
+      "params": {},
+      "active": true,
+      "cast_cost": null,
+      "can_veto": false,
+      "todo": "Confirm cast cost (none listed)"
+    }
+  ]
+}

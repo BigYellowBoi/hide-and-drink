@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "game_size": "small",
+  "hiding_zone": {
+    "bar_radius_m": 200,
+    "freeze_when_seeker_within_m": 200,
+    "station_zone": {
+      "enabled": null,
+      "radius_m": 805,
+      "stations": "osm:railway=station",
+      "todo": "Confirm if still a rule"
+    }
+  },
+  "answer_deadline_s": {
+    "default": 300,
+    "photos": null,
+    "todo": "Set longer deadlines for types that naturally take longer"
+  },
+  "late_answer_penalty": "one shot for the team",
+  "veto": {
+    "base_lock_s": 600,
+    "step_s": 600,
+    "penalty": "each seeker drinks"
+  },
+  "cast_costs": [
+    "free",
+    "drink",
+    "shot"
+  ],
+  "photo_proof_for_drinks": true,
+  "seeker_location_interval_s": 20,
+  "hiding_period_s": null,
+  "rounds": null,
+  "todo": "Hiding period, rounds and scoring from the official small-game rules"
+}
