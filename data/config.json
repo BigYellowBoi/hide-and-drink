@@ -33,6 +33,7 @@
   "photo_proof_for_drinks": true,
   "seeker_location_interval_s": 20,
   "hiding_period_s": 3600,
+  "hand_limit": 6,
   "rounds": null,
   "todo": "Rounds and scoring from the official small-game rules"
 }

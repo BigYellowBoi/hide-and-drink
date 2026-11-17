@@ -24,6 +24,8 @@ interface Props {
   /** Server ms when questions open; null if unknown. */
   seekingAt: number | null
   pending: boolean
+  /** Why questions are blocked (a curse in play), or null. */
+  blocked?: string | null
   now: number
   /** This phone's GPS (the seeker view already watches it and shares it with the team). */
   fix: Fix | null
@@ -33,7 +35,7 @@ interface Props {
 const startKey = (gameId: string) => `hd.thermometer.${gameId}`
 
 /** Seekers: pick a question type and option, place the tool, send. */
-export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingAt, pending, now, fix, geoError }: Props) {
+export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingAt, pending, blocked = null, now, fix, geoError }: Props) {
   const [types, setTypes] = useState<QuestionType[] | null>(null)
   const [type, setType] = useState<string>('radar')
   const [optionId, setOptionId] = useState<string | null>(null)
@@ -107,6 +109,7 @@ export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingA
   else if (type === 'thermometer' && distance && travelled < distance) blocker = `Travel ${km(distance - travelled)} more.`
   if (hidingLeft > 0) blocker = `Questions open when hiding ends (${formatClock(hidingLeft)}).`
   else if (pending) blocker = 'Waiting for the answer to the last question.'
+  else if (blocked) blocker = blocked
 
   const send = async () => {
     if (blocker || !option) return

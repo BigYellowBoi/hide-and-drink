@@ -29,9 +29,10 @@ select is(
   array[
     'answer_question', 'ask_question', 'can_join_topic', 'can_read_question_photo', 'can_see', 'can_see_seeker_position',
     'can_upload_question_photo', 'can_use_presence',
-    'choose_bar', 'create_game', 'delete_play_area', 'get_city_pack', 'hiding_bars', 'is_player', 'join_game', 'leave_game',
-    'my_team', 'remove_player', 'report_position', 'save_play_area', 'server_time', 'set_play_area', 'set_team',
-    'settle_timers', 'start_game', 'topic_for', 'update_config'
+    'choose_bar', 'clear_effect', 'confirm_clear', 'create_game', 'delete_play_area', 'get_city_pack', 'hiding_bars',
+    'is_player', 'join_game', 'keep_cards', 'leave_game',
+    'my_team', 'play_card', 'remove_player', 'report_position', 'save_play_area', 'server_time', 'set_play_area', 'set_team',
+    'settle_timers', 'start_followup', 'start_game', 'topic_for', 'update_config'
   ],
   'signed-in clients can call only the allow-listed functions'
 );

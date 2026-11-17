@@ -49,6 +49,21 @@ const MESSAGES: Record<string, string> = {
   not_far_enough: 'You haven\'t travelled far enough yet.',
   question_not_pending: 'That question has already been answered.',
   invalid_answer: 'That answer doesn\'t fit this question.',
+  invalid_deck: 'The deck has a card that isn\'t in the library. Fix the deck and try again.',
+  deck_empty: 'The deck has no cards.',
+  questions_blocked: 'Questions are blocked until you complete the curse.',
+  draw_not_pending: 'Those cards have already been kept.',
+  invalid_keep: 'Pick the right number of cards to keep.',
+  hand_full: 'Your hand is full. Discard a card to make room.',
+  card_not_in_hand: 'That card is no longer in your hand.',
+  card_not_configured: 'That card is missing its settings.',
+  card_behaviour_not_supported: 'That kind of card isn\'t in the app yet. Play it by hand.',
+  effect_not_found: 'That curse is no longer in play.',
+  effect_not_active: 'That curse is already waiting for the hider.',
+  clear_not_requested: 'The seekers haven\'t said they did it yet.',
+  no_followup: 'That card has no follow-on timer.',
+  followup_already_started: 'The follow-on timer is already running.',
+  timer_still_running: 'Wait for the timer to run out first.',
 }
 
 export const describeCode = (code: string) => MESSAGES[code] ?? code.replace(/_/g, ' ')
