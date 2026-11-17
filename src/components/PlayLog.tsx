@@ -2,6 +2,7 @@ import type { LobbyState } from '../lobby/state'
 import type { PlayState } from '../play/state'
 import { formatClock } from '../hiding/state'
 import { LockIcon } from './BarPicker'
+import { PhotoThumb } from './PhotoThumb'
 
 interface Props {
   play: PlayState
@@ -24,6 +25,7 @@ export function PlayLog({ play, lobby }: Props) {
               <span className="log-time">+{formatClock(l.at - roundStart, { up: true })}</span>
               <span>
                 {l.text}
+                {l.photo && <PhotoThumb path={l.photo} />}
                 {l.private && (
                   <span className="muted small">
                     {' '}

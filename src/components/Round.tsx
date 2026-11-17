@@ -10,7 +10,9 @@ import { readLocal, writeLocal } from '../lib/storage'
 import { distanceM, formatDistance } from '../map/geo'
 import { questionTool } from '../play/overlays'
 import { remainingBars, shade, type HiderZone } from '../play/shading'
-import { answerLabel, derivePlay, questionLabel, shadable, type PlayState, type Question } from '../play/state'
+import { answerText, derivePlay, questionLabel, shadable, type PlayState, type Question } from '../play/state'
+import { shadingBounds, type LayerLookup } from '../play/features'
+import { useCityLayers } from '../play/useCityLayers'
 import { useHidingVenues } from '../play/useHidingVenues'
 import { useSettleTimers } from '../play/useSettleTimers'
 import type { GameSync } from '../sync/engine'
@@ -66,6 +68,7 @@ interface Shared {
   tab: Tab
   now: number
   nameOf: (userId: string | null) => string
+  layer: LayerLookup | null
 }
 
 /**
@@ -82,7 +85,12 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
 
   const playArea = started?.playArea ?? null
   const answered = useMemo(() => shadable(play), [play])
-  const shading = useMemo(() => (playArea ? shade(playArea, answered) : null), [playArea, answered])
+  const layer = useCityLayers(lobby.city)
+  const ctx = useMemo(
+    () => (layer && playArea ? { layer, bounds: shadingBounds(playArea), barRadiusM: zone.barRadiusM } : undefined),
+    [layer, playArea, zone.barRadiusM],
+  )
+  const shading = useMemo(() => (playArea ? shade(playArea, answered, ctx) : null), [playArea, answered, ctx])
   const venues = useHidingVenues(lobby.city, sync.gameId)
   const left = useMemo(
     () => (playArea && shading ? remainingBars(venues, playArea, shading.remaining, zone.barRadiusM) : []),
@@ -127,6 +135,7 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
     tab,
     now,
     nameOf,
+    layer,
   }
 
   return (
@@ -214,7 +223,7 @@ function QuestionList({ questions }: { questions: readonly Question[] }) {
             <li key={q.id}>
               <strong>{questionLabel(q)}</strong>
               <span>
-                {q.answer ? answerLabel(q.answer) : 'Waiting'}
+                {q.answer ? answerText(q, q.answer) : 'Waiting'}
                 {q.late && <span className="penalty"> · late</span>}
                 {q.overdue && !q.late && <span className="penalty"> · missed deadline</span>}
               </span>
@@ -269,6 +278,7 @@ function HiderView({
   tab,
   now,
   nameOf,
+  layer,
 }: HiderProps) {
   // Hider GPS stays on this phone: it sorts bars, suggests answers and draws "you" on the map.
   const { fix, error } = useGeolocation(true)
@@ -316,6 +326,7 @@ function HiderView({
           seekers={seekerDots}
           canAct={canAct}
           now={now}
+          layer={layer ?? undefined}
         />
       )}
       {!bar && tab !== 'map' && (
