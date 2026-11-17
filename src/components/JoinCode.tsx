@@ -15,7 +15,7 @@ export function JoinCode({ code }: { code: string }) {
   useEffect(() => {
     if (!showQr) return
     let cancelled = false
-    QRCode.toDataURL(url, { margin: 1, width: 480, color: { dark: '#1a1a1a', light: '#ffffff' } })
+    QRCode.toDataURL(url, { margin: 1, width: 480, color: { dark: '#17222e', light: '#ffffff' } })
       .then((d) => !cancelled && setQr(d))
       .catch(() => !cancelled && setQr(null))
     return () => {
@@ -43,7 +43,7 @@ export function JoinCode({ code }: { code: string }) {
 
   return (
     <section className="card join-card">
-      <p className="muted">Join code</p>
+      <p className="eyebrow">Join code</p>
       <p className="join-code" aria-label={`Join code ${code.split('').join(' ')}`}>
         {code}
       </p>

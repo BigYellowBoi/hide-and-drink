@@ -32,17 +32,25 @@ export function Started({ sync, lobby, userId, presence }: Props) {
 
   return (
     <section className="card started">
-      <p className="muted">Round {started.round} · {started.playAreaName ?? 'Play area'}</p>
-      <h2>{left > 0 ? 'Hiding period' : 'Hiding period over'}</h2>
+      <p className="eyebrow">{left > 0 ? 'Hiding period' : 'Hiding period over'}</p>
       <p className="countdown">{mmss(left)}</p>
-      <p>
-        You are {me?.team ? <strong>{me.team === 'hiders' ? 'hiding' : 'seeking'}</strong> : 'not on a team'}.
+      <p className="started-you">
+        You are{' '}
+        {me?.team ? (
+          <strong className={`team-label-${me.team}`}>{me.team === 'hiders' ? 'hiding' : 'seeking'}</strong>
+        ) : (
+          'not on a team'
+        )}
+        .
+      </p>
+      <p className="muted">
+        Round {started.round} · {started.playAreaName ?? 'Play area'}
       </p>
       {lobby.players.length > 0 && (
         <ul className="started-teams">
           {(['hiders', 'seekers'] as const).map((t) => (
             <li key={t}>
-              <strong>{t === 'hiders' ? 'Hiders' : 'Seekers'}:</strong>{' '}
+              <strong className={`team-label-${t}`}>{t === 'hiders' ? 'Hiders' : 'Seekers'}</strong>{' '}
               {lobby.players
                 .filter((p) => p.team === t)
                 .map((p) => (

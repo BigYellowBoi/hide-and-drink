@@ -51,6 +51,7 @@ Full spec: `docs/spec.md`. Design (colours, fonts, logos, screens): `docs/design
 - `src/sync/`: client sync engine. `sequencer.ts` (pure ordering/gap logic), `engine.ts` (`GameSync`: topics, resync, status, actions), `transport.ts` (backend interface; `supabaseTransport.ts` in the app, fakes in tests), `clock.ts` (server clock offset), `useGameSync.ts` (React hook), `lockout.ts` (stale-state banner), `presence.ts`. Broadcasts carry `prev_seq` per audience so clients can skip the other team's seqs without a fetch.
 - Presence (who has the app open) rides on `game:{id}` only; ephemeral, never game state. Clients may insert presence, never broadcasts.
 - While not live the game screen is `inert` under a stale-state banner (`StaleBanner`)
+- Styling: design tokens are CSS variables in `src/index.css` (names match `docs/design.md`); fonts are bundled via `@fontsource` (Space Grotesk, Inter) and precached by the PWA
 - Vite `base` is `/hide-and-drink/` (GitHub Pages path); keep asset paths relative to it
 - `supabase/migrations/`: schema, RLS, action functions, Realtime broadcast trigger; `supabase/tests/`: pgTAP tests
 
