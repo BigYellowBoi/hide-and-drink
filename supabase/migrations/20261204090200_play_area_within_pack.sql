@@ -60,7 +60,9 @@ begin
   -- Stations, venues and streets exist only inside the city pack's extent; an area past it
   -- would play with missing data. Cities with no pack loaded yet are not checked.
   select extent into v_extent from public.city_packs where city = v_game.city;
-  if v_extent is not null and not extensions.st_covers(v_extent, v_geom) then
+  -- Force the SRID: on some PostGIS versions the repaired union comes back with SRID 0.
+  if v_extent is not null
+     and not extensions.st_covers(extensions.st_setsrid(v_extent, 4326), extensions.st_setsrid(v_geom, 4326)) then
     raise exception 'play_area_outside_map_data' using errcode = 'P0001';
   end if;
 
