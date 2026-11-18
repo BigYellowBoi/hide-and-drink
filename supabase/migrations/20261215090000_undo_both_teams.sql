@@ -10,15 +10,24 @@
 -- host_override itself becomes a thin front: undo requests and their votes are handled here,
 -- everything else goes to the original function, renamed _host_override_core.
 
-alter table public.override_requests add column confirmed_hiders uuid;
-alter table public.override_requests add column confirmed_seekers uuid;
+-- Renamed from 20261214090000_undo_both_teams.sql: that version was already taken by
+-- 20261214090000_playtest_tools_curse_cost.sql, so Supabase refused to apply it. Guarded so it
+-- also runs cleanly on a database where the old copy did get applied.
+alter table public.override_requests add column if not exists confirmed_hiders uuid;
+alter table public.override_requests add column if not exists confirmed_seekers uuid;
 
-alter function public.host_override(uuid, text, jsonb, text, uuid, bigint, uuid) rename to _host_override_core;
+do $do$
+begin
+  if to_regprocedure('public._host_override_core(uuid, text, jsonb, text, uuid, bigint, uuid)') is null then
+    alter function public.host_override(uuid, text, jsonb, text, uuid, bigint, uuid) rename to _host_override_core;
+  end if;
+end;
+$do$;
 revoke execute on function public._host_override_core(uuid, text, jsonb, text, uuid, bigint, uuid)
   from public, anon, authenticated;
 
 -- Ask to undo a fix. Counts as the asker's team agreeing.
-create function public._override_undo_request(
+create or replace function public._override_undo_request(
   p_game_id uuid,
   p_params jsonb,
   p_reason text,
@@ -88,7 +97,7 @@ end;
 $$;
 
 -- Agree to (or turn down) an undo. When both teams have agreed, the undo runs.
-create function public._override_undo_vote(
+create or replace function public._override_undo_vote(
   p_game_id uuid,
   p_request_id uuid,
   p_kind text,
@@ -201,7 +210,7 @@ begin
 end;
 $$;
 
-create function public.host_override(
+create or replace function public.host_override(
   p_game_id uuid,
   p_kind text,
   p_params jsonb,
