@@ -260,7 +260,8 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
         draws: [...state.draws, { drawId, seq: e.seq, questionId: str(p.question_id), pick, cards }],
         pileLeft: num(p.pile_left) ?? state.pileLeft,
       }
-      return log({ kind: 'draw', text: `Drew ${cards.length}, keep ${pick}`, private: true }, next)
+      const qid = str(p.question_id)
+      return log({ kind: 'draw', text: `Drew ${cards.length}, keep ${pick}`, private: true, ...(qid ? { questionId: qid } : {}) }, next)
     }
     case 'cards_kept': {
       const drawId = str(p.draw_id)
@@ -274,7 +275,10 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
         hand: [...state.hand.filter((c) => !dropped.has(c.instanceId)), ...fromDraw],
       }
       const names = fromDraw.map((c) => cardOf(state, c.cardId).name).join(', ')
-      return log({ kind: 'draw', text: `Kept ${names || 'cards'}`, private: true }, next)
+      return log(
+        { kind: 'draw', text: `Kept ${names || 'cards'}`, private: true, ...(draw?.questionId ? { questionId: draw.questionId } : {}) },
+        next,
+      )
     }
     case 'card_played': {
       const card = parseCard(p.card)
@@ -324,7 +328,17 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
           ],
         }
       }
-      return log({ kind: 'card', text: playedText(state, card, p), colour: card.colour, private: e.visibility === 'hiders' }, next)
+      const closes = str(p.question_id)
+      return log(
+        {
+          kind: 'card',
+          text: playedText(state, card, p),
+          colour: card.colour,
+          private: e.visibility === 'hiders',
+          ...(closes ? { questionId: closes } : {}),
+        },
+        next,
+      )
     }
     case 'question_answered':
       // The server spends every waiting modifier on the next answer.

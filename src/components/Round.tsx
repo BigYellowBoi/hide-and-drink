@@ -12,7 +12,8 @@ import { readLocal, writeLocal } from '../lib/storage'
 import { distanceM, formatDistance } from '../map/geo'
 import { questionTool } from '../play/overlays'
 import { shade, type HiderZone } from '../play/shading'
-import { derivePlay, outcomeText, questionLabel, shadable, type PlayState, type Question } from '../play/state'
+import { derivePlay, questionLabel, shadable, type PlayState } from '../play/state'
+import { useQuestionTypes } from '../play/useQuestionTypes'
 import { shadingBounds, type LayerLookup } from '../play/features'
 import { useCityLayers } from '../play/useCityLayers'
 import { useSettleTimers } from '../play/useSettleTimers'
@@ -43,22 +44,23 @@ import { BlockedBanner, ConfirmClear, EffectStrip, EffectsPanel, TriviaPrompt } 
 import { HandPanel } from './HandPanel'
 import type { MapDot } from './GameMap'
 import { LazyGameMap } from './lazyMap'
-import { PlayLog } from './PlayLog'
+import { Timeline } from './Timeline'
+import { MapsLink } from './MapsLink'
+import { ManualShadeSheet } from './ManualShadeSheet'
 import { PresenceDot } from './PresenceDot'
 
-type Tab = 'map' | 'ask' | 'hand' | 'effects' | 'questions' | 'log'
+type Tab = 'map' | 'ask' | 'hand' | 'effects' | 'log'
 const TABS = {
   hiders: [
     ['map', 'Map'],
     ['hand', 'Hand'],
-    ['questions', 'Questions'],
-    ['log', 'Log'],
+    ['log', 'Timeline'],
   ],
   seekers: [
     ['map', 'Map'],
     ['ask', 'Ask'],
     ['effects', 'Effects'],
-    ['log', 'Log'],
+    ['log', 'Timeline'],
   ],
 } as const
 
@@ -112,6 +114,11 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
   const cards = useMemo(() => deriveCards(events), [events])
   const log = useMemo(() => [...play.log, ...cards.log].sort((a, b) => a.seq - b.seq), [play.log, cards.log])
   const [tab, setTab] = useState<Tab>('map')
+  /** A past question shown on the map from the timeline (its tool, candidates and distances). */
+  const [shownId, setShownId] = useState<string | null>(null)
+  /** The answered question the seekers are shading by hand. */
+  const [shadeId, setShadeId] = useState<string | null>(null)
+  const questionTypes = useQuestionTypes(lobby.city)
   useSettleTimers(sync, play, canAct, now)
 
   const playArea = started?.playArea ?? null
@@ -122,8 +129,11 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
     [layer, playArea, zone.barRadiusM],
   )
   const shading = useMemo(() => (playArea ? shade(playArea, answered, ctx) : null), [playArea, answered, ctx])
-  // Only while a question is open: once answered, the white outline of what's left says it all.
-  const tool = useMemo(() => (play.pending ? questionTool(play.pending) : undefined), [play.pending])
+  // While a question is open, or one picked from the timeline: otherwise the white outline of
+  // what's left says it all.
+  const shownQ = play.pending ?? play.questions.find((q) => q.id === shownId) ?? null
+  const tool = useMemo(() => (shownQ ? questionTool(shownQ, layer) : undefined), [shownQ, layer])
+  const shadeQ = play.questions.find((q) => q.id === shadeId) ?? null
 
   const remaining = useMemo<FeatureCollection | undefined>(
     () =>
@@ -183,7 +193,16 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
         </section>
       )}
 
-      {tab === 'questions' && <QuestionList questions={play.questions} />}
+      {tab === 'map' && !play.pending && shownQ && (
+        <div className="shown-chip" role="status">
+          <span>
+            Showing <strong>{questionLabel(shownQ)}</strong>
+          </span>
+          <button className="small secondary" onClick={() => setShownId(null)}>
+            Hide
+          </button>
+        </div>
+      )}
 
       {tab === 'effects' && team && (
         <EffectsPanel sync={sync} cards={cards} team={team} canAct={canAct} now={now} config={lobby.config} nameOf={nameOf} isHost={shared.isHost} />
@@ -191,7 +210,22 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
 
       {tab === 'log' && (
         <>
-          <PlayLog log={log} lobby={lobby} />
+          <Timeline
+            questions={play.questions}
+            log={log}
+            lobby={lobby}
+            types={questionTypes}
+            team={team}
+            round={started.round}
+            canAct={canAct}
+            shownId={shownQ?.id ?? null}
+            nameOf={nameOf}
+            onShow={(q) => {
+              setShownId(q.id)
+              setTab('map')
+            }}
+            onShade={(q) => setShadeId(q.id)}
+          />
           <section className="card">
             <p className="muted">
               Round {started.round} · {started.playAreaName ?? 'Play area'}
@@ -215,11 +249,24 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
         </>
       )}
 
+      {shadeQ && team === 'seekers' && (
+        <ManualShadeSheet
+          sync={sync}
+          question={shadeQ}
+          city={lobby.city}
+          playArea={playArea}
+          ruled={shading?.ruledOut ?? EMPTY}
+          layer={layer}
+          canAct={canAct}
+          onClose={() => setShadeId(null)}
+        />
+      )}
+
       <nav className="tabbar" aria-label="Game sections">
         {tabs.map(([id, label]) => (
           <button key={id} className={tab === id ? 'on' : ''} aria-current={tab === id} onClick={() => setTab(id)}>
             {label}
-            {id === 'questions' && play.pending && <span className="tab-dot" aria-label="needs answer" />}
+            {id === 'log' && team === 'hiders' && play.pending && <span className="tab-dot" aria-label="needs answer" />}
             {id === 'hand' && (cards.draws.length > 0 || triviaWaiting(cards, 'hiders').length > 0) && (
               <span className="tab-dot" aria-label="cards to act on" />
             )}
@@ -231,30 +278,6 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
         ))}
       </nav>
     </HiderCountContext.Provider>
-  )
-}
-
-function QuestionList({ questions }: { questions: readonly Question[] }) {
-  return (
-    <section className="card">
-      <h2>Questions</h2>
-      {questions.length === 0 ? (
-        <p className="muted">No questions yet.</p>
-      ) : (
-        <ul className="question-list">
-          {[...questions].reverse().map((q) => (
-            <li key={q.id}>
-              <strong>{questionLabel(q)}</strong>
-              <span>
-                {outcomeText(q)}
-                {q.late && <span className="penalty"> · late</span>}
-                {q.overdue && !q.late && <span className="penalty"> · missed deadline</span>}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
   )
 }
 
@@ -481,6 +504,7 @@ function HiderView({
               {!hiding.frozen && (
                 <p className="ok small-note">Clear: no seeker within {formatDistance(zone.freezeRadiusM)}.</p>
               )}
+              <MapsLink point={[bar.lng, bar.lat]} />
               <GeoNote error={error} waiting={!fix} dev={dev} />
             </section>
             <EffectStrip cards={cards} now={now} />
@@ -535,6 +559,7 @@ function SeekerView({
   goEffects,
   now,
   nameOf,
+  layer,
   dev,
   userId,
 }: SeekerProps) {
@@ -653,6 +678,7 @@ function SeekerView({
           fix={fix}
           geoError={error}
           onLongPress={place}
+          layer={layer}
         />
       )}
     </>

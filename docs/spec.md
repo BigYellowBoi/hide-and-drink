@@ -83,6 +83,8 @@ Utilities: `params.utility` = `dice` (with `params.dice` count) or `wheel` (`par
 - Types with auto-shading: radar, thermometer, measuring, matching, tentacles. Manual: photos, bonus (except "3+ bars within 50 m").
 - Suggested answer = computed from the hider's chosen bar (or GPS within the circle); flag when the answer differs across the 100 m circle.
 - "Custom" distance options let seekers type a value. Tentacles allow a "none in range" answer.
+- Manual shading (fallback for every answer, auto-shaded or not): seekers pick (suburbs, council areas, the question's circle) or draw an area and say whether the hider is inside it, outside it, or that the answer rules nothing out. `set_question_shading` stores it on the question and logs a public `question_shading_set`; every phone then shades that answer from it instead of the app's computation. Back to the app's shading at any time.
+- Questions that use app data (nearest library, ferry stop, tentacles candidates, measuring targets) show their candidate points on the map while open, with a line to the nearest and its distance in km; the timeline's "Show on map" brings any past question back.
 
 ## 7. Data
 

@@ -5,6 +5,7 @@
     {
       "type": "matching",
       "prompt": "Is your nearest ___ the same as mine?",
+      "colour": "#2F6FD6",
       "reward": {
         "draw": 3,
         "pick": 1
@@ -56,6 +57,7 @@
     {
       "type": "measuring",
       "prompt": "Compared to me, are you closer to or further from ___?",
+      "colour": "#3BA55C",
       "reward": {
         "draw": 3,
         "pick": 1
@@ -98,6 +100,7 @@
     {
       "type": "thermometer",
       "prompt": "I travelled ___, am I hotter or colder?",
+      "colour": "#F2C744",
       "reward": {
         "draw": 2,
         "pick": 1
@@ -125,6 +128,7 @@
     {
       "type": "radar",
       "prompt": "Are you within ___ of me?",
+      "colour": "#F08A24",
       "reward": {
         "draw": 2,
         "pick": 1
@@ -156,6 +160,7 @@
     {
       "type": "tentacles",
       "prompt": "Of all the ___ within 1 km of me, which are you closest to? (You need to be within 1 km of it, otherwise send null.)",
+      "colour": "#9B5BD4",
       "reward": {
         "draw": 4,
         "pick": 2
@@ -216,6 +221,7 @@
     {
       "type": "photos",
       "prompt": "Send a photo of ___ (must be possible within your zone, otherwise send null).",
+      "colour": "#35BFD8",
       "reward": {
         "draw": 1,
         "pick": 1
@@ -273,6 +279,7 @@
     {
       "type": "bonus",
       "prompt": "Bonus question",
+      "colour": "#A9B4BF",
       "reward": {
         "draw": 2,
         "pick": 1

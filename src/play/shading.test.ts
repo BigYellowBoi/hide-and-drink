@@ -45,6 +45,7 @@ const q = (type: string, params: Record<string, unknown>, answer: string | null)
   closedBy: null,
   randomizedFrom: null,
   rewardMultiplier: null,
+    manualShading: null,
 })
 
 const km2 = (f: GeoJSON.Feature | null) => (f ? area(f) / 1e6 : 0)

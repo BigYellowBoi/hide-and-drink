@@ -1018,6 +1018,16 @@ details.card > summary h2 {
   border: 1px solid var(--line);
 }
 
+.map-popup-body {
+  display: grid;
+  gap: 4px;
+}
+
+.map-popup-body a {
+  color: var(--hider);
+  font-size: 13px;
+}
+
 .maplibregl-popup.map-popup .maplibregl-popup-tip {
   display: none;
 }
@@ -1577,8 +1587,23 @@ button.type-tile .small {
   color: var(--text-muted);
 }
 
+/* Filled in the type's colour (question_types.extra.colour); the selected tile gets a white ring. */
+button.type-tile[style] .small {
+  color: inherit;
+  opacity: 0.85;
+}
+
 button.type-tile.on {
   border-color: var(--seeker-on-dark);
+}
+
+button.type-tile[style].on {
+  outline: 3px solid var(--text);
+  outline-offset: 2px;
+}
+
+button.type-tile[style]:not(.on) {
+  opacity: 0.72;
 }
 
 .chips {
@@ -1613,6 +1638,11 @@ button.option-chip.on {
   margin-top: 16px;
 }
 
+a.link {
+  color: var(--hider);
+  font-weight: 600;
+}
+
 button.link {
   padding: 0;
   border: 0;
@@ -1645,28 +1675,110 @@ button.link {
   padding: 8px 16px 12px;
 }
 
-.play-log {
+/* Timeline: question cards (type colour band on the left) and rows for everything else. */
+.timeline {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
-.question-list li {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--surface-2);
-}
-
-.play-log li {
+.tl-row {
   display: grid;
   grid-template-columns: 10px 64px 1fr;
   align-items: baseline;
   gap: 8px;
+}
+
+.tl-question {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px 12px 16px;
+  border-radius: 16px;
+  background: var(--surface-2);
+  border-left: 6px solid var(--type, var(--text-muted));
+}
+
+.tl-question p {
+  margin: 0;
+}
+
+.tl-open {
+  box-shadow: 0 0 0 2px var(--type, var(--line)) inset;
+}
+
+.tl-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.tl-type {
+  color: var(--type, var(--text));
+  font: 700 13px/1.2 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.tl-text {
+  font-weight: 600;
+}
+
+.tl-sub {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 6px 0 0;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 4px;
+  font-size: 15px;
+}
+
+.tl-sub li {
+  display: grid;
+  grid-template-columns: 10px 1fr;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.tl-manual {
+  color: var(--alert);
+}
+
+.tl-actions {
+  margin-top: 6px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.log-shading .log-dot {
+  background: var(--alert);
+}
+
+/* "Showing Matching · Library" over the map (a past question picked from the timeline). */
+.shown-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 6px 8px 6px 14px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.map-selected {
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 16px 12px;
+}
+
+.maps-link {
+  margin-top: 8px;
 }
 
 .log-dot {

@@ -48,3 +48,20 @@ export const optionLabel = (o: QuestionOption) =>
     : o.id === 'custom'
       ? 'Custom'
       : o.id)
+
+/** The type's colour (as in the original game), from question_types.extra.colour. */
+export function typeColour(types: readonly QuestionType[] | null, type: string): string | null {
+  const c = types?.find((t) => t.type === type)?.extra?.colour
+  return typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c) ? c : null
+}
+
+/** Dark or light text for a filled tile of colour hex (WCAG relative luminance). */
+export function textOn(hex: string): '#17222E' | '#FFFFFF' {
+  const lin = (i: number) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  }
+  const l = 0.2126 * lin(1) + 0.7152 * lin(3) + 0.0722 * lin(5)
+  // Contrast against white vs against --bg (#17222E, luminance ~0.015).
+  return (1.05 / (l + 0.05)) >= (l + 0.05) / 0.065 ? '#FFFFFF' : '#17222E'
+}

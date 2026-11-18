@@ -8,7 +8,8 @@ import { layerCollection, loadCityPack, type CityPack } from '../map/cityPack'
 import { circlePolygon, distanceM, formatDistance } from '../map/geo'
 import { boundsOf, outsideMask, type AreaCollection } from '../map/playArea'
 import { resetGestures } from '../map/gestures'
-import { hatchImage, MAP_COLORS, mapStyle, PACK_SOURCES, TAPPABLE_LAYERS } from '../map/style'
+import { glyphsUrl, hatchImage, MAP_COLORS, mapStyle, PACK_SOURCES, TAPPABLE_LAYERS } from '../map/style'
+import { googleMapsUrl } from '../map/googleMaps'
 import { packWithVenues, type VenueEdits } from '../venues/state'
 
 /** Game things drawn over the city: a zone circle, candidate bars and people. */
@@ -73,6 +74,32 @@ interface Props {
   /** The game's venue edits: hidden venues drop off the venue dots, custom ones appear. */
   venues?: VenueEdits
 }
+
+/** Popup content: the name (or distance) and an "Open in Google Maps" link for the point. */
+function popupContent(text: string, at: [number, number]): HTMLElement {
+  const box = document.createElement('span')
+  box.className = 'map-popup-body'
+  if (text) {
+    const label = document.createElement('span')
+    label.textContent = text
+    box.append(label)
+  }
+  const link = document.createElement('a')
+  link.href = googleMapsUrl(at)
+  link.target = '_blank'
+  link.rel = 'noopener noreferrer'
+  link.textContent = 'Open in Google Maps'
+  box.append(link)
+  return box
+}
+
+/** A tapped feature's own point when it has one (station, bar, dot), else where the tap landed. */
+function pointOf(geometry: { type: string; coordinates?: unknown } | undefined, fallback: [number, number]): [number, number] {
+  const c = geometry?.type === 'Point' ? geometry.coordinates : null
+  return Array.isArray(c) && typeof c[0] === 'number' && typeof c[1] === 'number' ? [c[0], c[1]] : fallback
+}
+
+const GLYPHS = typeof location === 'undefined' ? undefined : glyphsUrl(location.origin, import.meta.env.BASE_URL)
 
 const LONG_PRESS_MS = 500
 /** A hold that drifts further than this (px) is a pan, not a press. */
@@ -140,7 +167,7 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
     const extent = boundsOf({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: pack.pack.extent }] })
     const map = new MapLibre({
       container: container.current,
-      style: mapStyle(pack),
+      style: mapStyle(pack, { glyphs: GLYPHS }),
       bounds: extent as LngLatBoundsLike,
       fitBoundsOptions: { padding: 16 },
       maxBounds: [extent[0] - 0.2, extent[1] - 0.2, extent[2] + 0.2, extent[3] + 0.2],
@@ -228,14 +255,14 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
         popupRef.current?.remove()
         if (!hit) return
         if (hit.layer.id === 'bars' && typeof hit.properties?.id === 'string') onBarTapRef.current?.(hit.properties.id)
-        const label = document.createElement('span')
-        label.textContent =
+        const text =
           hit.layer.id === 'dots'
             ? describeDot(dotsRef.current, hit.properties?.id)
             : describeFeature(hit.layer.id, hit.properties ?? {})
+        const at = pointOf(hit.geometry, [e.lngLat.lng, e.lngLat.lat])
         popupRef.current = new Popup({ closeButton: false, className: 'map-popup', offset: 8 })
-          .setLngLat(e.lngLat)
-          .setDOMContent(label)
+          .setLngLat(at)
+          .setDOMContent(popupContent(text, at))
           .addTo(map)
       })
     }
@@ -319,12 +346,10 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
           ev.stopPropagation()
           const cur = dotsRef.current.find((x) => x.id === d.id)
           if (!cur) return
-          const label = document.createElement('span')
-          label.textContent = describeDot(dotsRef.current, d.id)
           popupRef.current?.remove()
           popupRef.current = new Popup({ closeButton: false, className: 'map-popup', offset: 8 })
             .setLngLat([cur.lng, cur.lat])
-            .setDOMContent(label)
+            .setDOMContent(popupContent(describeDot(dotsRef.current, d.id), [cur.lng, cur.lat]))
             .addTo(map)
         })
         m = new Marker({ element: el, anchor: 'top', offset: [0, 9] })

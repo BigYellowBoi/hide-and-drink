@@ -1,3 +1,4 @@
+import type { Feature, MultiPolygon, Polygon } from 'geojson'
 import type { GameEvent } from '../sync/types'
 import { isLngLat, type LngLat } from './geo'
 
@@ -74,14 +75,35 @@ export interface Question {
   randomizedFrom: string | null
   /** Final reward when a modifier changed it (question_answered). */
   rewardMultiplier: number | null
+  /** The seekers' own shading, replacing the app's (set_question_shading). null: the app's. */
+  manualShading: ManualShading | null
 }
 
-export type LogKind = 'seeking' | 'asked' | 'answered' | 'penalty' | 'bar' | 'draw' | 'card' | 'proof'
+/** keep/cut: keep only / rule out the area. none: the answer rules nothing out. */
+export type ManualShading =
+  | { mode: 'keep' | 'cut'; area: Feature<Polygon | MultiPolygon> }
+  | { mode: 'none' }
+
+export function parseManualShading(v: unknown): ManualShading | null {
+  if (!isObject(v)) return null
+  if (v.mode === 'none') return { mode: 'none' }
+  const a = v.area
+  if ((v.mode === 'keep' || v.mode === 'cut') && isObject(a) && (a.type === 'Polygon' || a.type === 'MultiPolygon') && Array.isArray(a.coordinates)) {
+    return { mode: v.mode, area: { type: 'Feature', properties: {}, geometry: a as unknown as Polygon | MultiPolygon } }
+  }
+  return null
+}
+
+export type LogKind = 'seeking' | 'asked' | 'answered' | 'penalty' | 'bar' | 'draw' | 'card' | 'proof' | 'shading'
 export interface LogEntry {
   seq: number
   kind: LogKind
   at: number
   text: string
+  /** The question this entry belongs to (answer, cards drawn for it, a veto): shown on its timeline card. */
+  questionId?: string
+  /** Who did it (user id), when the event says. */
+  by?: string | null
   /** Hider-only entry (shown with a lock). */
   private?: boolean
   /** Storage path of a photo (answer photo, or drink proof with photoBucket). */
@@ -248,6 +270,7 @@ export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
         closedBy: null,
         randomizedFrom: str(p.randomized_from),
         rewardMultiplier: null,
+        manualShading: null,
       }
       return {
         ...state,
@@ -255,7 +278,17 @@ export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
         seekingStarted: true,
         questions: [...state.questions, q],
         pending: q,
-        log: [...state.log, { seq: e.seq, kind: 'asked', at, text: q.randomizedFrom ? `Randomized into ${questionLabel(q)}` : `${questionLabel(q)} asked` }],
+        log: [
+          ...state.log,
+          {
+            seq: e.seq,
+            kind: 'asked',
+            at,
+            text: q.randomizedFrom ? `Randomized into ${questionLabel(q)}` : `${questionLabel(q)} asked`,
+            questionId: id,
+            by: q.askedBy,
+          },
+        ],
       }
     }
     case 'question_answered': {
@@ -281,6 +314,7 @@ export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
             kind: 'answered',
             at,
             text: `${label}: ${q ? answerText(q, answer) : answerLabel(answer)}${p.late === true ? ' (late)' : ''}`,
+            questionId: id,
             ...(q?.type === 'photos' && answer !== NULL_ANSWER ? { photo: answer } : {}),
           },
         ],
@@ -295,13 +329,34 @@ export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
     }
     case 'hider_moved':
       return { ...state, movedSeq: e.seq }
+    case 'question_shading_set': {
+      const id = str(p.question_id)
+      const q = state.questions.find((x) => x.id === id)
+      if (!id || !q) return state
+      const manual = parseManualShading(p.shading)
+      const next = update(state, id, (x) => ({ ...x, manualShading: manual }))
+      const what = !manual
+        ? 'back to the app\'s shading'
+        : manual.mode === 'none'
+          ? 'rules nothing out'
+          : manual.mode === 'keep'
+            ? 'shaded by hand (keep inside)'
+            : 'shaded by hand (rule out inside)'
+      return {
+        ...next,
+        log: [...next.log, { seq: e.seq, kind: 'shading', at, text: `${questionLabel(q)}: ${what}`, questionId: id, by: str(p.by) }],
+      }
+    }
     case 'answer_overdue': {
       const id = str(p.question_id)
       const next = update(state, id, (x) => ({ ...x, overdue: true }))
       return {
         ...next,
         penalties: next.penalties + 1,
-        log: [...next.log, { seq: e.seq, kind: 'penalty', at, text: 'Answer deadline missed: hiders take a shot' }],
+        log: [
+          ...next.log,
+          { seq: e.seq, kind: 'penalty', at, text: 'Answer deadline missed: hiders take a shot', ...(id ? { questionId: id } : {}) },
+        ],
       }
     }
     default:

@@ -13,8 +13,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'logo.svg', 'mark.svg', 'wordmark.svg'],
-      // Precache the bundled fonts too, so the app looks right offline.
-      workbox: { globPatterns: ['**/*.{js,mjs,css,html,woff2}'] },
+      // Precache the bundled fonts and map label glyphs too, so the app looks right offline.
+      workbox: { globPatterns: ['**/*.{js,mjs,css,html,woff2,pbf}'] },
       manifest: {
         name: 'Hide + Drink',
         short_name: 'Hide+Drink',

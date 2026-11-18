@@ -84,6 +84,7 @@ function q(type: string, params: Record<string, unknown>, answer: string | null 
     closedBy: null,
     randomizedFrom: null,
     rewardMultiplier: null,
+    manualShading: null,
   }
 }
 
