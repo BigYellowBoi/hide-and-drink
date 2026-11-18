@@ -11,7 +11,7 @@ import type { VenueEdits } from '../venues/state'
 import { photoPath, shrinkPhoto, uploadPhoto } from '../play/photos'
 import { supabase } from '../lib/supabase'
 import { ANSWERS, answerText, candidatesOf, km, NULL_ANSWER, optionText, questionLabel, questionText, type Question } from '../play/state'
-import { LockIcon } from './BarPicker'
+import { LockIcon, PrivateLabel } from './PrivateLabel'
 import { DeadlineRing } from './DeadlineRing'
 import type { MapDot } from './GameMap'
 import { LazyGameMap } from './lazyMap'
@@ -189,9 +189,7 @@ export function AnswerSheet({
       )}
 
       <div className="suggestion">
-        <p className="eyebrow">
-          <LockIcon /> Only you see this
-        </p>
+        <PrivateLabel />
         {suggestion ? (
           <>
             <p>

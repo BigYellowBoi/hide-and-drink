@@ -100,6 +100,7 @@ export const COMMON_FIELDS: ParamField[] = [
       { value: 'photo', label: 'Photo' },
       { value: 'video', label: 'Video' },
     ],
+    hint: 'Photo: the app asks for it (seekers before a curse clears; each drink the card hands out). Video: shown in person',
   },
 ]
 

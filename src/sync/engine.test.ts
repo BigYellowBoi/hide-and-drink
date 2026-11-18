@@ -473,6 +473,30 @@ describe('GameSync', () => {
       sync.stop()
     })
 
+    it('hiders get teammates\' bar picks (newest per hider); seekers ignore them', async () => {
+      const pick = (user: string, venue: string | null, at: string) => ({ game_id: GAME, user_id: user, round: 1, venue_id: venue, name: venue, at })
+      const server = new FakeServer()
+      server.team = 'hiders'
+      const sync = await started(server)
+      await flush()
+      const signal = server.topics.get(`game:${GAME}:hiders`)?.onSignal
+      signal?.('picking', pick('ben', 'bar1', '2026-11-17T10:00:20Z'))
+      signal?.('picking', pick('ben', 'bar0', '2026-11-17T10:00:10Z')) // older, arrives late
+      signal?.('picking', { ...pick('eve', 'x', '2026-11-17T10:00:20Z'), game_id: 'other' })
+      expect(sync.getSnapshot().picks).toMatchObject([{ userId: 'ben', venueId: 'bar1', name: 'bar1' }])
+      expect((await sync.reportPicking('bar2')).ok).toBe(true)
+      expect(server.calls.at(-1)).toEqual({ fn: 'report_picking', args: { p_game_id: GAME, p_venue_id: 'bar2' } })
+      sync.stop()
+
+      const seekerServer = new FakeServer()
+      const seeker = await started(seekerServer)
+      await flush()
+      seekerServer.topics.get(`game:${GAME}:seekers`)?.onSignal?.('picking', pick('ben', 'bar1', '2026-11-17T10:00:20Z'))
+      expect(seeker.getSnapshot().picks).toEqual([])
+      expect((await seeker.reportPicking('bar1')).ok).toBe(false)
+      seeker.stop()
+    })
+
     it('reports only while live, once, without queueing', async () => {
       const server = new FakeServer()
       const sync = await started(server)

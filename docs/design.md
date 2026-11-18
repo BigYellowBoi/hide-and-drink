@@ -6,7 +6,7 @@ Visual source of truth for the app. Decided 17 Nov 2026. Clickable mockups of ev
 
 1. **Glanceable, one-handed, in a dark bar.** Dark theme only. Big targets, few words.
 2. **One thing needs you at a time.** Anything that needs action (incoming question, freeze, curse to clear) sits at the top of the screen until handled.
-3. **Your team colour is always visible** in the top bar. Hider-only screens show a lock and "Only you see this".
+3. **Your team colour is always visible** in the top bar. Hider-only screens show a lock and "Only you see this" ("Only your team sees this" with more than one hider).
 4. **Never act on stale state.** Anything but a green status dot disables actions and says why.
 5. **Suggest, don't decide.** Suggested answers and shading are labelled as suggestions; the hider's tap is final.
 6. **Content is data.** Cards and questions render from one template each; a new card needs no UI work.
@@ -64,7 +64,7 @@ Map: ground `#1C2A37`, streets `#2A3B4C`, river `#24506E`. Ruled-out area is a g
 | Decision | Choice |
 | --- | --- |
 | Navigation in play | Bottom tabs, map first. Hider: Map, Hand, Questions, Log. Seekers: Map, Ask, Effects, Log |
-| Card style | Playing card: tall, category colour band on top, cost badge (Free / Drink / Shot), text below |
+| Card style | Playing card: tall, category colour band on top, cost badge (Free / Drink / Shot), text below. Every card (and library row) has an info button: bottom sheet with the full text, cast cost, veto status and params facts |
 | Map shading | Grey hatch over ruled-out area. No bar count until the venue list is comprehensive (the list of bars still possible stays) |
 | Timers | Ring + digits for deadlines; digits in the top bar for the main clock; thin bar for running curses |
 | Top bar (every in-game screen) | Team chip left, main timer centre with a small caps label, status dot right |
@@ -79,10 +79,10 @@ Flow: Home → Lobby → (host: setup) → Start round → each phone switches t
 | Join via QR | Anyone scanning | Code prefilled from `?join=`, name, Join |
 | Lobby | Everyone | Big join code + QR. Hiders and Seekers as full-width lists, one above the other (not side-by-side columns: names get cut off on phones). Tap your name to switch team; the host can tap anyone's. "Join" button under the team you're not in; unassigned players listed below. Host setup checklist, slide to start |
 | Deck builder | Host | Presets, category tabs with live totals, -/count/+ per card (0 greys out), "+ New card" |
-| Pick a bar | Hider | Hiding countdown, map + list of valid bars by distance, 100 m circle preview, slide to lock in |
+| Pick a bar | Hider | Hiding countdown, map + list of valid bars by distance, 100 m circle preview, slide to lock in. Other hiders show live as "[name] is picking…" with their selected bar; first to lock in wins |
 | Hider map | Hider | Own bar circle and position, seekers' name-tagged dots (tap for distance), freeze banner, "New question" card with deadline |
 | Answer sheet | Hider | Question type + asker, deadline ring, mini map, suggested answer (flag if it differs across the circle), big answer buttons, reward reminder |
-| Hand | Hider | Selected card large, Cast / Discard, hand strip below, lock label |
+| Hand | Hider | Selected card large, Cast / Discard, hand grid below (one slot per hand-limit card, no scrolling), lock label |
 | Seeker map | Seekers | Hatched shading with the remaining area outlined in white (no bar dots or bar list: those are hider-only), teammates' name-tagged dots, active curse strip, Ask button |
 | Ask | Seekers | 7 type tiles with draw/keep, tool on the map (e.g. radar circle), option chips, Send |
 | Effects | Seekers | "Questions blocked" banner, curse cards with timer or We did it / Veto, vetoes used |

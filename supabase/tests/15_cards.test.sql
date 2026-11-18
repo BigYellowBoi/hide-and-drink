@@ -206,6 +206,8 @@ select set_config('test.d2', (select id::text from public.card_instances
   where draw_id = current_setting('test.draw2')::uuid order by pile_pos limit 1), true);
 select set_config('test.h1', (select id::text from public.card_instances
   where game_id = pg_temp.gid() and location = 'hand' order by pile_pos limit 1), true);
+select set_config('test.d2b', (select id::text from public.card_instances
+  where draw_id = current_setting('test.draw2')::uuid order by pile_pos offset 1 limit 1), true);
 set local role authenticated;
 select throws_ok(
   format($$ select public.keep_cards(pg_temp.gid(), %L, %L, '{}', pg_temp.uid(42), pg_temp.seq()) $$,
@@ -214,8 +216,8 @@ select throws_ok(
 );
 select throws_ok(
   format($$ select public.keep_cards(pg_temp.gid(), %L, %L, %L, pg_temp.uid(43), pg_temp.seq()) $$,
-    current_setting('test.draw2'), '{' || current_setting('test.d2') || '}', '{' || current_setting('test.d2') || '}'),
-  'P0001', 'card_not_in_hand', 'only hand cards can be discarded to make room'
+    current_setting('test.draw2'), '{' || current_setting('test.d2') || '}', '{' || current_setting('test.d2b') || '}'),
+  'P0001', 'card_not_in_hand', 'only hand cards or kept cards can be discarded to make room'
 );
 select lives_ok(
   format($$ select public.keep_cards(pg_temp.gid(), %L, %L, %L, pg_temp.uid(44), pg_temp.seq()) $$,
@@ -228,6 +230,8 @@ select is((select count(*)::int from public.card_instances where game_id = pg_te
 select is((select location from public.card_instances where id = current_setting('test.h1')::uuid), 'discarded',
   'the hand card was discarded');
 -- Clear the hand for the play tests.
+-- Photo evidence for curses is covered in 19_card_proofs_picking.test.sql.
+update public.game_cards set params = params - 'proof' where game_id = pg_temp.gid();
 update public.card_instances set location = 'discarded' where game_id = pg_temp.gid() and location = 'hand';
 select set_config('test.cuisine', pg_temp.to_hand('distant_cuisine')::text, true);
 select set_config('test.clash', pg_temp.to_hand('clash')::text, true);

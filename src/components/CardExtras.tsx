@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import {
   cardUtility,
-  DRINK_BUCKET,
   lockedUntil,
   nextVetoLockS,
   openProofs,
@@ -13,12 +12,11 @@ import {
   type PlayedCard,
 } from '../cards/state'
 import { formatClock } from '../hiding/state'
-import { supabase } from '../lib/supabase'
 import { describeError } from '../lobby/messages'
-import { photoPath, shrinkPhoto, uploadPhoto } from '../play/photos'
 import type { GameSync } from '../sync/engine'
 import type { Team } from '../sync/types'
 import { EffectBar } from './EffectsPanel'
+import { useProofPhoto } from './useProofPhoto'
 
 const minutes = (s: number) => `${Math.round(s / 60)} min`
 
@@ -214,53 +212,16 @@ export function DrinkProofs({ sync, cards, team, canAct }: { sync: GameSync; car
 }
 
 function DrinkProofCard({ sync, proof, canAct }: { sync: GameSync; proof: DrinkProof; canAct: boolean }) {
-  const fileRef = useRef<HTMLInputElement>(null)
-  const [photo, setPhoto] = useState<{ blob: Blob; url: string; path: string } | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
-  const [err, setErr] = useState<string | null>(null)
-  useEffect(
-    () => () => {
-      if (photo) URL.revokeObjectURL(photo.url)
-    },
-    [photo],
-  )
-
-  const pick = async (file: File | undefined) => {
-    if (!file) return
-    setErr(null)
-    setBusy('Preparing photo…')
-    try {
-      const blob = await shrinkPhoto(file)
-      setPhoto({ blob, url: URL.createObjectURL(blob), path: photoPath(sync.gameId, proof.id) })
-    } catch (e) {
-      setErr(describeError(e))
-    } finally {
-      setBusy(null)
-    }
-  }
-  const send = async () => {
-    if (!photo || !supabase) return
-    setErr(null)
-    try {
-      setBusy('Uploading photo…')
-      const path = await uploadPhoto(supabase, photo.path, photo.blob, DRINK_BUCKET)
-      setBusy('Sending…')
-      await sync.action('submit_drink_proof', { p_proof_id: proof.id, p_path: path })
-    } catch (e) {
-      setErr(describeError(e))
-      setBusy(null)
-    }
-  }
-
+  const { input, photo, busy, err, take, send } = useProofPhoto(sync, proof.id)
   return (
     <section className="card drink-proof" role="alert">
       <p className="eyebrow">Photo proof</p>
       <h2>{proof.cost === 'shot' ? 'Take a shot' : 'Have a drink'}</h2>
       <p className="muted small">{proof.label}. Photograph it: the other team sees the photo.</p>
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => void pick(e.target.files?.[0])} />
+      {input}
       {photo && <img className="photo-preview" src={photo.url} alt="Your drink" />}
       <div className="confirm-row">
-        <button className="secondary" disabled={!!busy || !canAct} onClick={() => fileRef.current?.click()}>
+        <button className="secondary" disabled={!!busy || !canAct} onClick={take}>
           {photo ? 'Retake' : 'Take photo'}
         </button>
         <button disabled={!photo || !!busy || !canAct} onClick={() => void send()}>

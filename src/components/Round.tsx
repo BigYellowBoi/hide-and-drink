@@ -20,6 +20,7 @@ import {
   bannedSet,
   cardOf,
   deriveCards,
+  evidenceFor,
   liveEffects,
   lockedUntil,
   powerupAction,
@@ -33,7 +34,9 @@ import type { Presence } from '../sync/presence'
 import type { GameEvent, SeekerPosition } from '../sync/types'
 import { AnswerSheet } from './AnswerSheet'
 import { AskPanel } from './AskPanel'
-import { BarPicker, LockIcon } from './BarPicker'
+import { BarPicker } from './BarPicker'
+import { HiderCountContext } from './hiderCount'
+import { PrivateLabel } from './PrivateLabel'
 import { DeadlineRing } from './DeadlineRing'
 import { BlockedBanner, ConfirmClear, EffectStrip, EffectsPanel } from './EffectsPanel'
 import { HandPanel } from './HandPanel'
@@ -140,6 +143,7 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
   }, [positions, userId, round, lobby.players, ageTick, zone.locationIntervalS])
 
   if (!started) return null
+  const hiderCount = lobby.players.filter((p) => p.team === 'hiders').length
   const clock = roundClock(started.startedAt, started.hidingPeriodS, now)
   const team = lobby.players.find((p) => p.userId === userId)?.team ?? null
   const tabs = team ? TABS[team] : TABS.seekers
@@ -162,7 +166,7 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
   }
 
   return (
-    <>
+    <HiderCountContext.Provider value={hiderCount}>
       {team === 'hiders' ? (
         <HiderView sync={sync} lobby={lobby} started={started} zone={zone} canAct={canAct} events={events} clock={clock} {...shared} />
       ) : team === 'seekers' ? (
@@ -218,7 +222,7 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
           </button>
         ))}
       </nav>
-    </>
+    </HiderCountContext.Provider>
   )
 }
 
@@ -306,6 +310,10 @@ function HiderView({
   const hiding = useMemo(() => deriveHiding(events, started.round), [events, started.round])
   const bar = hiding.bar
   const picking = !bar || hiding.moving
+  const hiderNames = useMemo(
+    () => new Map(lobby.players.filter((p) => p.team === 'hiders').map((p) => [p.userId, p.name])),
+    [lobby.players],
+  )
   // Veto / Randomize in hand: offered right on the answer sheet.
   const powerups = cards.hand.flatMap((c) => {
     const def = cardOf(cards, c.cardId)
@@ -371,14 +379,12 @@ function HiderView({
       {cards.effects
         .filter((e) => e.status === 'clear_requested')
         .map((e) => (
-          <ConfirmClear key={e.id} sync={sync} effect={e} canAct={canAct} />
+          <ConfirmClear key={e.id} sync={sync} effect={e} canAct={canAct} proofPath={evidenceFor(cards, e.id)?.path ?? null} />
         ))}
       {cards.draws.length > 0 && tab !== 'hand' && (
         <section className="card pick-prompt">
           <div>
-            <p className="eyebrow">
-              <LockIcon /> Only you see this
-            </p>
+            <PrivateLabel />
             <h2>
               Keep {cards.draws[0].pick} of {cards.draws[0].cards.length} cards
             </h2>
@@ -402,9 +408,7 @@ function HiderView({
       {picking && tab !== 'map' && (
         <section className="card pick-prompt">
           <div>
-            <p className="eyebrow">
-              <LockIcon /> Only you see this
-            </p>
+            <PrivateLabel />
             <h2>{hiding.moving ? 'Pick your new bar' : 'Pick your bar'}</h2>
             <p className="muted small">
               {hiding.moving
@@ -433,15 +437,16 @@ function HiderView({
             canAct={canAct}
             fix={fix}
             onLongPress={place}
+            moving={hiding.moving}
+            userId={userId}
+            hiderNames={hiderNames}
             late={clock.phase === 'seeking' && !hiding.moving}
             timeNote={hiding.moving ? `Moving from ${bar?.name ?? 'your bar'}` : `${formatClock(clock.ms)} left to hide`}
           />
         ) : (
           <>
             <section className="card">
-              <p className="eyebrow">
-                <LockIcon /> Only you see this
-              </p>
+              <PrivateLabel />
               <h2 className="bar-title">{bar.name}</h2>
               <p className="muted">
                 Hide inside or within {formatDistance(bar.radiusM)} of it.

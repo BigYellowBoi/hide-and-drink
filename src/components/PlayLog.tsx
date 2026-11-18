@@ -1,7 +1,9 @@
 import type { LobbyState } from '../lobby/state'
 import type { LogEntry } from '../play/state'
 import { formatClock } from '../hiding/state'
-import { LockIcon } from './BarPicker'
+import { useContext } from 'react'
+import { HiderCountContext } from './hiderCount'
+import { LockIcon } from './PrivateLabel'
 import { PhotoThumb } from './PhotoThumb'
 
 interface Props {
@@ -12,6 +14,7 @@ interface Props {
 /** Newest first, time since the round started. Penalties in amber. */
 export function PlayLog({ log, lobby }: Props) {
   const roundStart = lobby.started?.startedAt ?? 0
+  const hiders = useContext(HiderCountContext)
   return (
     <section className="card">
       <h2>Log</h2>
@@ -25,11 +28,11 @@ export function PlayLog({ log, lobby }: Props) {
               <span className="log-time">+{formatClock(l.at - roundStart, { up: true })}</span>
               <span>
                 {l.text}
-                {l.photo && <PhotoThumb path={l.photo} bucket={l.photoBucket} alt={l.photoBucket ? 'Drink photo' : 'Answer photo'} />}
+                {l.photo && <PhotoThumb path={l.photo} bucket={l.photoBucket} alt={l.photoBucket ? 'Proof photo' : 'Answer photo'} />}
                 {l.private && (
                   <span className="muted small">
                     {' '}
-                    <LockIcon /> only you
+                    <LockIcon /> {hiders > 1 ? 'only your team' : 'only you'}
                   </span>
                 )}
               </span>

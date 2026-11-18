@@ -34,6 +34,35 @@ export function isGameEvent(value: unknown): value is GameEvent {
   )
 }
 
+/**
+ * The bar a hider has selected in the picker (null: none) while the team has no bar or is
+ * moving. Ephemeral, hiders' topic only, latest wins: never in the event log.
+ */
+export interface HiderPick {
+  userId: string
+  round: number
+  venueId: string | null
+  name: string | null
+  /** Server time of the report, ms since epoch. */
+  at: number
+}
+
+/** A 'picking' broadcast, or null if malformed. */
+export function parsePick(raw: unknown): HiderPick | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const v = raw as Record<string, unknown>
+  const round = typeof v.round === 'number' && Number.isFinite(v.round) ? v.round : null
+  const at = Date.parse(String(v.at ?? ''))
+  if (typeof v.user_id !== 'string' || round === null || Number.isNaN(at)) return null
+  return {
+    userId: v.user_id,
+    round,
+    venueId: typeof v.venue_id === 'string' ? v.venue_id : null,
+    name: typeof v.name === 'string' ? v.name : null,
+    at,
+  }
+}
+
 /** A seeker's latest GPS fix. Ephemeral: broadcast to seekers only, never in the event log. */
 export interface SeekerPosition {
   userId: string

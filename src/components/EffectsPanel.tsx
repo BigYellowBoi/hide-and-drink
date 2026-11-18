@@ -1,11 +1,24 @@
 import { useState } from 'react'
-import { clearable, effectPhase, effectTimer, liveEffects, questionsBlockedBy, type CardsState, type Effect } from '../cards/state'
+import {
+  clearable,
+  DRINK_BUCKET,
+  effectPhase,
+  effectTimer,
+  evidenceFor,
+  liveEffects,
+  questionsBlockedBy,
+  type CardsState,
+  type DrinkProof,
+  type Effect,
+} from '../cards/state'
 import { formatClock } from '../hiding/state'
 import { describeError } from '../lobby/messages'
 import type { GameSync } from '../sync/engine'
 import type { Team } from '../sync/types'
 import { CardFace } from './CardFace'
 import { BanList, CardUtility, LockBanner, VetoButton, VetoSummary } from './CardExtras'
+import { useProofPhoto } from './useProofPhoto'
+import { PhotoThumb } from './PhotoThumb'
 
 interface Props {
   sync: GameSync
@@ -91,6 +104,7 @@ function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf 
   const phase = effectPhase(e, now)
   const timer = effectTimer(e, now)
   const played = cards.played.find((p) => p.effectId === e.id)
+  const evidence = evidenceFor(cards, e.id)
 
   const act = async (fn: string, params: Record<string, unknown>) => {
     setBusy(true)
@@ -117,12 +131,19 @@ function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf 
       )}
       {clearable(e, now) &&
         (team === 'seekers' ? (
-          <button className="small" disabled={busy || !canAct} onClick={() => void act('clear_effect', {})}>
-            We did it
-          </button>
+          evidence && !evidence.path ? (
+            <EvidenceClear sync={sync} proof={evidence} canAct={canAct && !busy} onSent={() => act('clear_effect', {})} />
+          ) : (
+            <button className="small" disabled={busy || !canAct} onClick={() => void act('clear_effect', {})}>
+              We did it
+            </button>
+          )
         ) : (
-          <span className="muted small">Waiting for the seekers to do it.</span>
+          <span className="muted small">
+            Waiting for the seekers to do it{evidence ? ' and send a photo' : ''}.
+          </span>
         ))}
+      {evidence?.path && phase === 'awaiting_confirm' && <PhotoThumb path={evidence.path} bucket={DRINK_BUCKET} alt="Proof photo" />}
       {phase === 'awaiting_confirm' && (
         <span className="muted small">{team === 'seekers' ? 'Waiting for the hider to confirm.' : 'Seekers say they did it. Confirm above.'}</span>
       )}
@@ -130,6 +151,31 @@ function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf 
       {played && team === 'seekers' && <VetoButton sync={sync} cards={cards} played={played} config={config} canAct={canAct} now={now} />}
       {err && <span className="bad small">{err}</span>}
     </CardFace>
+  )
+}
+
+/** Seekers: a curse with photo proof is cleared by sending the photo, then "we did it". */
+function EvidenceClear({ sync, proof, canAct, onSent }: { sync: GameSync; proof: DrinkProof; canAct: boolean; onSent: () => Promise<void> }) {
+  const { input, photo, busy, err, take, send } = useProofPhoto(sync, proof.id)
+  return (
+    <span className="effect-actions">
+      {input}
+      <span className="muted small">Photo proof needed: the hider sees it before confirming.</span>
+      {photo && <img className="photo-preview" src={photo.url} alt="Your proof" />}
+      <span className="confirm-row">
+        <button className="secondary small" disabled={!!busy || !canAct} onClick={take}>
+          {photo ? 'Retake' : 'Take photo'}
+        </button>
+        <button
+          className="small"
+          disabled={!photo || !!busy || !canAct}
+          onClick={() => void send().then((ok) => (ok ? onSent() : undefined))}
+        >
+          {busy ?? 'Send, we did it'}
+        </button>
+      </span>
+      {err && <span className="bad small">{err}</span>}
+    </span>
   )
 }
 
@@ -181,7 +227,18 @@ export function EffectStrip({ cards, now }: { cards: CardsState; now: number }) 
 }
 
 /** Hider: seekers say they've done a curse. Pinned on top until confirmed or rejected. */
-export function ConfirmClear({ sync, effect: e, canAct }: { sync: GameSync; effect: Effect; canAct: boolean }) {
+export function ConfirmClear({
+  sync,
+  effect: e,
+  canAct,
+  proofPath = null,
+}: {
+  sync: GameSync
+  effect: Effect
+  canAct: boolean
+  /** The seekers' photo, for a curse with photo proof. */
+  proofPath?: string | null
+}) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const answer = async (accept: boolean) => {
@@ -199,6 +256,7 @@ export function ConfirmClear({ sync, effect: e, canAct }: { sync: GameSync; effe
       <p className="eyebrow">Seekers say they did it</p>
       <h2>{e.card.name}</h2>
       {e.card.text && <p className="muted small">{e.card.text}</p>}
+      {proofPath && <PhotoThumb path={proofPath} bucket={DRINK_BUCKET} alt="Proof photo" />}
       <div className="confirm-row">
         <button className="secondary" disabled={busy || !canAct} onClick={() => void answer(false)}>
           Not yet

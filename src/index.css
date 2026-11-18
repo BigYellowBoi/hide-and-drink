@@ -1920,23 +1920,161 @@ button.pcard {
   margin-top: 16px;
 }
 
-.hand-strip {
+.pcard-wrap {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+
+.pcard-wrap > .pcard {
+  flex: 1 1 auto;
+}
+
+/* Room in the band for the info button. */
+.pcard-wrap .pcard-band {
+  padding-right: 40px;
+}
+
+.pcard-cat {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Info button over the band's right end: dark on the category colour, 44 px target. */
+.pcard-info {
+  position: absolute;
+  top: 0;
+  right: 0;
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(128px, 40%);
+  place-items: center;
+  width: 44px;
+  min-height: 44px;
+  height: 44px;
+  margin: -6px -4px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--bg);
+}
+
+.card-info-btn {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.pcard-tag {
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  background: var(--hider);
+  color: var(--bg);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Hand: one slot per card the hand can hold, all on screen at once. */
+.hand-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
   gap: 8px;
-  margin: 16px -16px 0;
-  padding: 0 16px 4px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
+  margin-top: 16px;
 }
 
-.hand-strip > * {
-  scroll-snap-align: start;
+.hand-grid .pcard-small .pcard-body {
+  padding: 6px 8px 10px;
+  gap: 4px;
 }
 
-.hand-strip .pcard {
-  height: 100%;
+.hand-grid .pcard-small .pcard-name {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.hand-grid .pcard-small .pcard-band {
+  padding: 6px 36px 6px 8px;
+  font-size: 12px;
+}
+
+.hand-grid .pcard-facts {
+  font-size: 12px;
+}
+
+.hand-slot,
+.hand-slot > .pcard-wrap {
+  display: flex;
+  min-width: 0;
+}
+
+.hand-slot > * {
+  flex: 1 1 auto;
+}
+
+.hand-slot-empty {
+  display: grid;
+  place-items: center;
+  min-height: 96px;
+  border: 2px dashed var(--line);
+  border-radius: 18px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* Card info sheet. */
+.info-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(0 0 0 / 55%);
+}
+
+.info-sheet {
+  width: 100%;
+  max-width: 480px;
+  max-height: 88vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  border-radius: 24px 24px 0 0;
+  background: var(--surface);
+}
+
+.pcard-sheet {
+  min-height: 0;
+}
+
+.info-facts {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 0;
+}
+
+.info-facts > div {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 8px;
+}
+
+.info-facts dt {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.info-facts dd {
+  margin: 0;
+  font-size: 15px;
 }
 
 .draw-card {
@@ -2536,4 +2674,29 @@ button.preset-delete.danger {
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+/* Bar picker: what the other hiders are looking at (live, hiders only). */
+.team-picks {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.team-picks li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  box-shadow: inset 3px 0 0 var(--hider);
+}
+
+.pick-tag {
+  color: var(--hider);
+  font-weight: 600;
 }
