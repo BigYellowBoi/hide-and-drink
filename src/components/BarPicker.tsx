@@ -12,6 +12,7 @@ import { useServerNow } from '../hiding/useServerNow'
 import type { GameSync } from '../sync/engine'
 import type { MapDot } from './GameMap'
 import { LazyGameMap } from './lazyMap'
+import { MapsLink } from './MapsLink'
 import { PrivateLabel } from './PrivateLabel'
 import { SlideToConfirm } from './SlideToConfirm'
 
@@ -248,6 +249,14 @@ export function BarPicker({
             onLongPress={onLongPress}
           />
         </Suspense>
+        {chosen && !adding && (
+          <div className="row map-selected">
+            <span className="small">
+              <strong>{chosen.name}</strong>
+            </span>
+            <MapsLink point={[chosen.lng, chosen.lat]} />
+          </div>
+        )}
       </section>
 
       {adding ? (

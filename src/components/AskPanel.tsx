@@ -6,10 +6,11 @@ import type { GameSync } from '../sync/engine'
 import type { AreaCollection } from '../map/playArea'
 import { describeError } from '../lobby/messages'
 import { distanceM, isLngLat, type LngLat } from '../play/geo'
-import { measuringTool, radarTool, thermometerTool } from '../play/overlays'
-import { loadQuestionTypes, optionLabel, type QuestionType } from '../play/questionTypes'
+import { measuringTool, nearestTool, radarTool, tentacleCandidates, tentaclesTool, thermometerTool } from '../play/overlays'
+import type { LayerLookup } from '../play/features'
+import { MapsLink } from './MapsLink'
+import { loadQuestionTypes, optionLabel, textOn, typeColour, type QuestionType } from '../play/questionTypes'
 import { isSupportedType, km, MAP_TYPES, questionText, typeName } from '../play/state'
-import { radarCircle } from '../play/geo'
 import type { Fix, GeoError } from '../hiding/useGeolocation'
 import { formatClock } from '../hiding/state'
 import { banKey } from '../cards/state'
@@ -37,6 +38,8 @@ interface Props {
   geoError: GeoError | null
   /** Dev/playtest mode: long-press the map to move this phone's position. */
   onLongPress?: (lngLat: [number, number]) => void
+  /** City pack layers, to preview candidates (nearest library, ferry stops within 1 km). */
+  layer?: LayerLookup | null
 }
 
 const startKey = (gameId: string) => `hd.thermometer.${gameId}`
@@ -60,6 +63,7 @@ export function AskPanel({
   fix,
   geoError,
   onLongPress,
+  layer = null,
 }: Props) {
   const [types, setTypes] = useState<QuestionType[] | null>(null)
   const [type, setType] = useState<string>('radar')
@@ -111,10 +115,14 @@ export function AskPanel({
     let tool: FeatureCollection | undefined
     const target = isLngLat(option?.point) ? option.point : null
     const radius = typeof option?.radius_m === 'number' ? option.radius_m : null
+    const source = typeof option?.source === 'string' ? option.source : null
     if (type === 'radar' && at && distance) tool = radarTool(at, distance)
     else if (type === 'thermometer' && start) tool = thermometerTool(start, at)
-    else if (type === 'measuring' && target) tool = measuringTool(target, at ? distanceM(at, target) : 1, at)
-    else if (type === 'tentacles' && at && radius) tool = { type: 'FeatureCollection', features: [radarCircle(at, radius)] }
+    else if (type === 'measuring' && target)
+      tool = measuringTool(target, at ? distanceM(at, target) : 1, at, option ? optionLabel(option) : undefined)
+    else if (type === 'tentacles' && at && radius)
+      tool = tentaclesTool(at, radius, layer && source ? tentacleCandidates(at, radius, layer(source)) : [])
+    else if (type === 'matching' && at && layer && source) tool = nearestTool(at, layer(source))
     const dots =
       fixLng !== undefined && fixLat !== undefined
         ? [{ id: 'me', lng: fixLng, lat: fixLat, team: 'seekers' as const, me: true }]
@@ -122,7 +130,7 @@ export function AskPanel({
     return { ruled, tool, dots }
     // `distance` comes from the loaded option list, which is never mutated.
     // oxlint-disable-next-line react/preserve-manual-memoization
-  }, [type, tapped, fixLng, fixLat, distance, start, ruled, option])
+  }, [type, tapped, fixLng, fixLat, distance, start, ruled, option, layer])
 
   let blocker: string | null = null
   if (!qt || !isSupportedType(type)) blocker = 'Pick a question type.'
@@ -168,12 +176,14 @@ export function AskPanel({
       <div className="type-tiles" role="radiogroup" aria-label="Question type">
         {(types ?? []).map((t) => {
           const ok = isSupportedType(t.type)
+          const colour = typeColour(types, t.type)
           return (
             <button
               key={t.type}
               role="radio"
               aria-checked={type === t.type}
               className={`type-tile${type === t.type ? ' on' : ''}`}
+              style={colour ? { background: colour, color: textOn(colour), borderColor: colour } : undefined}
               disabled={!ok}
               onClick={() => {
                 setType(t.type)
@@ -261,7 +271,8 @@ export function AskPanel({
             Using the point you tapped.{' '}
             <button className="link" onClick={() => setTapped(null)}>
               {fix?.fake ? 'Use my position' : 'Use GPS'}
-            </button>
+            </button>{' '}
+            <MapsLink point={tapped} inline />
           </>
         ) : fix?.fake ? (
           'Using your playtest position (long-press the map to move it). Tap the map to place the tool by hand.'

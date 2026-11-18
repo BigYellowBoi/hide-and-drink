@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import pack from '../../data/city-packs/brisbane.geojson?raw'
 import layers from '../../data/map-layers.json'
 import type { CityPack } from './cityPack'
-import { MAP_COLORS, PACK_SOURCES, mapStyle } from './style'
+import { existsSync } from 'node:fs'
+import { LABEL_FONT, MAP_COLORS, PACK_SOURCES, glyphsUrl, mapStyle } from './style'
 
 const brisbane = JSON.parse(pack) as CityPack
 
@@ -23,7 +24,18 @@ describe('map style', () => {
     expect(count('area')).toBe(0)
   })
 
-  it('uses the design map colours and needs no glyphs or tiles', () => {
+  it('draws street names and tool distances only with the app glyphs', () => {
+    const glyphs = glyphsUrl('https://example.org', '/hide-and-drink/')
+    expect(glyphs).toBe('https://example.org/hide-and-drink/glyphs/{fontstack}/{range}.pbf')
+    const style = mapStyle(brisbane, { glyphs })
+    expect(style.glyphs).toBe(glyphs)
+    const symbols = style.layers.filter((l) => l.type === 'symbol')
+    expect(symbols.map((l) => l.id)).toEqual(['street-labels', 'tool-labels-line', 'tool-labels-point'])
+    for (const l of symbols) expect((l.layout as { 'text-font': string[] })['text-font']).toEqual([LABEL_FONT])
+    expect(existsSync(`public/glyphs/${LABEL_FONT}/0-255.pbf`)).toBe(true)
+  })
+
+  it('uses the design map colours and needs no tiles', () => {
     const style = mapStyle(brisbane)
     expect(style.glyphs).toBeUndefined()
     expect(style.layers.some((l) => l.type === 'symbol')).toBe(false)

@@ -1,4 +1,4 @@
-import type { StyleSpecification } from 'maplibre-gl'
+import type { StyleSpecification, SymbolLayerSpecification } from 'maplibre-gl'
 import type { FeatureCollection } from 'geojson'
 import { layerCollection, type CityPack } from './cityPack'
 
@@ -45,22 +45,80 @@ export const PACK_SOURCES = {
 } as const
 
 /** Layers that answer a tap with the feature's name. */
-export const TAPPABLE_LAYERS = ['dots', 'bars', 'venues', 'stations', 'lines', 'lines-ferry']
+export const TAPPABLE_LAYERS = ['dots', 'bars', 'tool-points', 'venues', 'stations', 'lines', 'lines-ferry']
+
+/** Font stack of the label glyphs in public/glyphs (built by scripts/glyphs/build.py). */
+export const LABEL_FONT = 'Inter SemiBold'
+
+/** Glyph URL template for a page served under base (Vite's BASE_URL), e.g. /hide-and-drink/. */
+export const glyphsUrl = (origin: string, base: string) =>
+  `${origin}${base.endsWith('/') ? base : `${base}/`}glyphs/{fontstack}/{range}.pbf`
 
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] }
 
 /**
- * The whole map is drawn from the city pack: no tile server, no API key, no glyphs (no text
- * labels; tapping a feature shows its name). Play area and mask sources start empty.
+ * The whole map is drawn from the city pack: no tile server, no API key. Labels (street names,
+ * distances on question tools) use the app's own glyphs when a glyphs URL is given; without
+ * one the map has no text and tapping a feature shows its name. Play area and mask sources
+ * start empty.
  */
-export function mapStyle(pack: CityPack): StyleSpecification {
+export function mapStyle(pack: CityPack, opts: { glyphs?: string } = {}): StyleSpecification {
   const src = (layers: readonly string[]) => ({ type: 'geojson' as const, data: layerCollection(pack, [...layers]) })
   // ODbL (OpenStreetMap) asks for "© OpenStreetMap contributors"; CC BY sources by name.
   const attribution = (pack.pack.sources ?? [])
     .map((s) => (s.licence?.startsWith('ODbL') ? `© ${s.name} contributors` : s.name))
     .join(' · ')
+  const labels: StyleSpecification['layers'] = opts.glyphs
+    ? [
+        {
+          id: 'street-labels',
+          type: 'symbol',
+          source: 'streets',
+          minzoom: 14.5,
+          layout: {
+            'symbol-placement': 'line',
+            'text-field': ['get', 'name'],
+            'text-font': [LABEL_FONT],
+            'text-size': ['interpolate', ['linear'], ['zoom'], 14.5, 10.5, 17, 13],
+            'text-max-angle': 30,
+            'symbol-spacing': 280,
+            'text-padding': 4,
+          },
+          paint: { 'text-color': MAP_COLORS.muted, 'text-halo-color': MAP_COLORS.ground, 'text-halo-width': 1.5 },
+        },
+      ]
+    : []
+  const labelText: SymbolLayerSpecification['layout'] = {
+    'text-field': ['get', 'label'],
+    'text-font': [LABEL_FONT],
+    'text-size': 13,
+    'text-optional': true,
+  }
+  const labelPaint = { 'text-color': MAP_COLORS.text, 'text-halo-color': MAP_COLORS.bg, 'text-halo-width': 2 }
+  // Distances on question tools ("0.4 km") and candidate names, from feature.properties.label.
+  const toolLabels: StyleSpecification['layers'] = opts.glyphs
+    ? [
+        {
+          id: 'tool-labels-line',
+          type: 'symbol',
+          source: 'tool',
+          filter: ['all', ['has', 'label'], ['==', ['geometry-type'], 'LineString']],
+          layout: { ...labelText, 'symbol-placement': 'line-center', 'text-offset': [0, -0.8] },
+          paint: labelPaint,
+        },
+        {
+          id: 'tool-labels-point',
+          type: 'symbol',
+          source: 'tool',
+          filter: ['all', ['has', 'label'], ['==', ['geometry-type'], 'Point']],
+          layout: { ...labelText, 'text-anchor': 'top', 'text-offset': [0, 0.9] },
+          paint: labelPaint,
+        },
+      ]
+    : []
   return {
     version: 8,
+    ...(opts.glyphs ? { glyphs: opts.glyphs } : {}),
     sources: {
       water: { ...src(PACK_SOURCES.water), attribution },
       streets: src(PACK_SOURCES.streets),
@@ -107,6 +165,7 @@ export function mapStyle(pack: CityPack): StyleSpecification {
         layout: { 'line-join': 'round' },
         paint: { 'line-color': MAP_COLORS.text, 'line-width': 2.5 },
       },
+      ...labels,
       {
         id: 'lines',
         type: 'line',
@@ -150,8 +209,21 @@ export function mapStyle(pack: CityPack): StyleSpecification {
         id: 'tool-line',
         type: 'line',
         source: 'tool',
+        filter: ['!', ['has', 'role']],
         layout: { 'line-cap': 'round' },
         paint: { 'line-color': MAP_COLORS.seeker, 'line-width': 2, 'line-dasharray': [2, 1.5] },
+      },
+      {
+        // The nearest feature (a street, a park edge) and the line from the seeker to the nearest candidate.
+        id: 'tool-highlight',
+        type: 'line',
+        source: 'tool',
+        filter: ['has', 'role'],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': ['case', ['==', ['get', 'role'], 'nearest-line'], MAP_COLORS.text, MAP_COLORS.seeker],
+          'line-width': ['case', ['==', ['get', 'role'], 'nearest-line'], 2, 4],
+        },
       },
       {
         id: 'tool-points',
@@ -159,9 +231,12 @@ export function mapStyle(pack: CityPack): StyleSpecification {
         source: 'tool',
         filter: ['==', ['geometry-type'], 'Point'],
         paint: {
-          'circle-color': MAP_COLORS.seeker,
-          'circle-radius': 5,
-          'circle-stroke-color': MAP_COLORS.bg,
+          // Candidates: hollow, the nearest one filled white.
+          'circle-color': [
+            'match', ['get', 'role'], 'candidate', MAP_COLORS.bg, 'nearest', MAP_COLORS.text, MAP_COLORS.seeker,
+          ],
+          'circle-radius': ['match', ['get', 'role'], 'nearest', 7, 5],
+          'circle-stroke-color': ['match', ['get', 'role'], 'candidate', MAP_COLORS.seeker, 'nearest', MAP_COLORS.seeker, MAP_COLORS.bg],
           'circle-stroke-width': 2,
         },
       },
@@ -227,6 +302,7 @@ export function mapStyle(pack: CityPack): StyleSpecification {
           'circle-stroke-width': ['case', ['boolean', ['get', 'me'], false], 4, 2],
         },
       },
+      ...toolLabels,
     ],
   }
 }

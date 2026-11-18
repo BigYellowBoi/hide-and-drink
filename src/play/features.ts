@@ -7,7 +7,7 @@ import voronoi from '@turf/voronoi'
 import type { BBox, Feature, Geometry, Point, Position } from 'geojson'
 import { destination, distanceM, type LngLat } from '../map/geo'
 import type { AreaCollection } from '../map/playArea'
-import type { Area } from './geo'
+import { projector, type Area } from './geo'
 
 /**
  * Geometry against city pack features, for the questions that use them (matching,
@@ -60,6 +60,42 @@ export function distanceTo(p: LngLat, g: Geometry): number {
     if (line.length >= 2) best = Math.min(best, pointToLineDistance(p, lineString(line), M))
   }
   return best
+}
+
+/** The point of a feature nearest to p (p itself inside an area). */
+export function closestPoint(p: LngLat, g: Geometry): LngLat {
+  if (g.type === 'Point') return g.coordinates as LngLat
+  if (g.type === 'MultiPoint') {
+    let best = g.coordinates[0] as LngLat
+    for (const c of g.coordinates) if (distanceM(p, c as LngLat) < distanceM(p, best)) best = c as LngLat
+    return best
+  }
+  if (isArea(g) && booleanPointInPolygon(p, g as Area['geometry'])) return p
+  const proj = projector(p)
+  let best: [number, number] | null = null
+  let bestD = Infinity
+  for (const line of linesOf(g)) {
+    for (let i = 0; i + 1 < line.length; i++) {
+      const [ax, ay] = proj.toXY(line[i])
+      const [bx, by] = proj.toXY(line[i + 1])
+      const dx = bx - ax
+      const dy = by - ay
+      const len2 = dx * dx + dy * dy
+      const t = len2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0
+      const c: [number, number] = [ax + t * dx, ay + t * dy]
+      const d = Math.hypot(c[0], c[1])
+      if (d < bestD) [best, bestD] = [c, d]
+    }
+  }
+  return best ? proj.toLngLat(best) : p
+}
+
+/** Features sorted by distance from p (nearest first), with the distance. */
+export function byDistance(p: LngLat, features: readonly PackFeature[]): { feature: PackFeature; distanceM: number }[] {
+  return features
+    .filter((f) => f.geometry)
+    .map((f) => ({ feature: f, distanceM: distanceTo(p, f.geometry) }))
+    .sort((a, b) => a.distanceM - b.distanceM)
 }
 
 const bboxes = new WeakMap<Geometry, BBox>()

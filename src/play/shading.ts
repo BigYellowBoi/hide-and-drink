@@ -123,8 +123,16 @@ const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] }
 
 const constraintCache = new Map<string, Constraint | null>()
 
+/** The seekers' own shading for a question, which replaces the app's. */
+export function manualConstraint(q: Pick<Question, 'manualShading'>): Constraint | null {
+  const m = q.manualShading
+  if (!m || m.mode === 'none') return null
+  return m.mode === 'keep' ? { keep: m.area } : { cut: m.area }
+}
+
 /** Constraints are pure in (question, answer, pack): street regions are slow, so cache them. */
 function cachedConstraint(q: Question, ctx?: PackContext): Constraint | null {
+  if (q.manualShading) return manualConstraint(q)
   if (q.type === 'radar' || q.type === 'thermometer' || q.type === 'measuring') return constraintOf(q, ctx)
   if (!ctx) return null
   const key = `${q.id}|${q.answer}|${ctx.barRadiusM}|${ctx.bounds.join(',')}`

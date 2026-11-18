@@ -42,7 +42,11 @@ The wordmark's real font is **Helvetica Neue LT Pro** (bold), which is licensed 
 
 Card categories: curse `#EC353A`, powerup `#9B8CF5`, time bonus `#4FC88A`, drink `#F2B705`.
 
-Map: ground `#1C2A37`, streets `#2A3B4C`, river `#24506E`. Ruled-out area is a grey 45° hatch (`#2C3E50` with `#5C6B7A` lines) so streets stay visible underneath.
+Question types, as in the original game (data: `colour` in `data/questions.json`, `question_types.extra.colour`): Matching `#2F6FD6` (blue), Measuring `#3BA55C` (green), Radar `#F08A24` (orange), Thermometer `#F2C744` (yellow), Photos `#35BFD8` (cyan), Tentacles `#9B5BD4` (purple), Bonus `#A9B4BF` (grey, not in the original). Ask tiles are filled in the type colour (text `#17222E` or white, whichever contrasts more; selected tile gets a white ring); timeline cards carry it as a left band and type label.
+
+Map: ground `#1C2A37`, streets `#2A3B4C`, river `#24506E`. Street names from zoom 14.5 in `--text-muted` with a ground-coloured halo, in Inter SemiBold (SDF glyphs built from the bundled font by `scripts/glyphs/build.py` into `public/glyphs/`, no font server). Ruled-out area is a grey 45° hatch (`#2C3E50` with `#5C6B7A` lines) so streets stay visible underneath.
+
+Question tools on the map are seeker red (`--seeker-on-dark`): radar circle, thermometer line, measuring circle. Questions that use app data also show their candidates: hollow red dots for the other candidates, a white dot for the nearest (or the server's pick), a white line from the seeker to it labelled with the distance in km ("0.42 km"), and for streets and suburbs the nearest one outlined in red. Tentacles shows the 1 km circle around the seeker and every candidate labelled "Name · 0.42 km". Shown while the question is open (both teams; in the Ask preview before sending) or when "Show on map" is tapped in the timeline (chip "Showing … · Hide" over the map).
 
 ## Type
 
@@ -63,9 +67,10 @@ Map: ground `#1C2A37`, streets `#2A3B4C`, river `#24506E`. Ruled-out area is a g
 
 | Decision | Choice |
 | --- | --- |
-| Navigation in play | Bottom tabs, map first. Hider: Map, Hand, Questions, Log. Seekers: Map, Ask, Effects, Log |
+| Navigation in play | Bottom tabs, map first. Hider: Map, Hand, Timeline. Seekers: Map, Ask, Effects, Timeline |
 | Card style | Playing card: tall, category colour band on top, cost badge (Free / Drink / Shot), text below. Every card (and library row) has an info button: bottom sheet with the full text, cast cost, veto status and params facts |
-| Map shading | Grey hatch over ruled-out area. No bar count until the venue list is comprehensive (the list of bars still possible stays) |
+| Map shading | Grey hatch over ruled-out area. No bar count until the venue list is comprehensive (the list of bars still possible stays). Seekers can shade any answer by hand instead (fallback) |
+| Points | Tapping any point (station, venue, person, candidate) opens a popup with its name and "Open in Google Maps"; the selected bar in the picker, the hider's bar and a point tapped in Ask show the same link |
 | Timers | Ring + digits for deadlines; digits in the top bar for the main clock; thin bar for running curses |
 | Top bar (every in-game screen) | Team chip left, main timer centre with a small caps label, status dot right |
 
@@ -84,9 +89,10 @@ Flow: Home → Lobby → (host: setup) → Start round → each phone switches t
 | Answer sheet | Hider | Question type + asker, deadline ring, mini map, suggested answer (flag if it differs across the circle), big answer buttons, reward reminder |
 | Hand | Hider | Selected card large, Cast / Discard, hand grid below (one slot per hand-limit card, no scrolling), lock label |
 | Seeker map | Seekers | Hatched shading with the remaining area outlined in white (no bar dots or bar list: those are hider-only), teammates' name-tagged dots, active curse strip, Ask button |
-| Ask | Seekers | 7 type tiles with draw/keep, tool on the map (e.g. radar circle), option chips, Send |
+| Ask | Seekers | 7 type tiles filled in the type colour with draw/keep, tool on the map (radar circle, candidates with the line to the nearest in km), option chips, Send |
 | Effects | Seekers | "Questions blocked" banner, curse cards with timer or We did it / Veto, vetoes used |
-| Log | Both (filtered) | Newest first, elapsed time, coloured dot by type, photo proof thumbnails, penalties in amber |
+| Timeline | Both (filtered) | The game's activity log, newest first. One card per question: type label and colour band, elapsed time, the full question, "Asked by", the answer (late in amber), answer photo, reward, and under a divider what followed from it (cards drawn and kept, hider-only with a lock; veto/randomize; missed deadline; manual shading). Buttons: Show on map, Shade by hand (seekers). Everything else as a row: coloured dot by kind, elapsed time, text, photo proof thumbnails, penalties in amber, curses played and cleared |
+| Shade by hand | Seekers | Full-screen map: Keep only / Rule out / Nothing, then Pick (tap a suburb or council area, or "Use the question's circle") or Draw (Terra Draw polygon). Red preview, Save shading, Back to the app's shading. Shared with every phone |
 
 ## Not decided yet
 
