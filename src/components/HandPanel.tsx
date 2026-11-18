@@ -304,6 +304,12 @@ function DrawChooser({ sync, cards, draw, canAct }: Props & { draw: PendingDraw 
     setDiscard((d) => d.filter((id) => next.includes(id) || cards.hand.some((h) => h.instanceId === id)))
   }
 
+  // Name what goes, so the button never reads as keeping the card just picked to discard.
+  const discardNames = [...kept, ...cards.hand]
+    .filter((c) => discard.includes(c.instanceId))
+    .map((c) => cardOf(cards, c.cardId).name)
+    .join(', ')
+
   const send = async () => {
     setBusy(true)
     setErr(null)
@@ -344,7 +350,7 @@ function DrawChooser({ sync, cards, draw, canAct }: Props & { draw: PendingDraw 
                 key={c.instanceId}
                 card={cardOf(cards, c.cardId)}
                 size="small"
-                tag={kept.includes(c) ? 'New' : undefined}
+                tag={discard.includes(c.instanceId) ? 'Discard' : kept.includes(c) ? 'New' : undefined}
                 selected={discard.includes(c.instanceId)}
                 onClick={() => setDiscard((d) => toggle(d, c.instanceId, overflow))}
               />
@@ -356,7 +362,9 @@ function DrawChooser({ sync, cards, draw, canAct }: Props & { draw: PendingDraw 
         {busy
           ? 'Keeping…'
           : ready
-            ? `Keep ${draw.pick === 1 ? 'this card' : 'these cards'}`
+            ? overflow > 0
+              ? `Keep ${draw.pick === 1 ? 'new card' : `${draw.pick} new cards`}, discard ${discardNames}`
+              : `Keep ${draw.pick === 1 ? 'this card' : 'these cards'}`
             : keep.length < draw.pick
               ? `Pick ${draw.pick - keep.length} more`
               : `Pick ${overflow - discard.length} to discard`}

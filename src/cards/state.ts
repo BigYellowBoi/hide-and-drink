@@ -31,7 +31,8 @@ export interface PendingDraw {
   cards: CardRef[]
 }
 
-export type EffectStatus = 'active' | 'clear_requested' | 'cleared' | 'vetoed'
+/** awaiting_seekers: a seeker_confirm curse the seekers haven't said applies yet. */
+export type EffectStatus = 'active' | 'clear_requested' | 'cleared' | 'vetoed' | 'awaiting_seekers'
 
 /** One question of a trivia curse, public to both teams. */
 export interface TriviaQuestion {
@@ -47,6 +48,8 @@ export interface TriviaQuestion {
 /** A trivia curse: the hider's questions (null until sent) and how many it needs. */
 export interface Trivia {
   count: number
+  /** How many must be right to clear it (params.need_right; default all). */
+  need: number
   topic: string | null
   questions: TriviaQuestion[] | null
   /** The host marked everything right by hand. */
@@ -73,6 +76,8 @@ export interface Effect {
   status: EffectStatus
   /** Trivia curses only. */
   trivia: Trivia | null
+  /** seeker_confirm curses: what the seekers are asked before it starts (params.seeker_confirm). */
+  seekerConfirm: string | null
 }
 
 export interface PlayedCard {
@@ -313,7 +318,8 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
         moving: state.moving || powerupAction(card) === 'move',
       }
       if (effectId && (card.behaviour === 'timed' || card.behaviour === 'until_cleared' || card.behaviour === 'trivia')) {
-        const endsAt = card.behaviour === 'timed' ? time(p.ends_at, e.created_at) : null
+        const awaiting = p.awaiting_seekers === true
+        const endsAt = card.behaviour === 'timed' ? (awaiting ? Number.POSITIVE_INFINITY : time(p.ends_at, e.created_at)) : null
         next = {
           ...next,
           effects: [
@@ -331,11 +337,12 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
               followupEndsAt: null,
               blocksQuestions: p.blocks_questions === true,
               pausedLeftMs: null,
-              status: 'active',
+              status: awaiting ? 'awaiting_seekers' : 'active',
               trivia:
                 card.behaviour === 'trivia'
-                  ? { count: num(p.count) ?? triviaCount(card), topic: triviaTopic(card), questions: null, forced: false }
+                  ? { count: num(p.count) ?? triviaCount(card), need: triviaNeed(card), topic: triviaTopic(card), questions: null, forced: false }
                   : null,
+              seekerConfirm: awaiting ? (str(p.seeker_confirm) ?? 'Does this curse apply to you right now?') : null,
             },
           ],
         }
@@ -456,6 +463,20 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
       const name = next.effects.find((x) => x.id === id)?.card.name ?? 'Curse'
       return log({ kind: 'penalty', text: `Hider says ${name} is not done yet`, ...effectLink(next, id) }, next)
     }
+    case 'curse_checked': {
+      const id = str(p.effect_id)
+      const applies = p.applies === true
+      const next = updateEffect(state, id, (x) => ({
+        ...x,
+        status: applies ? 'active' : 'cleared',
+        endsAt: x.behaviour === 'timed' && applies ? time(p.ends_at, e.created_at) : x.endsAt,
+      }))
+      const name = effectName(next, id)
+      return log(
+        { kind: 'card', text: applies ? `Seekers confirmed ${name}: it starts now` : `Seekers say ${name} doesn't apply: dropped`, ...effectLink(next, id) },
+        next,
+      )
+    }
     case 'effect_cleared': {
       const id = str(p.effect_id)
       const next = updateEffect(state, id, (x) => ({ ...x, status: 'cleared' }))
@@ -498,8 +519,19 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
           }) ?? null,
       }))
       const right = marks.flatMap((m, i) => (m?.correct ? [`Q${i + 1}`] : []))
+      const reset = p.reset === true
+      const t = next.effects.find((x) => x.id === id)?.trivia
+      const enough = !!t?.questions && t.questions.filter((q) => q.correct).length >= t.need
       const wrong = marks.flatMap((m, i) => (m && !m.correct ? [`Q${i + 1} "${m.answer}"`] : []))
-      const parts = [right.length ? `${right.join(', ')} right` : null, wrong.length ? `${wrong.join(', ')} wrong, try again` : null]
+      const parts = [
+        right.length ? `${right.join(', ')} right` : null,
+        wrong.length ? `${wrong.join(', ')} wrong${reset || enough ? '' : ', try again'}` : null,
+        reset ? 'not enough right: the hider sends new questions' : null,
+      ]
+      if (reset) {
+        const cleared = updateTrivia(next, id, (t) => ({ ...t, questions: null }))
+        return log({ kind: 'penalty', text: `${effectName(next, id)}: ${parts.filter(Boolean).join('; ')}`, ...effectLink(next, id) }, cleared)
+      }
       return log(
         { kind: wrong.length ? 'penalty' : 'card', text: `${effectName(next, id)}: ${parts.filter(Boolean).join('; ')}`, ...effectLink(next, id) },
         next,
@@ -615,6 +647,12 @@ export function triviaCount(c: CardDef): number {
   const n = num(c.params.count)
   return n !== null && n >= 1 && n <= 10 ? Math.floor(n) : 3
 }
+/** How many trivia answers must be right (params.need_right, 1..count; default all). */
+export function triviaNeed(c: CardDef): number {
+  const n = num(c.params.need_right)
+  const count = triviaCount(c)
+  return n !== null && n >= 1 && n <= count ? Math.floor(n) : count
+}
 export const triviaTopic = (c: CardDef): string | null => {
   const t = str(c.params.topic)?.trim()
   return t ? t : null
@@ -657,11 +695,14 @@ export type EffectPhase =
   /** Until cleared: in force (or waiting for the hider to confirm). */
   | 'until_cleared'
   | 'awaiting_confirm'
+  /** seeker_confirm: waiting for the seekers to say whether it applies. */
+  | 'awaiting_seekers'
   | 'over'
 
 /** Where an effect is at this (server) time. */
 export function effectPhase(e: Effect, now: number): EffectPhase {
   if (e.status === 'vetoed') return 'over'
+  if (e.status === 'awaiting_seekers') return 'awaiting_seekers'
   if (e.behaviour === 'trivia') return e.status === 'cleared' ? 'over' : 'until_cleared'
   if (e.behaviour === 'until_cleared') {
     return e.status === 'cleared' ? 'over' : e.status === 'clear_requested' ? 'awaiting_confirm' : 'until_cleared'
@@ -727,7 +768,7 @@ function playedText(s: CardsState, card: CardDef, p: Record<string, unknown>): s
     case 'veto':
       return 'Hider vetoed the question (no reward)'
     case 'randomize':
-      return 'Hider randomized the question'
+      return p.as_veto === true ? 'Hider randomized the thermometer: counts as a veto (no reward)' : 'Hider randomized the question'
     case 'move':
       return 'Hider is moving to a new bar. Questions wait until they lock it in'
     case 'duplicate': {
@@ -849,7 +890,8 @@ export function cardFacts(c: CardDef): string[] {
   if (c.behaviour === 'until_cleared') out.push(c.params.blocks_questions === true ? 'Blocks questions' : 'Until done')
   if (c.behaviour === 'trivia') {
     const n = triviaCount(c)
-    out.push(`${n} trivia question${n > 1 ? 's' : ''}${triviaTopic(c) ? ` (${triviaTopic(c)})` : ''}`)
+    const need = triviaNeed(c)
+    out.push(`${n} trivia question${n > 1 ? 's' : ''}${triviaTopic(c) ? ` (${triviaTopic(c)})` : ''}${need < n ? `, ${need} right needed` : ''}`)
     if (c.params.blocks_questions === true) out.push('Blocks questions')
   }
   if (c.behaviour === 'time_bonus' && num(c.params.minutes)) out.push(`+${num(c.params.minutes)} min`)
@@ -940,4 +982,10 @@ export function cardDetails(c: CardDef): { label: string; value: string }[] {
   if (facts.length) rows.push({ label: 'Rules', value: facts.join(' · ') })
   if ((c.behaviour === 'until_cleared' || c.behaviour === 'trivia') && typeof c.params.blocks === 'string') rows.push({ label: 'Blocks', value: cap(c.params.blocks) })
   return rows
+}
+
+/** Teams a played card makes drink (params.drinks), e.g. Drinks All Round: both. */
+export function drinkTeams(p: PlayedCard): ('hiders' | 'seekers')[] {
+  const d = p.card.params.drinks
+  return Array.isArray(d) ? d.filter((t): t is 'hiders' | 'seekers' => t === 'hiders' || t === 'seekers') : []
 }

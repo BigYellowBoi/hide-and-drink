@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PackFeature } from './features'
-import { kmLabel, nearestTool, tentacleCandidates, tentaclesTool } from './overlays'
+import { candidateDistances, hiderTool, kmLabel, nearestTool, tentacleCandidates, tentaclesTool, thermometerTool } from './overlays'
+import type { Question } from './state'
 import { textOn } from './questionTypes'
 
 const pt = (id: string, name: string, c: [number, number]): PackFeature => ({
@@ -47,5 +48,33 @@ describe('question overlays', () => {
     expect(kmLabel(12_345)).toBe('12.3 km')
     expect(textOn('#F2C744')).toBe('#17222E')
     expect(textOn('#2F6FD6')).toBe('#FFFFFF')
+  })
+})
+
+describe("the hider's side of a question", () => {
+  const q = (type: string, params: Record<string, unknown>) => ({ type, params }) as unknown as Question
+
+  it('thermometer: start and end are labelled', () => {
+    const labels = thermometerTool([153, -27], [153.01, -27]).features.map((f) => f.properties?.label).filter(Boolean)
+    expect(labels).toEqual(['Start', 'End'])
+  })
+
+  it('tentacles: the same circle around the hider, a line to their nearest, distances per candidate', () => {
+    const cands = tentacleCandidates([153, -27], 1000, libs)
+    const tq = q('tentacles', { radius_m: 1000, candidates: cands })
+    const extra = hiderTool(tq, [153.005, -27])
+    expect(extra.map((f) => f.geometry.type)).toEqual(['Polygon', 'LineString'])
+    expect(extra[1].properties?.label).toBe('0.00 km')
+    const d = candidateDistances(tq, [153.005, -27])
+    expect(Math.round(d.get('a') ?? 0)).toBe(396)
+    expect(hiderTool(tq, null)).toEqual([])
+  })
+
+  it('matching: a line from the hider to their own nearest, with its distance', () => {
+    const mq = q('matching', { layer: 'libraries', center: [153, -27] })
+    const extra = hiderTool(mq, [153.02, -27], () => libs)
+    const near = extra.find((f) => f.properties?.role === 'nearest')
+    expect(near?.properties?.name).toBe('Far')
+    expect(extra.some((f) => f.properties?.role === 'candidate')).toBe(false)
   })
 })

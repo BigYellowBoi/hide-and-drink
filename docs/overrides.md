@@ -2,7 +2,7 @@
 
 Rule: every decision the app makes automatically has a manual override, so a bug never stops a game.
 
-This is the audit of `supabase/migrations/` (up to `20261213090000_host_overrides.sql`): every event the server writes on its own and every refusal an action can raise, with the fix for each.
+This is the audit of `supabase/migrations/` (up to `20261217090000_playtest2_fixes.sql`): every event the server writes on its own and every refusal an action can raise, with the fix for each.
 
 ## How overrides work
 
@@ -45,7 +45,7 @@ This is the audit of `supabase/migrations/` (up to `20261213090000_host_override
 | `set_answer` | `question_id`, `answer` (free text), `draw` | Answers an open question by hand (draws the reward unless `draw` false), or edits an answer. Skips answer validation | `question_answered` (`by_override`), `cards_drawn` |
 | `void_answer` | `question_id` | No answer, no shading, no pending question (`closed_by` void) | `question_voided` |
 | `reopen_question` | `question_id`, `deadline_s` | Back to pending with a new deadline (refuses `question_pending` if another is open) | `question_reopened` |
-| `ask_question` | `type`, `option_id`, `params` | Asks past `questions_blocked`, `question_banned`, `hider_moving`, `still_hiding`. If the map data can't be worked out, it's sent without it (`params.manual`) | `question_asked` (`by_override`) |
+| `ask_question` | `type`, `option_id`, `params` | Asks past `questions_blocked`, `question_banned`, `question_used`, `hider_moving`, `still_hiding`. If the map data can't be worked out, it's sent without it (`params.manual`) | `question_asked` (`by_override`) |
 | `lift_ban` | `type`, `option_id` | Removes a question ban | `ban_lifted` |
 | `set_blocking` | `effect_id`, `blocks` | A curse stops (or starts) blocking questions | `effect_changed` |
 | `clear_effect` | `effect_id` | Ends any curse now. Waives its open evidence proof | `drink_resolved`, `effect_cleared` |
@@ -74,13 +74,15 @@ This is the audit of `supabase/migrations/` (up to `20261213090000_host_override
 | Answer reward size (modifiers multiply draw and pick) | `answer_question` | `draw_cards`, `give_card`, `remove_card` |
 | `cards_drawn` (which cards, server shuffle) | `_draw_reward`, `_deal_deck` | `remove_card`, `give_card`, `reshuffle`, `draw_cards` |
 | Empty pile: no reward drawn (silent) | `_draw_reward` | `reshuffle`, then `draw_cards` |
-| Randomize picks the new question | `play_card` randomize | `void_answer` the new one; `ask_question` the one wanted |
+| Randomize picks the new question (only options not asked this run) | `play_card` randomize | `void_answer` the new one; `ask_question` the one wanted |
+| Randomize on a thermometer (`extra.randomize_vetoes`) closes it as a veto | `play_card` randomize | `reopen_question` (back to pending), `ask_question` override |
+| A seeker_confirm curse waits (`awaiting_seekers`), then starts or drops on the seekers' answer (`curse_checked`) | `play_card`, `check_curse` | `reinstate_effect` (starts it, or brings back one dropped by mistake), `clear_effect` (drops it), `timer` effect |
 | Curse timer ending (`ends_at`, `followup_ends_at`) | time | `timer` effect/followup, `reinstate_effect`, `clear_effect` |
 | Veto lock length and chaining | `veto_curse` (`base_lock_s + step_s × vetoes`) | `timer` veto_lock, `cancel_veto` |
 | `hider_moved` | `choose_bar` after Move | `set_bar` (completes it), `cancel_move` |
 | `venues_revealed` | trigger when the round ends or changes | none needed: reveals only after the round |
 | `dice_rolled`, `wheel_spun` results | server random | not game state; roll again, or `add_penalty` / `clear_effect` as agreed |
-| `trivia_*` marks | hider marks | `force_clear_trivia` (existing, host), `clear_effect`, `reinstate_effect` |
+| `trivia_*` marks; a set short of `params.need_right` thrown out (`trivia_marked.reset`) | hider marks | `clear_effect` (Fix something), `reinstate_effect`; `force_clear_trivia` (host, no button any more) |
 | Hiding-zone validity (`hiding_bars`, `_valid_bars`) | play area + venue edits | `set_bar` accepts any known venue or a pin |
 | Suggested answers, shading | each phone, from answers | hider taps the answer (non-negotiable 6); `set_question_shading` (seekers); `set_answer`/`void_answer` |
 | Lobby sweep after 24 h unused | `_sweep_stale_lobbies` | lobbies only; create a new one |
@@ -96,6 +98,7 @@ This is the audit of `supabase/migrations/` (up to `20261213090000_host_override
 | `question_pending` | `ask_question`, `play_card` move | `set_answer`, `void_answer`, `timer` answer end |
 | `questions_blocked` | `ask_question` | `set_blocking`, `clear_effect`, `ask_question` override |
 | `question_banned` | `ask_question` | `lift_ban`, `ask_question` override |
+| `question_used` (each option once per run) | `ask_question` | `ask_question` override; `void_answer` the earlier one (voided ones don't count) |
 | `hider_moving` | `ask_question` | `cancel_move`, `set_bar`, `ask_question` override |
 | `question_type_not_supported`, `no_map_data`, `option_not_configured`, `position_outside_map`, `invalid_distance`, `not_far_enough`, `invalid_params` | `ask_question` (`_question_params`) | `ask_question` override (sent without map data) and `set_answer` |
 | `question_not_pending` | `answer_question`, `set_trivia`... | `reopen_question`, `set_answer` |
@@ -115,6 +118,7 @@ This is the audit of `supabase/migrations/` (up to `20261213090000_host_override
 | `no_followup`, `followup_already_started`, `timer_still_running` | `start_followup` | `timer` effect end, then `start_followup`; `timer` followup |
 | `cannot_veto`, `already_vetoed`, `curse_over`, `card_not_found` | `veto_curse` | `clear_effect` (= veto without the lock), `add_penalty`; `cancel_veto` |
 | `trivia_*`, `invalid_trivia*` | trivia actions | `force_clear_trivia`, `clear_effect` |
+| `effect_not_awaiting` | `check_curse` | `reinstate_effect`, `clear_effect` |
 | `no_utility`, `wheel_not_configured` | `roll_dice`, `spin_wheel` | roll or spin by hand (the wheel link) |
 | `invalid_shading`, `shading_too_detailed`, `question_not_answered` | `set_question_shading` | pick fewer areas; `set_answer` first |
 | `hiders_only`, `seekers_only` | team checks | `move_player` |

@@ -116,6 +116,8 @@ Reuse: taibeled/JetLagHideAndSeek (MIT) for question geometry and OSM queries; k
 | 4 Brisbane beta | Full game, end game + winner, auto-end, code reuse, bug bash, fixes, second game | One full game with no manual reconciliation |
 | 5 Sydney + v1 | Sydney city pack, scoring/history | First Sydney game |
 
+Phase 4 round end (from playtest 2, 18/11/26): seekers end the seeking period with a "Found them" control guarded three ways so it can't happen by accident: tap once ("Are you sure?"), tap again to unlock a slider, then slide to confirm. Either seeker can do it; the hiders see it immediately.
+
 ## 10. Testing
 
 Latency harness (fail deploy if p95 > 1 s), leak test (seeker client never receives hider-only data), concurrency tests (simultaneous asks, curse mid-question, duplicate sends), disruption tests (airplane mode, locked screen, tunnels), geometry unit tests, rules tests, device matrix (iPhone home-screen PWA, Android Chrome), error tracking.
@@ -126,4 +128,4 @@ Latency harness (fail deploy if p95 > 1 s), leak test (seeker client never recei
 - Copies per curse (assumed 1 each).
 - Curse of Nathan: no text yet.
 - Who clears an until_cleared curse (default: seekers tap Done, hider confirms)?
-- Curse of Prison: who draws the card?
+- Curse of Prison: who draws the card? (The seekers now confirm they're in the bar before it starts.)

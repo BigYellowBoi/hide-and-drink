@@ -348,7 +348,9 @@ export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
       const id = str(p.question_id)
       const action = isObject(p.card) && isObject(p.card.params) ? p.card.params.action : null
       if (!id || (action !== 'veto' && action !== 'randomize')) return state
-      return update(state, id, (x) => ({ ...x, closedBy: action, answeredAt: time(p.played_at, e.created_at) }))
+      // A Randomize on a thermometer (extra.randomize_vetoes) closes it as a veto.
+      const closedBy = action === 'randomize' && p.as_veto === true ? 'veto' : action
+      return update(state, id, (x) => ({ ...x, closedBy, answeredAt: time(p.played_at, e.created_at) }))
     }
     case 'hider_moved':
       return { ...state, movedSeq: e.seq }

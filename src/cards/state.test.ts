@@ -28,6 +28,7 @@ import {
   questionsBlockedBy,
   triviaTodo,
   triviaWaiting,
+  drinkTeams,
 } from './state'
 
 let seq = 0
@@ -422,7 +423,7 @@ describe('trivia curses', () => {
   it('waits for the hider to write the questions, without blocking questions', () => {
     const s = deriveCards(start())
     const e = s.effects[0]
-    expect(e.trivia).toEqual({ count: 3, topic: 'Harry Potter', questions: null, forced: false })
+    expect(e.trivia).toEqual({ count: 3, need: 3, topic: 'Harry Potter', questions: null, forced: false })
     expect(triviaTodo(e, 'hiders')).toBe('write')
     expect(triviaTodo(e, 'seekers')).toBeNull()
     expect(questionsBlockedBy(s)).toEqual([])
@@ -471,5 +472,73 @@ describe('trivia curses', () => {
     expect(s.effects[0].trivia!.questions!.every((q) => q.correct)).toBe(true)
     expect(effectPhase(s.effects[0], 0)).toBe('over')
     expect(triviaWaiting(s, 'seekers')).toEqual([])
+  })
+})
+
+describe('playtest 2: Moll 1 of 3, seeker-confirmed curses, drink cards', () => {
+  it('a set short of need_right is thrown out and the hider writes a new one', () => {
+    const moll = card('moll', 'trivia', { count: 3, need_right: 1 })
+    const events = [
+      ev('game_started', { round: 1, deck: [moll] }),
+      ev('card_played', { round: 1, instance_id: 'i1', card: moll, effect_id: 'e1', count: 3 }),
+      ev('trivia_set', { effect_id: 'e1', questions: ['a', 'b', 'c'] }),
+      ev('trivia_answered', { effect_id: 'e1', answers: ['x', 'y', 'z'], by: 's1' }),
+      ev('trivia_marked', {
+        effect_id: 'e1',
+        reset: true,
+        need: 1,
+        marks: [
+          { correct: false, answer: 'x' },
+          { correct: false, answer: 'y' },
+          { correct: false, answer: 'z' },
+        ],
+      }),
+    ]
+    const s = deriveCards(events)
+    const e = s.effects[0]
+    expect(e.trivia).toMatchObject({ need: 1, questions: null })
+    expect(e.status).toBe('active')
+    expect(triviaTodo(e, 'hiders')).toBe('write')
+    expect(s.log.at(-1)?.text).toBe('MOLL: Q1 "x", Q2 "y", Q3 "z" wrong; not enough right: the hider sends new questions')
+  })
+
+  it('a seeker_confirm curse waits for the seekers, then starts or drops', () => {
+    const prison = card('prison', 'timed', { duration_s: 600, seeker_confirm: 'In the bar?' })
+    const played = [
+      ev('game_started', { round: 1, deck: [prison] }),
+      ev('card_played', {
+        round: 1,
+        instance_id: 'i1',
+        card: prison,
+        effect_id: 'e1',
+        duration_s: 600,
+        ends_at: null,
+        awaiting_seekers: true,
+        seeker_confirm: 'In the bar?',
+      }),
+    ]
+    let s = deriveCards(played)
+    expect(s.effects[0]).toMatchObject({ status: 'awaiting_seekers', seekerConfirm: 'In the bar?' })
+    expect(effectPhase(s.effects[0], 0)).toBe('awaiting_seekers')
+    expect(effectTimer(s.effects[0], 0)).toBeNull()
+    expect(liveEffects(s, 0)).toHaveLength(1)
+
+    s = deriveCards([...played, ev('curse_checked', { effect_id: 'e1', applies: true, ends_at: '2026-11-20T10:10:00Z' })])
+    expect(s.effects[0].status).toBe('active')
+    expect(effectPhase(s.effects[0], Date.parse('2026-11-20T10:05:00Z'))).toBe('running')
+
+    s = deriveCards([...played, ev('curse_checked', { effect_id: 'e1', applies: false, ends_at: null })])
+    expect(s.effects[0].status).toBe('cleared')
+    expect(liveEffects(s, 0)).toEqual([])
+    expect(s.log.at(-1)?.text).toBe("Seekers say PRISON doesn't apply: dropped")
+  })
+
+  it('knows which teams a drink card makes drink', () => {
+    const all = card('drinks_all_round', 'text', { drinks: ['hiders', 'seekers'] })
+    const s = deriveCards([
+      ev('game_started', { round: 1, deck: [all] }),
+      ev('card_played', { round: 1, instance_id: 'i1', card: all }),
+    ])
+    expect(drinkTeams(s.played[0])).toEqual(['hiders', 'seekers'])
   })
 })
