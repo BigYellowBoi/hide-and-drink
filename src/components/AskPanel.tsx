@@ -12,6 +12,7 @@ import { isSupportedType, km, MAP_TYPES, questionText, typeName } from '../play/
 import { radarCircle } from '../play/geo'
 import type { Fix, GeoError } from '../hiding/useGeolocation'
 import { formatClock } from '../hiding/state'
+import { banKey } from '../cards/state'
 import { LazyGameMap } from './lazyMap'
 
 interface Props {
@@ -24,8 +25,12 @@ interface Props {
   /** Server ms when questions open; null if unknown. */
   seekingAt: number | null
   pending: boolean
-  /** Why questions are blocked (a curse in play), or null. */
+  /** Why questions are blocked (a curse in play, the hider moving), or null. */
   blocked?: string | null
+  /** Banned questions, as banKey(type, option id). */
+  banned?: ReadonlySet<string>
+  /** Seekers are serving a veto lock (asking is still allowed). */
+  locked?: boolean
   now: number
   /** This phone's GPS (the seeker view already watches it and shares it with the team). */
   fix: Fix | null
@@ -35,7 +40,24 @@ interface Props {
 const startKey = (gameId: string) => `hd.thermometer.${gameId}`
 
 /** Seekers: pick a question type and option, place the tool, send. */
-export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingAt, pending, blocked = null, now, fix, geoError }: Props) {
+const NONE: ReadonlySet<string> = new Set()
+
+export function AskPanel({
+  sync,
+  gameId,
+  city,
+  playArea,
+  ruled,
+  canAct,
+  seekingAt,
+  pending,
+  blocked = null,
+  banned = NONE,
+  locked = false,
+  now,
+  fix,
+  geoError,
+}: Props) {
   const [types, setTypes] = useState<QuestionType[] | null>(null)
   const [type, setType] = useState<string>('radar')
   const [optionId, setOptionId] = useState<string | null>(null)
@@ -102,6 +124,7 @@ export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingA
   let blocker: string | null = null
   if (!qt || !isSupportedType(type)) blocker = 'Pick a question type.'
   else if (!option) blocker = 'Pick an option.'
+  else if (banned.has(banKey(type, option.id))) blocker = 'That question is banned for the rest of the run.'
   else if ((type === 'radar' || type === 'thermometer') && (!distance || distance < 10)) blocker = 'Type a distance.'
   else if ((MAP_TYPES.includes(type) || type === 'thermometer') && !here)
     blocker = 'Waiting for GPS. Or tap the map to place yourself.'
@@ -168,17 +191,22 @@ export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingA
               : qt.prompt}
           </p>
           <div className="chips" role="radiogroup" aria-label="Option">
-            {qt.options.map((o) => (
-              <button
-                key={o.id}
-                role="radio"
-                aria-checked={optionId === o.id}
-                className={`option-chip${optionId === o.id ? ' on' : ''}`}
-                onClick={() => setOptionId(o.id)}
-              >
-                {optionLabel(o)}
-              </button>
-            ))}
+            {qt.options.map((o) => {
+              const isBanned = banned.has(banKey(type, o.id))
+              return (
+                <button
+                  key={o.id}
+                  role="radio"
+                  aria-checked={optionId === o.id}
+                  className={`option-chip${optionId === o.id ? ' on' : ''}${isBanned ? ' banned' : ''}`}
+                  disabled={isBanned}
+                  title={isBanned ? 'Banned for the rest of the run' : undefined}
+                  onClick={() => setOptionId(o.id)}
+                >
+                  {optionLabel(o)}
+                </button>
+              )
+            })}
           </div>
           {option && option.distance_m == null && type === 'radar' && (
             <label className="field">
@@ -247,6 +275,7 @@ export function AskPanel({ sync, gameId, city, playArea, ruled, canAct, seekingA
         {sent ? 'Sent' : 'Send question'}
       </button>
       {blocker && <p className="muted small">{blocker}</p>}
+      {locked && !blocker && <p className="muted small">You're locked at a bar: ask from where you are.</p>}
       {err && <p className="bad">{err}</p>}
     </section>
   )

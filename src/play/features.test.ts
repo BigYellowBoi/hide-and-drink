@@ -81,6 +81,9 @@ function q(type: string, params: Record<string, unknown>, answer: string | null 
     answeredAt: null,
     late: false,
     overdue: false,
+    closedBy: null,
+    randomizedFrom: null,
+    rewardMultiplier: null,
   }
 }
 

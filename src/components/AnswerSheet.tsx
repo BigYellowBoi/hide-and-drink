@@ -29,6 +29,10 @@ interface Props {
   now: number
   /** City pack features, for suggestions that need them (matching, bonus count rules). */
   layer?: LayerLookup
+  /** Veto / Randomize cards in the hand: play one instead of answering. */
+  powerups?: readonly { instanceId: string; name: string; action: 'veto' | 'randomize' }[]
+  /** The answer's reward is multiplied by this (next_question_modifier cards). */
+  rewardMultiplier?: number
 }
 
 interface Photo {
@@ -41,7 +45,21 @@ interface Photo {
  * Hider's answer sheet: sits at the top until answered. The suggestion is only a
  * suggestion; nothing is sent until the hider picks an answer and taps Send.
  */
-export function AnswerSheet({ sync, question: q, askerName, city, playArea, zone, ruled, seekers, canAct, now, layer }: Props) {
+export function AnswerSheet({
+  sync,
+  question: q,
+  askerName,
+  city,
+  playArea,
+  zone,
+  ruled,
+  seekers,
+  canAct,
+  now,
+  layer,
+  powerups = [],
+  rewardMultiplier = 1,
+}: Props) {
   const [choice, setChoice] = useState<string | null>(null)
   const [text, setText] = useState('')
   const [photo, setPhoto] = useState<Photo | null>(null)
@@ -115,7 +133,19 @@ export function AnswerSheet({ sync, question: q, askerName, city, playArea, zone
       setBusy(null)
     }
   }
+  const playPowerup = async (instanceId: string) => {
+    setErr(null)
+    setBusy('Playing…')
+    try {
+      await sync.action('play_card', { p_instance_id: instanceId })
+    } catch (e) {
+      setErr(describeError(e))
+      setBusy(null)
+    }
+  }
   const ready = answer !== null || photo !== null
+  const draw = Math.round(q.reward.draw * rewardMultiplier)
+  const pick = Math.round(q.reward.pick * rewardMultiplier)
   const sendLabel =
     busy ?? (answer ? `Send “${answerText(q, answer)}”` : photo ? 'Send photo' : typed ? 'Type an answer' : 'Pick an answer')
   const ref = q.params
@@ -234,8 +264,24 @@ export function AnswerSheet({ sync, question: q, askerName, city, playArea, zone
       </button>
       {late && <p className="flag">Deadline passed: a shot for your team is logged. You still need to answer.</p>}
       <p className="muted small">
-        Answering earns you: draw {q.reward.draw}, keep {q.reward.pick}.
+        Answering earns you: draw {draw}, keep {pick}
+        {rewardMultiplier !== 1 ? ` (×${+rewardMultiplier.toFixed(2)})` : ''}.
       </p>
+      {powerups.length > 0 && (
+        <div className="sheet-powerups">
+          <p className="eyebrow">
+            <LockIcon /> Or play a card instead
+          </p>
+          <div className="confirm-row">
+            {[...new Map(powerups.map((p) => [p.action, p])).values()].map((p) => (
+              <button key={p.instanceId} className="secondary" disabled={!!busy || !canAct} onClick={() => void playPowerup(p.instanceId)}>
+                {p.name}
+              </button>
+            ))}
+          </div>
+          <p className="muted small">Veto: no answer, no reward. Randomize: they get another question of this type.</p>
+        </div>
+      )}
       {err && <p className="bad">{err}</p>}
     </section>
   )

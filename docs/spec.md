@@ -38,9 +38,9 @@ Source of truth for building the app. The shared roadmap doc is a read-only over
 | 100 m bar zone | Hiding zone = 100 m circle around the chosen bar. A bar stays possible for seekers while any part of its circle overlaps the remaining area. |
 | Freeze when a seeker is within 100 m | Server compares seekers' live positions to the circle and pushes Freeze / Clear to the hider only. Guide, not referee. |
 | Cast cost | Card field `cast_cost`: free / drink / shot, shown when cast. |
-| Veto | Veto button on curses with `can_veto: true`. Server counts vetoes; lock = base + step x vetoes_used (from config). |
+| Veto | Veto button on curses with `can_veto: true`. Server counts vetoes per run; lock = base + step x vetoes_used (from config), starting when any earlier lock ends. Opens a drink proof for the seekers. |
 | 5 min reply | Default answer deadline 300 s, overridable per question type. Missed deadline logs a penalty shot event. |
-| Photo proof | Photo upload attached to the event, visible to both teams. |
+| Photo proof | Each drink the app knows about (cast cost, drink cards, veto, missed deadline) asks the drinking team for a photo, shown to both teams in the log. |
 | Station zone (open) | If enabled, bar picker only offers bars inside a station zone. |
 
 ## 4. Sync and concurrency
@@ -75,7 +75,7 @@ Behaviours (the only card logic in code):
 
 Seed deck: `data/cards.json` (81 cards: 12 powerups, 42 time bonuses, 5 drink cards, 22 curses). Curse values are the small-game values, the left-most of the `[small, medium, large]` options on the cards. Cards with `copies: 0` (Nathan, Brothel) are in the library but not the default deck.
 
-Utilities: `params.utility` = `dice` (with `params.dice` count) or `wheel`. Proof: `params.proof` = `photo` or `video`.
+Utilities: `params.utility` = `dice` (with `params.dice` count) or `wheel` (`params.wheel_options` to spin in the app, else `params.wheel_url` opens). Proof: `params.proof` = `photo` or `video`. Drinks: `params.drinks` lists the teams that drink when the card is played (photo proof each); `params.cost` is a cost for cards with no `cast_cost`.
 
 ## 6. Questions
 

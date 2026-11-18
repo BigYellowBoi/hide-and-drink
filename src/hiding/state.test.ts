@@ -18,7 +18,7 @@ const bar = (round: number, name = 'The Pub') =>
 
 describe('deriveHiding', () => {
   it('starts with no bar and no freeze', () => {
-    expect(deriveHiding([], 1)).toEqual({ bar: null, frozen: false })
+    expect(deriveHiding([], 1)).toEqual({ bar: null, frozen: false, moving: false })
   })
 
   it('reads the chosen bar and follows freeze changes', () => {
@@ -79,5 +79,26 @@ describe('positionAge', () => {
     expect(positionAge(0, 50_000, 20)).toBeNull()
     expect(positionAge(0, 55_000, 20)).toBe('55 s')
     expect(positionAge(0, 200_000, 20)).toBe('3 min')
+  })
+})
+
+describe('deriveHiding: Move', () => {
+  const ev = (type: string, payload: Record<string, unknown>, seq: number) => ({
+    game_id: 'g',
+    seq,
+    type,
+    visibility: 'hiders' as const,
+    actor_id: null,
+    payload: { round: 1, ...payload },
+    created_at: '2026-11-20T10:00:00Z',
+  })
+  it('a Move reopens the picker until the new bar is locked in', () => {
+    const chosen = ev('bar_chosen', { venue_id: 'a', name: 'A', lng: 153, lat: -27 }, 1)
+    const move = ev('card_played', { card: { card_id: 'move', params: { action: 'move' } } }, 2)
+    const s = deriveHiding([chosen, move], 1)
+    expect(s.moving).toBe(true)
+    expect(s.bar?.venueId).toBe('a')
+    const moved = deriveHiding([chosen, move, ev('bar_chosen', { venue_id: 'b', name: 'B', lng: 153.01, lat: -27, moved: true }, 3)], 1)
+    expect(moved).toMatchObject({ moving: false, bar: { venueId: 'b' } })
   })
 })

@@ -65,6 +65,21 @@ const MESSAGES: Record<string, string> = {
   no_followup: 'That card has no follow-on timer.',
   followup_already_started: 'The follow-on timer is already running.',
   timer_still_running: 'Wait for the timer to run out first.',
+  no_pending_question: 'Play this while a question is waiting for you.',
+  nothing_to_randomize: 'There is no other question of this type to switch to.',
+  invalid_choice: 'Pick the cards or questions this card asks for.',
+  no_bar_yet: 'Lock in a bar first.',
+  already_moving: 'You are already moving. Lock in your new bar.',
+  same_bar: 'Pick a different bar from the one you are moving from.',
+  hider_moving: 'The hider is moving. Questions open once they lock in a new bar.',
+  question_banned: 'That question is banned for the rest of the run.',
+  card_not_found: 'That card is not in play.',
+  cannot_veto: 'That curse can\'t be vetoed.',
+  already_vetoed: 'That curse has already been vetoed.',
+  curse_over: 'That curse is already over.',
+  no_utility: 'That card has nothing to roll or spin.',
+  wheel_not_configured: 'This wheel has no options in the app. Open its link instead.',
+  proof_not_pending: 'That photo has already been sent.',
 }
 
 export const describeCode = (code: string) => MESSAGES[code] ?? code.replace(/_/g, ' ')

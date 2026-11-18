@@ -15,6 +15,8 @@ export interface HidingState {
   bar: ChosenBar | null
   /** A seeker is within the freeze radius of the bar (server-computed, hider-only). */
   frozen: boolean
+  /** The hider played Move: pick a new bar (the old one stays until then). */
+  moving: boolean
 }
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
@@ -25,7 +27,7 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object
  * for them this is always empty.
  */
 export function deriveHiding(events: readonly GameEvent[], round: number): HidingState {
-  let state: HidingState = { bar: null, frozen: false }
+  let state: HidingState = { bar: null, frozen: false, moving: false }
   for (const e of events) {
     if (e.payload.round !== round) continue
     if (e.type === 'bar_chosen') {
@@ -43,7 +45,10 @@ export function deriveHiding(events: readonly GameEvent[], round: number): Hidin
           radiusM: num(p.radius_m) ?? 100,
           late: p.late === true,
         },
+        moving: false,
       }
+    } else if (e.type === 'card_played' && isObj(e.payload.card) && isObj(e.payload.card.params) && e.payload.card.params.action === 'move') {
+      state = { ...state, moving: true }
     } else if (e.type === 'freeze_changed' && typeof e.payload.frozen === 'boolean') {
       state = { ...state, frozen: e.payload.frozen }
     }

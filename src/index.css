@@ -2106,3 +2106,109 @@ button.pcard {
   font-family: var(--font-display);
   font-size: 26px;
 }
+
+/* Card utilities: dice and wheel results (server random, same on every phone) */
+.utility {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.utility-result {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  animation: utility-pop 0.35s ease-out;
+}
+
+.die {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--text);
+  color: var(--bg);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wheel-result {
+  font-family: var(--font-display);
+  font-size: 17px;
+}
+
+@keyframes utility-pop {
+  from {
+    transform: scale(0.6) rotate(-20deg);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .utility-result {
+    animation: none;
+  }
+}
+
+/* A link that looks like a small secondary button (the wheel link). */
+.link-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 2px solid var(--line);
+  border-radius: var(--r-pill);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* Hand: picks a card needs before it's cast (duplicate target, discards, bans). */
+.cast-choice {
+  margin-top: 12px;
+}
+
+.cast-choice p {
+  margin: 0 0 8px;
+}
+
+.ban-type {
+  margin-top: 8px;
+}
+
+.ban-type .chips {
+  margin-top: 4px;
+}
+
+.option-chip.banned {
+  text-decoration: line-through;
+}
+
+.sheet-powerups {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+/* Photo proof for a drink: pinned on top for the team that owes it. */
+.drink-proof {
+  box-shadow: inset 0 0 0 2px var(--alert);
+}
+
+.drink-proof h2 {
+  margin: 4px 0;
+}
+
+.log-proof .log-dot {
+  background: var(--alert);
+}

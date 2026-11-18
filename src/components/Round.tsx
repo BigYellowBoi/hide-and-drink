@@ -10,12 +10,23 @@ import { readLocal, writeLocal } from '../lib/storage'
 import { distanceM, formatDistance } from '../map/geo'
 import { questionTool } from '../play/overlays'
 import { remainingBars, shade, type HiderZone } from '../play/shading'
-import { answerText, derivePlay, questionLabel, shadable, type PlayState, type Question } from '../play/state'
+import { derivePlay, outcomeText, questionLabel, shadable, type PlayState, type Question } from '../play/state'
 import { shadingBounds, type LayerLookup } from '../play/features'
 import { useCityLayers } from '../play/useCityLayers'
 import { useHidingVenues } from '../play/useHidingVenues'
 import { useSettleTimers } from '../play/useSettleTimers'
-import { deriveCards, liveEffects, questionsBlockedBy, type CardsState } from '../cards/state'
+import {
+  bannedSet,
+  cardOf,
+  deriveCards,
+  liveEffects,
+  lockedUntil,
+  powerupAction,
+  questionsBlockedBy,
+  vetoable,
+  type CardsState,
+} from '../cards/state'
+import { DrinkProofs, LockBanner } from './CardExtras'
 import type { GameSync } from '../sync/engine'
 import type { Presence } from '../sync/presence'
 import type { GameEvent, SeekerPosition } from '../sync/types'
@@ -184,7 +195,9 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
 
       {tab === 'questions' && <QuestionList questions={play.questions} />}
 
-      {tab === 'effects' && team && <EffectsPanel sync={sync} cards={cards} team={team} canAct={canAct} now={now} />}
+      {tab === 'effects' && team && (
+        <EffectsPanel sync={sync} cards={cards} team={team} canAct={canAct} now={now} config={lobby.config} nameOf={nameOf} />
+      )}
 
       {tab === 'log' && (
         <>
@@ -218,7 +231,10 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
             {label}
             {id === 'questions' && play.pending && <span className="tab-dot" aria-label="needs answer" />}
             {id === 'hand' && cards.draws.length > 0 && <span className="tab-dot" aria-label="cards to keep" />}
-            {id === 'effects' && liveEffects(cards, now).length > 0 && <span className="tab-dot" aria-label="curses in play" />}
+            {id === 'effects' &&
+              (liveEffects(cards, now).length > 0 || cards.played.some((p) => vetoable(cards, p, now))) && (
+                <span className="tab-dot" aria-label="curses in play" />
+              )}
           </button>
         ))}
       </nav>
@@ -238,7 +254,7 @@ function QuestionList({ questions }: { questions: readonly Question[] }) {
             <li key={q.id}>
               <strong>{questionLabel(q)}</strong>
               <span>
-                {q.answer ? answerText(q, q.answer) : 'Waiting'}
+                {outcomeText(q)}
                 {q.late && <span className="penalty"> · late</span>}
                 {q.overdue && !q.late && <span className="penalty"> · missed deadline</span>}
               </span>
@@ -307,6 +323,13 @@ function HiderView({
   const { fix, error } = useGeolocation(true)
   const hiding = useMemo(() => deriveHiding(events, started.round), [events, started.round])
   const bar = hiding.bar
+  const picking = !bar || hiding.moving
+  // Veto / Randomize in hand: offered right on the answer sheet.
+  const powerups = cards.hand.flatMap((c) => {
+    const def = cardOf(cards, c.cardId)
+    const a = powerupAction(def)
+    return a === 'veto' || a === 'randomize' ? [{ instanceId: c.instanceId, name: def.name, action: a }] : []
+  })
   const overlay = useMemo(
     () => ({
       zone: bar ? { lng: bar.lng, lat: bar.lat, radiusM: bar.radiusM, team: 'hiders' as const } : null,
@@ -336,9 +359,19 @@ function HiderView({
           <p>A seeker is within {formatDistance(zone.freezeRadiusM)} of your bar. Don't move until this clears.</p>
         </div>
       )}
+      <DrinkProofs sync={sync} cards={cards} team="hiders" canAct={canAct} />
+      {hiding.moving && (
+        <div className="blocked-banner" role="status">
+          <strong>Moving</strong>
+          <p>Pick your new bar on the Map tab. Seekers can't ask until you lock it in.</p>
+        </div>
+      )}
+      <LockBanner cards={cards} team="hiders" now={now} />
       {play.pending && (
         <AnswerSheet
           key={play.pending.id}
+          powerups={powerups}
+          rewardMultiplier={cards.nextRewardMultiplier}
           sync={sync}
           question={play.pending}
           askerName={nameOf(play.pending.askedBy)}
@@ -374,20 +407,29 @@ function HiderView({
       )}
       {tab === 'hand' && (
         <>
-          <HandPanel sync={sync} cards={cards} canAct={canAct} />
+          <HandPanel
+            sync={sync}
+            cards={cards}
+            canAct={canAct}
+            ctx={{ city: lobby.city, pendingQuestion: !!play.pending, barChosen: !!bar }}
+          />
           {questionsBlockedBy(cards).length > 0 && <BlockedBanner effects={questionsBlockedBy(cards)} team="hiders" />}
-          <EffectsPanel sync={sync} cards={cards} team="hiders" canAct={canAct} now={now} />
+          <EffectsPanel sync={sync} cards={cards} team="hiders" canAct={canAct} now={now} config={lobby.config} nameOf={nameOf} />
         </>
       )}
-      {!bar && tab !== 'map' && (
+      {picking && tab !== 'map' && (
         <section className="card pick-prompt">
           <div>
             <p className="eyebrow">
               <LockIcon /> Only you see this
             </p>
-            <h2>Pick your bar</h2>
+            <h2>{hiding.moving ? 'Pick your new bar' : 'Pick your bar'}</h2>
             <p className="muted small">
-              {clock.phase === 'hiding' ? `${formatClock(clock.ms)} left to hide` : 'Hiding is over. Lock one in now.'}
+              {hiding.moving
+                ? 'You played Move.'
+                : clock.phase === 'hiding'
+                  ? `${formatClock(clock.ms)} left to hide`
+                  : 'Hiding is over. Lock one in now.'}
             </p>
           </div>
           <button className="small" onClick={goMap}>
@@ -396,9 +438,9 @@ function HiderView({
         </section>
       )}
 
-      {tab === 'map' && !bar && <GeoNote error={error} waiting={!fix} />}
+      {tab === 'map' && picking && <GeoNote error={error} waiting={!fix} />}
       {tab === 'map' &&
-        (!bar ? (
+        (picking || !bar ? (
           <BarPicker
             seekers={seekerDots}
             sync={sync}
@@ -407,8 +449,8 @@ function HiderView({
             zone={zone}
             canAct={canAct}
             fix={fix}
-            late={clock.phase === 'seeking'}
-            timeNote={`${formatClock(clock.ms)} left to hide`}
+            late={clock.phase === 'seeking' && !hiding.moving}
+            timeNote={hiding.moving ? `Moving from ${bar?.name ?? 'your bar'}` : `${formatClock(clock.ms)} left to hide`}
           />
         ) : (
           <>
@@ -500,10 +542,20 @@ function SeekerView({
   )
   const pending = play.pending
   const blocked = questionsBlockedBy(cards)
+  const banned = useMemo(() => bannedSet(cards), [cards])
+  const locked = lockedUntil(cards, now)
 
   return (
     <>
+      <DrinkProofs sync={sync} cards={cards} team="seekers" canAct={canAct} />
       {blocked.length > 0 && tab !== 'effects' && <BlockedBanner effects={blocked} team="seekers" />}
+      {tab !== 'effects' && <LockBanner cards={cards} team="seekers" now={now} />}
+      {cards.moving && tab !== 'effects' && (
+        <div className="blocked-banner" role="status">
+          <strong>Hider is moving</strong>
+          <p>Stay put: questions open once they lock in a new bar.</p>
+        </div>
+      )}
       {pending && (
         <section className="card waiting">
           <div>
@@ -565,7 +617,15 @@ function SeekerView({
           canAct={canAct}
           seekingAt={clock.phase === 'hiding' ? now + clock.ms : null}
           pending={!!pending}
-          blocked={blocked.length ? `Questions are blocked until you complete ${blocked.map((e) => e.card.name).join(' and ')}.` : null}
+          blocked={
+            blocked.length
+              ? `Questions are blocked until you complete ${blocked.map((e) => e.card.name).join(' and ')}.`
+              : cards.moving
+                ? 'The hider is moving. Questions open once they lock in a new bar.'
+                : null
+          }
+          banned={banned}
+          locked={!!locked}
           now={now}
           fix={fix}
           geoError={error}
