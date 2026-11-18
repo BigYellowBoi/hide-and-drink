@@ -118,6 +118,27 @@ const MESSAGES: Record<string, string> = {
   preset_name_taken: 'Someone else has a preset with that name. Pick another.',
   preset_not_found: 'That preset has already been deleted.',
   preset_protected: 'Built-in presets can\'t be deleted.',
+  // Host overrides
+  invalid_reason: 'Say why in a few words (up to 120 characters).',
+  unknown_override: 'That fix is not in this version of the app. Reload.',
+  invalid_override: 'Something is missing from that fix.',
+  request_not_open: 'That request has already been handled.',
+  no_penalty: 'That question has no shot to cancel.',
+  proof_not_found: 'That drink is not in this game.',
+  timer_paused: 'That countdown is already paused.',
+  timer_not_paused: 'That countdown is not paused.',
+  timer_not_running: 'That countdown is already over.',
+  no_timer: 'That curse has no countdown.',
+  veto_not_found: 'That veto is no longer in play.',
+  already_void: 'That question is already voided.',
+  ban_not_found: 'That question is not banned.',
+  effect_active: 'That curse is still in force.',
+  not_moving: 'The hider is not moving.',
+  same_team: 'They are already on that team.',
+  already_host: 'They are already the host.',
+  override_not_found: 'That fix is not in this game.',
+  already_undone: 'That fix has already been undone.',
+  undo_conflict: 'Things have moved on since that fix, so it can\'t be undone. Make another fix instead.',
 }
 
 export const describeCode = (code: string) => MESSAGES[code] ?? code.replace(/_/g, ' ')

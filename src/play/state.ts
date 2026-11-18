@@ -69,8 +69,12 @@ export interface Question {
   late: boolean
   /** The missed-deadline penalty has been logged. */
   overdue: boolean
-  /** Closed by a powerup instead of an answer. */
-  closedBy: 'veto' | 'randomize' | null
+  /** The host cancelled the missed-deadline penalty (override). */
+  penaltyCancelled: boolean
+  /** The answer deadline is paused (override): time left, ms. deadlineAt is Infinity meanwhile. */
+  pausedLeftMs: number | null
+  /** Closed by a powerup instead of an answer, or voided by the host (override). */
+  closedBy: 'veto' | 'randomize' | 'void' | null
   /** Randomize: the question this one replaced. */
   randomizedFrom: string | null
   /** Final reward when a modifier changed it (question_answered). */
@@ -94,7 +98,7 @@ export function parseManualShading(v: unknown): ManualShading | null {
   return null
 }
 
-export type LogKind = 'seeking' | 'asked' | 'answered' | 'penalty' | 'bar' | 'draw' | 'card' | 'proof' | 'shading'
+export type LogKind = 'seeking' | 'asked' | 'answered' | 'penalty' | 'bar' | 'draw' | 'card' | 'proof' | 'shading' | 'override'
 export interface LogEntry {
   seq: number
   kind: LogKind
@@ -112,6 +116,12 @@ export interface LogEntry {
   photoBucket?: string
   /** Dot colour (card category), when the kind's own colour doesn't fit. */
   colour?: string
+  /** Host override this entry records (kind 'override'). */
+  overrideId?: string
+  /** Why the host did it. */
+  reason?: string
+  /** The override was undone since. */
+  undone?: boolean
 }
 
 export interface PlayState {
@@ -119,6 +129,8 @@ export interface PlayState {
   /** Server ms when seeking starts (end of the hiding period). */
   seekingAt: number | null
   seekingStarted: boolean
+  /** The hiding period is paused (override): time left, ms. seekingAt is Infinity meanwhile. */
+  hidingPausedLeftMs: number | null
   questions: Question[]
   pending: Question | null
   penalties: number
@@ -131,6 +143,7 @@ export const emptyPlay: PlayState = {
   round: 0,
   seekingAt: null,
   seekingStarted: false,
+  hidingPausedLeftMs: null,
   questions: [],
   pending: null,
   penalties: 0,
@@ -267,6 +280,8 @@ export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
         answeredAt: null,
         late: false,
         overdue: false,
+        penaltyCancelled: false,
+        pausedLeftMs: null,
         closedBy: null,
         randomizedFrom: str(p.randomized_from),
         rewardMultiplier: null,
@@ -301,6 +316,8 @@ export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
         answer,
         answeredAt: time(p.answered_at, e.created_at),
         late: p.late === true,
+        closedBy: null,
+        pausedLeftMs: null,
         rewardMultiplier: num(p.reward_multiplier),
         reward: isObject(p.reward) ? { draw: num(p.reward.draw) ?? x.reward.draw, pick: num(p.reward.pick) ?? x.reward.pick } : x.reward,
       }))
@@ -359,10 +376,80 @@ export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
         ],
       }
     }
+    case 'penalty_cancelled': {
+      const id = str(p.question_id)
+      const next = update(state, id, (x) => ({ ...x, penaltyCancelled: true }))
+      return {
+        ...next,
+        penalties: Math.max(0, next.penalties - 1),
+        log: [...next.log, { seq: e.seq, kind: 'override', at, text: 'Missed-deadline shot cancelled', ...(id ? { questionId: id } : {}) }],
+      }
+    }
+    case 'penalty_added': {
+      const who = p.team === 'seekers' ? 'Seekers' : 'Hiders'
+      return {
+        ...state,
+        penalties: state.penalties + (p.team === 'hiders' ? 1 : 0),
+        log: [...state.log, { seq: e.seq, kind: 'penalty', at, text: `${who} take a ${str(p.cost) ?? 'shot'}: ${str(p.label) ?? 'penalty'}` }],
+      }
+    }
+    case 'question_voided': {
+      const id = str(p.question_id)
+      return update(state, id, (x) => ({ ...x, answer: null, closedBy: 'void', answeredAt: x.answeredAt ?? at, pausedLeftMs: null }))
+    }
+    case 'question_reopened': {
+      const id = str(p.question_id)
+      return update(state, id, (x) => ({
+        ...x,
+        answer: null,
+        answeredAt: null,
+        closedBy: null,
+        late: false,
+        overdue: false,
+        penaltyCancelled: false,
+        pausedLeftMs: null,
+        deadlineAt: time(p.deadline_at, e.created_at),
+        deadlineS: num(p.deadline_s) ?? x.deadlineS,
+      }))
+    }
+    case 'timer_changed': {
+      const ends = str(p.ends_at)
+      const left = num(p.paused_left_s)
+      const endsAt = ends ? time(ends, e.created_at) : Number.POSITIVE_INFINITY
+      const pausedLeftMs = ends === null && left !== null ? left * 1000 : null
+      if (p.timer === 'answer') return update(state, str(p.id), (x) => ({ ...x, deadlineAt: endsAt, pausedLeftMs }))
+      if (p.timer === 'hiding') {
+        return { ...state, seekingAt: endsAt, hidingPausedLeftMs: pausedLeftMs, seekingStarted: p.status === 'seeking' }
+      }
+      return state
+    }
+    case 'override': {
+      const text = str(p.summary) ?? 'Host fixed something'
+      const id = str(p.override_id) ?? undefined
+      return {
+        ...state,
+        log: [...state.log, { seq: e.seq, kind: 'override', at, text, by: str(p.by), overrideId: id, reason: str(p.reason) ?? undefined }],
+      }
+    }
+    case 'override_detail': {
+      // Hider phones: what the hider-only override changed.
+      const id = str(p.override_id)
+      const text = str(p.summary)
+      if (!id || !text) return state
+      return { ...state, log: state.log.map((l) => (l.overrideId === id ? { ...l, text, private: true } : l)) }
+    }
+    case 'override_undone': {
+      const id = str(p.target_id)
+      return { ...state, log: state.log.map((l) => (id && l.overrideId === id ? { ...l, undone: true } : l)) }
+    }
     default:
       return state
   }
 }
+
+/** When a countdown shows it ends: paused ones stay put at the time left. */
+export const shownEnd = (endsAt: number, pausedLeftMs: number | null, now: number) =>
+  pausedLeftMs !== null ? now + pausedLeftMs : endsAt
 
 export const derivePlay = (events: readonly GameEvent[]): PlayState => events.reduce(applyPlayEvent, emptyPlay)
 
@@ -372,7 +459,7 @@ export const shadable = (s: PlayState) =>
 
 /** What happened to a question, in words, for lists. */
 export const outcomeText = (q: Question): string =>
-  q.closedBy === 'veto' ? 'Vetoed' : q.closedBy === 'randomize' ? 'Randomized' : q.answer ? answerText(q, q.answer) : 'Waiting'
+  q.closedBy === 'veto' ? 'Vetoed' : q.closedBy === 'randomize' ? 'Randomized' : q.closedBy === 'void' ? 'Voided by the host' : q.answer ? answerText(q, q.answer) : 'Waiting'
 
 /** What a phone should ask the server to settle now (null: nothing due). Server decides. */
 export function dueTimer(s: PlayState, serverNow: number): string | null {
