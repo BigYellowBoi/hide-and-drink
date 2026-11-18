@@ -47,7 +47,6 @@ import { HandPanel } from './HandPanel'
 import type { MapDot } from './GameMap'
 import { LazyGameMap } from './lazyMap'
 import { Timeline } from './Timeline'
-import { UndoButton } from './UndoButton'
 import { PushToggle } from './PushToggle'
 import type { SyncTransport } from '../sync/transport'
 import { MapsLink } from './MapsLink'
@@ -217,7 +216,6 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
 
       {tab === 'log' && (
         <>
-          {shared.isHost && <UndoButton sync={sync} events={events} canAct={canAct} />}
           <Timeline
             questions={play.questions}
             log={log}

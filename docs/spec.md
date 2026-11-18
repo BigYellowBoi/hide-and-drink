@@ -51,7 +51,6 @@ Source of truth for building the app. The shared roadmap doc is a read-only over
 - Clients: apply in order, detect gaps, refetch from last seq; resync on every reopen; show live/offline dots; block actions when stale.
 - Seeker GPS: ephemeral broadcast every 15 to 30 s, latest-wins, not in the event log. Hider GPS never goes to seekers.
 - Push alerts (web push) for new questions, answers, curses and freezes. Never wider than the event's visibility. Setup: `docs/push.md`.
-- Host undo: the host can take back the latest question asked, answer (with its unkept reward draw) or manual shading, step by step. The log stays append-only: an `action_undone` event names what was undone.
 - Targets: <500 ms typical, <1 s p95 delivery; full recovery <3 s after reopen.
 
 ## 5. Cards

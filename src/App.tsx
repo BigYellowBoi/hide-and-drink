@@ -16,7 +16,6 @@ import { Round, TopbarClock } from './components/Round'
 import { StaleBanner } from './components/StaleBanner'
 import { presenceOf } from './sync/presence'
 import { isDevMode } from './hiding/devPosition'
-import { withoutUndone } from './play/undo'
 
 const transport = supabase ? supabaseTransport(supabase) : null
 const asset = (f: string) => `${import.meta.env.BASE_URL}${f}`
@@ -34,8 +33,7 @@ function GameScreen({
   onRejoin: (gameId: string) => void
 }) {
   const game = useGameSync(gameId, transport)
-  // Host undo: events the server took back are left out of every derived state.
-  const events = useMemo(() => withoutUndone(game.events), [game.events])
+  const events = game.events
   const lobby = useMemo(() => deriveLobby(events), [events])
   const [confirmLeave, setConfirmLeave] = useState(false)
   const [rejoin, setRejoin] = useState<{ busy: boolean; err: string | null }>({ busy: false, err: null })
