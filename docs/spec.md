@@ -67,7 +67,7 @@ Behaviours (the only card logic in code):
 | `text` | Show to everyone; people enforce it |
 | `timed` | Countdown on every phone; optional follow-on timer if a condition is missed (`params.duration_s`, `params.followup_s`) |
 | `until_cleared` | Active until seekers tap Done and the hider confirms; `params.blocks_questions` |
-| `trivia` | Hider writes `params.count` questions (default 3, on `params.topic`); seekers answer each, the hider marks each right or wrong, wrong ones go back until all are right, which clears it. Public to both teams. Host can mark all correct by hand. Anything it blocks (e.g. transport) is on the honour system; `params.blocks_questions` as for `until_cleared` |
+| `trivia` | Hider writes `params.count` questions (default 3, on `params.topic`); seekers send all their answers at once, the hider marks them all at once (each right or wrong), wrong ones go back to be answered again (again as one set) until all are right, which clears it. Public to both teams. Host can mark all correct by hand. Anything it blocks (e.g. transport) is on the honour system; `params.blocks_questions` as for `until_cleared` |
 | `time_bonus` | Add `params.minutes` to the hider's score |
 | `next_question_modifier` | Modify the hider's reward on the next answer (`params.reward_multiplier`) |
 | `question_ban` | Hider picks `params.count` questions (from different types if `params.distinct_types`); seekers can't ask them until `params.until` (e.g. end of run) |

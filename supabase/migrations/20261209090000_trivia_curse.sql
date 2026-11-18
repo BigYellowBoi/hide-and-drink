@@ -1,9 +1,10 @@
 -- Trivia curses (behaviour 'trivia'), first used by Curse of Moll.
 --
 -- The hider writes params.count questions (default 3, on params.topic) and sends them with
--- set_trivia. The seekers answer each one (answer_trivia), the hider marks each answer right
--- or wrong (mark_trivia). A wrong answer goes back to the seekers to try again; once every
--- question is marked right the curse clears (effect_cleared). The host can mark them all
+-- set_trivia. The seekers send an answer to every question at once (answer_trivia), then the
+-- hider marks them all at once, each right or wrong (mark_trivia). Wrong ones go back to the
+-- seekers, who send new answers for just those; once every question is marked right the
+-- curse clears (effect_cleared). The host can mark them all
 -- right and clear the curse by hand (force_clear_trivia), e.g. when the hider's phone dies.
 -- Questions, answers and marks are public: both teams see them in the curse and the log.
 -- What the curse blocks (e.g. transport) stays on the honour system; params.blocks_questions
@@ -140,14 +141,15 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- answer_trivia (seekers): one answer to one question still to get right
+-- answer_trivia (seekers): one answer for every question not yet right, all at once
 -- ---------------------------------------------------------------------------
 
+-- p_answers has one entry per question, in order; entries for questions already right are
+-- ignored (send null).
 create function public.answer_trivia(
   p_game_id uuid,
   p_effect_id uuid,
-  p_index integer,
-  p_answer text,
+  p_answers text[],
   p_client_action_id uuid,
   p_last_seen_seq bigint
 )
@@ -161,8 +163,10 @@ declare
   v_prev jsonb := public._previous_result(p_client_action_id, v_uid);
   v_game public.games;
   v_e public.card_effects;
+  v_n integer;
+  v_answers jsonb := '[]'::jsonb;
   v_q public.trivia_questions;
-  v_answer text := btrim(coalesce(p_answer, ''));
+  v_a text;
   v_seq bigint;
 begin
   if v_prev is not null then
@@ -177,22 +181,32 @@ begin
   perform public._require_fresh(p_game_id, v_uid, p_last_seen_seq);
 
   v_e := public._lock_trivia(v_game, p_effect_id);
-  select * into v_q from public.trivia_questions where effect_id = v_e.id and idx = p_index for update;
-  if not found then
-    raise exception 'trivia_question_not_found' using errcode = 'P0001';
+  select count(*) into v_n from public.trivia_questions where effect_id = v_e.id;
+  if v_n = 0 then
+    raise exception 'trivia_not_set' using errcode = 'P0001';
   end if;
-  if v_q.correct or v_q.answer is not null then
+  if exists (select 1 from public.trivia_questions where effect_id = v_e.id and answer is not null and not correct) then
     raise exception 'trivia_already_answered' using errcode = 'P0001';
   end if;
-  if char_length(v_answer) not between 1 and 500 then
-    raise exception 'invalid_trivia_answer' using errcode = 'P0001';
+  if coalesce(cardinality(p_answers), 0) <> v_n then
+    raise exception 'invalid_trivia_answer' using errcode = 'P0001', detail = format('send %s answers', v_n);
   end if;
 
-  update public.trivia_questions set answer = v_answer, answered_by = v_uid
-   where effect_id = v_e.id and idx = p_index;
+  for v_q in select * from public.trivia_questions where effect_id = v_e.id order by idx for update loop
+    if v_q.correct then
+      v_answers := v_answers || 'null'::jsonb;
+      continue;
+    end if;
+    v_a := btrim(coalesce(p_answers[v_q.idx + 1], ''));
+    if char_length(v_a) not between 1 and 500 then
+      raise exception 'invalid_trivia_answer' using errcode = 'P0001', detail = format('answer question %s', v_q.idx + 1);
+    end if;
+    update public.trivia_questions set answer = v_a, answered_by = v_uid where effect_id = v_e.id and idx = v_q.idx;
+    v_answers := v_answers || to_jsonb(v_a);
+  end loop;
 
   v_seq := public._append_event(p_game_id, 'trivia_answered', jsonb_build_object(
-    'round', v_game.round, 'effect_id', v_e.id, 'index', p_index, 'answer', v_answer, 'by', v_uid));
+    'round', v_game.round, 'effect_id', v_e.id, 'answers', v_answers, 'by', v_uid));
 
   return public._record_result(p_client_action_id, v_uid, p_game_id,
     jsonb_build_object('game_id', p_game_id, 'seq', v_seq));
@@ -200,14 +214,16 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- mark_trivia (hiders): right, or wrong and back to the seekers. All right clears the curse.
+-- mark_trivia (hiders): marks every waiting answer at once. Wrong ones go back to the
+-- seekers; all right clears the curse.
 -- ---------------------------------------------------------------------------
 
+-- p_marks has one entry per question, in order; entries for questions already right are
+-- ignored (send null).
 create function public.mark_trivia(
   p_game_id uuid,
   p_effect_id uuid,
-  p_index integer,
-  p_correct boolean,
+  p_marks boolean[],
   p_client_action_id uuid,
   p_last_seen_seq bigint
 )
@@ -221,8 +237,10 @@ declare
   v_prev jsonb := public._previous_result(p_client_action_id, v_uid);
   v_game public.games;
   v_e public.card_effects;
+  v_n integer;
   v_q public.trivia_questions;
-  v_correct boolean := coalesce(p_correct, false);
+  v_mark boolean;
+  v_marks jsonb := '[]'::jsonb;
   v_seq bigint;
 begin
   if v_prev is not null then
@@ -237,24 +255,34 @@ begin
   perform public._require_fresh(p_game_id, v_uid, p_last_seen_seq);
 
   v_e := public._lock_trivia(v_game, p_effect_id);
-  select * into v_q from public.trivia_questions where effect_id = v_e.id and idx = p_index for update;
-  if not found then
-    raise exception 'trivia_question_not_found' using errcode = 'P0001';
-  end if;
-  if v_q.correct or v_q.answer is null then
+  select count(*) into v_n from public.trivia_questions where effect_id = v_e.id;
+  if v_n = 0 or exists (select 1 from public.trivia_questions where effect_id = v_e.id and answer is null and not correct) then
     raise exception 'trivia_nothing_to_mark' using errcode = 'P0001';
   end if;
-
-  if v_correct then
-    update public.trivia_questions set correct = true where effect_id = v_e.id and idx = p_index;
-  else
-    update public.trivia_questions set answer = null, answered_by = null, wrong_count = wrong_count + 1
-     where effect_id = v_e.id and idx = p_index;
+  if coalesce(cardinality(p_marks), 0) <> v_n then
+    raise exception 'invalid_trivia_marks' using errcode = 'P0001', detail = format('mark %s answers', v_n);
   end if;
 
+  for v_q in select * from public.trivia_questions where effect_id = v_e.id order by idx for update loop
+    if v_q.correct then
+      v_marks := v_marks || 'null'::jsonb;
+      continue;
+    end if;
+    v_mark := p_marks[v_q.idx + 1];
+    if v_mark is null then
+      raise exception 'invalid_trivia_marks' using errcode = 'P0001', detail = format('mark answer %s', v_q.idx + 1);
+    end if;
+    if v_mark then
+      update public.trivia_questions set correct = true where effect_id = v_e.id and idx = v_q.idx;
+    else
+      update public.trivia_questions set answer = null, answered_by = null, wrong_count = wrong_count + 1
+       where effect_id = v_e.id and idx = v_q.idx;
+    end if;
+    v_marks := v_marks || jsonb_build_object('correct', v_mark, 'answer', v_q.answer);
+  end loop;
+
   v_seq := public._append_event(p_game_id, 'trivia_marked', jsonb_build_object(
-    'round', v_game.round, 'effect_id', v_e.id, 'index', p_index, 'correct', v_correct,
-    'answer', v_q.answer, 'by', v_uid));
+    'round', v_game.round, 'effect_id', v_e.id, 'marks', v_marks, 'by', v_uid));
 
   if not exists (select 1 from public.trivia_questions where effect_id = v_e.id and not correct) then
     v_seq := public._clear_trivia(v_game, v_e);
@@ -761,8 +789,8 @@ revoke execute on function
   public._lock_trivia(public.games, uuid),
   public._clear_trivia(public.games, public.card_effects),
   public.set_trivia(uuid, uuid, text[], uuid, bigint),
-  public.answer_trivia(uuid, uuid, integer, text, uuid, bigint),
-  public.mark_trivia(uuid, uuid, integer, boolean, uuid, bigint),
+  public.answer_trivia(uuid, uuid, text[], uuid, bigint),
+  public.mark_trivia(uuid, uuid, boolean[], uuid, bigint),
   public.force_clear_trivia(uuid, uuid, uuid, bigint),
   public.play_card(uuid, uuid, uuid, bigint, jsonb),
   public._check_card_params(text, jsonb),
@@ -771,8 +799,8 @@ from public, anon, authenticated;
 
 grant execute on function
   public.set_trivia(uuid, uuid, text[], uuid, bigint),
-  public.answer_trivia(uuid, uuid, integer, text, uuid, bigint),
-  public.mark_trivia(uuid, uuid, integer, boolean, uuid, bigint),
+  public.answer_trivia(uuid, uuid, text[], uuid, bigint),
+  public.mark_trivia(uuid, uuid, boolean[], uuid, bigint),
   public.force_clear_trivia(uuid, uuid, uuid, bigint),
   public.play_card(uuid, uuid, uuid, bigint, jsonb),
   public.save_card(text, jsonb, uuid, timestamptz, text)

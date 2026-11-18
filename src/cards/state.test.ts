@@ -432,26 +432,39 @@ describe('trivia curses', () => {
     expect(isPlayable(parseCard(moll)!)).toBe(true)
   })
 
-  it('answers go to the hider, wrong ones back to the seekers, all right clears it', () => {
+  it('answers come and get marked as a set; wrong ones go back, all right clears it', () => {
     const events = [
       ...start(),
       ev('trivia_set', { effect_id: 'e1', questions: ['Owl?', 'Gift?', 'Dog?'] }),
-      ev('trivia_answered', { effect_id: 'e1', index: 0, answer: 'Hedwig', by: 's1' }),
-      ev('trivia_answered', { effect_id: 'e1', index: 1, answer: 'Hat', by: 's1' }),
+      ev('trivia_answered', { effect_id: 'e1', answers: ['Hedwig', 'Hat', 'Fluffy'], by: 's1' }),
     ]
     let s = deriveCards(events)
     expect(triviaTodo(s.effects[0], 'hiders')).toBe('mark')
-    expect(triviaTodo(s.effects[0], 'seekers')).toBe('answer')
+    expect(triviaTodo(s.effects[0], 'seekers')).toBeNull()
     expect(triviaWaiting(s, 'hiders')).toHaveLength(1)
 
-    events.push(ev('trivia_marked', { effect_id: 'e1', index: 0, correct: true, answer: 'Hedwig' }))
-    events.push(ev('trivia_marked', { effect_id: 'e1', index: 1, correct: false, answer: 'Hat' }))
+    events.push(
+      ev('trivia_marked', {
+        effect_id: 'e1',
+        marks: [
+          { correct: true, answer: 'Hedwig' },
+          { correct: false, answer: 'Hat' },
+          { correct: true, answer: 'Fluffy' },
+        ],
+      }),
+    )
     s = deriveCards(events)
     const qs = s.effects[0].trivia!.questions!
     expect(qs[0]).toMatchObject({ correct: true, answer: 'Hedwig' })
     expect(qs[1]).toMatchObject({ correct: false, answer: null, wrong: ['Hat'] })
     expect(triviaTodo(s.effects[0], 'hiders')).toBeNull()
-    expect(s.log.map((l) => l.text)).toContain('MOLL Q2: "Hat" is wrong, try again')
+    expect(triviaTodo(s.effects[0], 'seekers')).toBe('answer')
+    expect(s.log.map((l) => l.text)).toContain('MOLL: Q1, Q3 right; Q2 "Hat" wrong, try again')
+
+    events.push(ev('trivia_answered', { effect_id: 'e1', answers: [null, 'Sock', null], by: 's1' }))
+    s = deriveCards(events)
+    expect(s.effects[0].trivia!.questions!.map((q) => q.answer)).toEqual(['Hedwig', 'Sock', 'Fluffy'])
+    expect(triviaTodo(s.effects[0], 'hiders')).toBe('mark')
 
     events.push(ev('trivia_force_cleared', { effect_id: 'e1' }), ev('effect_cleared', { effect_id: 'e1' }))
     s = deriveCards(events)

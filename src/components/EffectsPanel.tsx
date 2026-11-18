@@ -240,14 +240,13 @@ export function TriviaPrompt({ effects, team, onOpen }: { effects: readonly Effe
   const e = effects[0]
   if (!e?.trivia) return null
   const todo = triviaTodo(e, team)
-  const toMark = e.trivia.questions?.filter((q) => !q.correct && q.answer !== null).length ?? 0
-  const toAnswer = e.trivia.questions?.filter((q) => !q.correct && q.answer === null).length ?? 0
+  const open = e.trivia.questions?.filter((q) => !q.correct).length ?? 0
   const title =
     todo === 'write'
       ? `Write ${e.trivia.count} trivia questions`
       : todo === 'mark'
-        ? `Mark ${toMark} trivia answer${toMark > 1 ? 's' : ''}`
-        : `Answer ${toAnswer} trivia question${toAnswer > 1 ? 's' : ''}`
+        ? `Mark ${open} trivia answer${open > 1 ? 's' : ''}`
+        : `Answer ${open} trivia question${open > 1 ? 's' : ''}`
   return (
     <section className="card pick-prompt confirm-clear" role="status">
       <div>

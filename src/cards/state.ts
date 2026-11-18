@@ -435,24 +435,39 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
       return log({ kind: 'card', text: `${effectName(next, id)}: hider sent ${questions.length} questions` }, next)
     }
     case 'trivia_answered': {
+      // One answer per question, null for questions already right.
       const id = str(p.effect_id)
-      const i = num(p.index) ?? -1
-      const answer = str(p.answer) ?? ''
-      const next = updateTriviaQ(state, id, i, (q) => ({ ...q, answer, answeredBy: str(p.by) }))
-      return log({ kind: 'card', text: `${effectName(next, id)} Q${i + 1}: seekers answered "${answer}"` }, next)
+      const answers = Array.isArray(p.answers) ? p.answers.map(str) : []
+      const by = str(p.by)
+      const next = updateTrivia(state, id, (t) => ({
+        ...t,
+        questions: t.questions?.map((q, i) => (answers[i] && !q.correct ? { ...q, answer: answers[i], answeredBy: by } : q)) ?? null,
+      }))
+      const sent = answers.map((x, i) => (x ? `Q${i + 1} "${x}"` : null)).filter(Boolean)
+      return log({ kind: 'card', text: `${effectName(next, id)}: seekers answered ${sent.join(', ')}` }, next)
     }
     case 'trivia_marked': {
+      // One mark per question ({correct, answer}), null for questions already right.
       const id = str(p.effect_id)
-      const i = num(p.index) ?? -1
-      const correct = p.correct === true
-      const answer = str(p.answer) ?? ''
-      const next = updateTriviaQ(state, id, i, (q) =>
-        correct ? { ...q, answer: q.answer ?? answer, correct: true } : { ...q, answer: null, answeredBy: null, wrong: [...q.wrong, answer] },
+      const marks = (Array.isArray(p.marks) ? p.marks : []).map((m) =>
+        isObject(m) && typeof m.correct === 'boolean' ? { correct: m.correct, answer: str(m.answer) ?? '' } : null,
       )
+      const next = updateTrivia(state, id, (t) => ({
+        ...t,
+        questions:
+          t.questions?.map((q, i) => {
+            const m = marks[i]
+            if (!m || q.correct) return q
+            return m.correct
+              ? { ...q, answer: q.answer ?? m.answer, correct: true }
+              : { ...q, answer: null, answeredBy: null, wrong: [...q.wrong, m.answer] }
+          }) ?? null,
+      }))
+      const right = marks.flatMap((m, i) => (m?.correct ? [`Q${i + 1}`] : []))
+      const wrong = marks.flatMap((m, i) => (m && !m.correct ? [`Q${i + 1} "${m.answer}"`] : []))
+      const parts = [right.length ? `${right.join(', ')} right` : null, wrong.length ? `${wrong.join(', ')} wrong, try again` : null]
       return log(
-        correct
-          ? { kind: 'card', text: `${effectName(next, id)} Q${i + 1}: "${answer}" is right` }
-          : { kind: 'penalty', text: `${effectName(next, id)} Q${i + 1}: "${answer}" is wrong, try again` },
+        { kind: wrong.length ? 'penalty' : 'card', text: `${effectName(next, id)}: ${parts.filter(Boolean).join('; ')}` },
         next,
       )
     }
@@ -481,9 +496,6 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
 const updateTrivia = (s: CardsState, id: string | null, f: (t: Trivia) => Trivia): CardsState =>
   updateEffect(s, id, (x) => (x.trivia ? { ...x, trivia: f(x.trivia) } : x))
 
-const updateTriviaQ = (s: CardsState, id: string | null, i: number, f: (q: TriviaQuestion) => TriviaQuestion): CardsState =>
-  updateTrivia(s, id, (t) => ({ ...t, questions: t.questions?.map((q, j) => (j === i ? f(q) : q)) ?? null }))
-
 const effectName = (s: CardsState, id: string | null) => s.effects.find((x) => x.id === id)?.card.name ?? 'Trivia'
 
 /** How many questions a trivia card needs (params.count, default 3), as the server reads it. */
@@ -502,9 +514,20 @@ export function triviaTodo(e: Effect, team: 'hiders' | 'seekers'): 'write' | 'ma
   if (!t || e.status !== 'active') return null
   if (team === 'hiders') {
     if (!t.questions) return 'write'
-    return t.questions.some((q) => !q.correct && q.answer !== null) ? 'mark' : null
+    return triviaStage(t) === 'marking' ? 'mark' : null
   }
-  return t.questions?.some((q) => !q.correct && q.answer === null) ? 'answer' : null
+  return triviaStage(t) === 'answering' ? 'answer' : null
+}
+
+/**
+ * Answers go in as a set and are marked as a set: 'answering' while the seekers owe answers
+ * to the questions not yet right, 'marking' while those answers wait for the hider.
+ */
+export function triviaStage(t: Trivia): 'writing' | 'answering' | 'marking' | 'done' {
+  if (!t.questions) return 'writing'
+  const open = t.questions.filter((q) => !q.correct)
+  if (!open.length) return 'done'
+  return open.some((q) => q.answer === null) ? 'answering' : 'marking'
 }
 
 /** Trivia curses waiting on this team. */

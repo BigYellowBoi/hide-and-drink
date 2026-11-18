@@ -2748,3 +2748,14 @@ button.preset-delete.danger {
 .trivia .small {
   margin-top: 0;
 }
+
+/* Hider's pick before sending the marks */
+.trivia-on-right {
+  background: var(--ok);
+  color: var(--hider-ink);
+}
+
+.trivia-on-wrong {
+  background: var(--seeker);
+  color: var(--seeker-ink);
+}

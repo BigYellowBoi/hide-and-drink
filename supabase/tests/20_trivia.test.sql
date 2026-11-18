@@ -97,8 +97,8 @@ set local role authenticated;
 select pg_temp.seeker();
 select throws_ok(format($$ select public.clear_effect(pg_temp.gid(), %L, pg_temp.uid(21), pg_temp.seq()) $$,
   current_setting('test.effect')), 'P0001', 'effect_not_active', 'seekers cannot clear it with We did it');
-select throws_ok(format($$ select public.answer_trivia(pg_temp.gid(), %L, 0, 'Hedwig', pg_temp.uid(22), pg_temp.seq()) $$,
-  current_setting('test.effect')), 'P0001', 'trivia_question_not_found', 'nothing to answer before the questions are sent');
+select throws_ok(format($$ select public.answer_trivia(pg_temp.gid(), %L, array['a', 'b', 'c'], pg_temp.uid(22), pg_temp.seq()) $$,
+  current_setting('test.effect')), 'P0001', 'trivia_not_set', 'nothing to answer before the questions are sent');
 
 -- ---------------------------------------------------------------- questions
 
@@ -123,52 +123,52 @@ select throws_ok(format($$ select public.set_trivia(pg_temp.gid(), %L, array['a'
 -- ---------------------------------------------------------------- answers and marks
 
 select pg_temp.hider();
-select throws_ok(format($$ select public.answer_trivia(pg_temp.gid(), %L, 0, 'Hedwig', pg_temp.uid(28), pg_temp.seq()) $$,
+select throws_ok(format($$ select public.answer_trivia(pg_temp.gid(), %L, array['a', 'b', 'c'], pg_temp.uid(28), pg_temp.seq()) $$,
   current_setting('test.effect')), 'P0001', 'seekers_only', 'hiders cannot answer');
-select throws_ok(format($$ select public.mark_trivia(pg_temp.gid(), %L, 0, true, pg_temp.uid(29), pg_temp.seq()) $$,
-  current_setting('test.effect')), 'P0001', 'trivia_nothing_to_mark', 'nothing to mark before an answer');
+select throws_ok(format($$ select public.mark_trivia(pg_temp.gid(), %L, array[true, true, true], pg_temp.uid(29), pg_temp.seq()) $$,
+  current_setting('test.effect')), 'P0001', 'trivia_nothing_to_mark', 'nothing to mark before the answers');
 select pg_temp.seeker();
-select lives_ok(format($$ select public.answer_trivia(pg_temp.gid(), %L, 0, 'Hedwig', pg_temp.uid(30), pg_temp.seq()) $$,
-  current_setting('test.effect')), 'a seeker answers the first question');
-select lives_ok(format($$ select public.answer_trivia(pg_temp.gid(), %L, 1, 'A hat', pg_temp.uid(31), pg_temp.seq()) $$,
-  current_setting('test.effect')), 'and the second');
-select throws_ok(format($$ select public.answer_trivia(pg_temp.gid(), %L, 1, 'A sock', pg_temp.uid(32), pg_temp.seq()) $$,
-  current_setting('test.effect')), 'P0001', 'trivia_already_answered', 'one answer at a time per question');
-select throws_ok(format($$ select public.answer_trivia(pg_temp.gid(), %L, 2, '  ', pg_temp.uid(33), pg_temp.seq()) $$,
-  current_setting('test.effect')), 'P0001', 'invalid_trivia_answer', 'answers are not blank');
-select throws_ok(format($$ select public.answer_trivia(pg_temp.gid(), %L, 3, 'x', pg_temp.uid(34), pg_temp.seq()) $$,
-  current_setting('test.effect')), 'P0001', 'trivia_question_not_found', 'only the three questions');
+select throws_ok(format($$ select public.answer_trivia(pg_temp.gid(), %L, array['Hedwig', 'A hat'], pg_temp.uid(30), pg_temp.seq()) $$,
+  current_setting('test.effect')), 'P0001', 'invalid_trivia_answer', 'all three answers come at once');
+select throws_ok(format($$ select public.answer_trivia(pg_temp.gid(), %L, array['Hedwig', ' ', 'Fluffy'], pg_temp.uid(31), pg_temp.seq()) $$,
+  current_setting('test.effect')), 'P0001', 'invalid_trivia_answer', 'none of them blank');
+select lives_ok(format($$ select public.answer_trivia(pg_temp.gid(), %L, array['Hedwig', 'A hat', 'Fluffy'], pg_temp.uid(32), pg_temp.seq()) $$,
+  current_setting('test.effect')), 'a seeker sends all three answers');
+reset role;
+select is((select array[visibility::text, payload -> 'answers' ->> 1] from pg_temp.last_event('trivia_answered')),
+  array['all', 'A hat'], 'both teams see the answers');
+set local role authenticated;
+select throws_ok(format($$ select public.answer_trivia(pg_temp.gid(), %L, array['x', 'y', 'z'], pg_temp.uid(33), pg_temp.seq()) $$,
+  current_setting('test.effect')), 'P0001', 'trivia_already_answered', 'no new answers until the hider marks them');
 
-select pg_temp.seeker();
-select throws_ok(format($$ select public.mark_trivia(pg_temp.gid(), %L, 0, true, pg_temp.uid(35), pg_temp.seq()) $$,
+select throws_ok(format($$ select public.mark_trivia(pg_temp.gid(), %L, array[true, true, true], pg_temp.uid(34), pg_temp.seq()) $$,
   current_setting('test.effect')), 'P0001', 'hiders_only', 'seekers cannot mark');
 select pg_temp.hider();
-select lives_ok(format($$ select public.mark_trivia(pg_temp.gid(), %L, 0, true, pg_temp.uid(36), pg_temp.seq()) $$,
-  current_setting('test.effect')), 'the hider marks the first right');
-select lives_ok(format($$ select public.mark_trivia(pg_temp.gid(), %L, 1, false, pg_temp.uid(37), pg_temp.seq()) $$,
-  current_setting('test.effect')), 'and the second wrong');
+select throws_ok(format($$ select public.mark_trivia(pg_temp.gid(), %L, array[true, null, true], pg_temp.uid(35), pg_temp.seq()) $$,
+  current_setting('test.effect')), 'P0001', 'invalid_trivia_marks', 'every answer gets a mark');
+select lives_ok(format($$ select public.mark_trivia(pg_temp.gid(), %L, array[true, false, true], pg_temp.uid(36), pg_temp.seq()) $$,
+  current_setting('test.effect')), 'the hider marks all three at once, one wrong');
 reset role;
-select is((select array[payload ->> 'correct', payload ->> 'answer', visibility::text] from pg_temp.last_event('trivia_marked')),
-  array['false', 'A hat', 'all'], 'the mark and the answer it was for are public');
+select is((select array[payload -> 'marks' -> 1 ->> 'correct', payload -> 'marks' -> 1 ->> 'answer', visibility::text]
+            from pg_temp.last_event('trivia_marked')),
+  array['false', 'A hat', 'all'], 'the marks and the answers they were for are public');
 select is((select array[coalesce(answer, 'none'), wrong_count::text] from public.trivia_questions
             where effect_id = current_setting('test.effect')::uuid and idx = 1),
-  array['none', '1'], 'a wrong answer goes back to the seekers');
-set local role authenticated;
-select pg_temp.seeker();
-select lives_ok(format($$ select public.answer_trivia(pg_temp.gid(), %L, 1, 'A sock', pg_temp.uid(38), pg_temp.seq()) $$,
-  current_setting('test.effect')), 'the seekers try again');
-select throws_ok(format($$ select public.answer_trivia(pg_temp.gid(), %L, 0, 'Errol', pg_temp.uid(39), pg_temp.seq()) $$,
-  current_setting('test.effect')), 'P0001', 'trivia_already_answered', 'a right answer stays right');
-select lives_ok(format($$ select public.answer_trivia(pg_temp.gid(), %L, 2, 'Fluffy', pg_temp.uid(40), pg_temp.seq()) $$,
-  current_setting('test.effect')), 'and answer the last');
-select pg_temp.hider();
-select public.mark_trivia(pg_temp.gid(), current_setting('test.effect')::uuid, 1, true, pg_temp.uid(41), pg_temp.seq());
-reset role;
+  array['none', '1'], 'the wrong answer goes back to the seekers');
 select is((select status from public.card_effects where id = current_setting('test.effect')::uuid), 'active',
   'still active with one left');
 set local role authenticated;
+select pg_temp.seeker();
+select throws_ok(format($$ select public.answer_trivia(pg_temp.gid(), %L, array[null, ' ', null], pg_temp.uid(37), pg_temp.seq()) $$,
+  current_setting('test.effect')), 'P0001', 'invalid_trivia_answer', 'the wrong one needs a new answer');
+select lives_ok(format($$ select public.answer_trivia(pg_temp.gid(), %L, array[null, 'A sock', null], pg_temp.uid(38), pg_temp.seq()) $$,
+  current_setting('test.effect')), 'the seekers answer just the wrong one again');
+reset role;
+select is((select answer from public.trivia_questions where effect_id = current_setting('test.effect')::uuid and idx = 0), 'Hedwig',
+  'right answers stay as they were');
+set local role authenticated;
 select pg_temp.hider();
-select public.mark_trivia(pg_temp.gid(), current_setting('test.effect')::uuid, 2, true, pg_temp.uid(42), pg_temp.seq());
+select public.mark_trivia(pg_temp.gid(), current_setting('test.effect')::uuid, array[null, true, null]::boolean[], pg_temp.uid(39), pg_temp.seq());
 reset role;
 select is((select status from public.card_effects where id = current_setting('test.effect')::uuid), 'cleared',
   'all three right clears the curse');
