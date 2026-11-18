@@ -5,7 +5,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(17);
+select plan(20);
 
 insert into auth.users (id) values
   ('11111111-1111-1111-1111-111111111111'),
@@ -108,6 +108,18 @@ select is(
     where o.game_id = pg_temp.gid() and e.visibility <> 'all' and o.audience::text <> e.visibility::text),
   0, 'every team-only event alerts only that team'
 );
+
+select ok(
+  has_table_privilege('service_role', 'public.push_outbox', 'select')
+    and has_table_privilege('service_role', 'public.push_outbox', 'update'),
+  'send-push can read and mark the outbox'
+);
+select ok(
+  has_table_privilege('service_role', 'public.push_subscriptions', 'select')
+    and has_table_privilege('service_role', 'public.push_subscriptions', 'delete'),
+  'send-push can read and prune subscriptions'
+);
+select ok(has_table_privilege('service_role', 'public.players', 'select'), 'send-push can read players');
 
 select * from finish();
 rollback;

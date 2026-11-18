@@ -79,15 +79,6 @@ export function Home({ transport, onEnter, onSettings }: Props) {
           />
         </label>
 
-        <button
-          className={linkCode ? 'wide secondary' : 'wide'}
-          disabled={busy || !trimmed}
-          onClick={() => run(() => createGame(transport, trimmed, defaultConfig))}
-        >
-          Create game
-        </button>
-
-        <p className="divider">or join with a code</p>
         {linkCode && <p className="muted small-note">Code from your link. Enter your name and tap Join.</p>}
         <div className="join-inline">
           <input
@@ -109,6 +100,15 @@ export function Home({ transport, onEnter, onSettings }: Props) {
           </button>
         </div>
         <p className="muted small-note">Or scan the host's QR code with your camera.</p>
+
+        <p className="divider">or start a new game</p>
+        <button
+          className={linkCode || codeOk ? 'wide secondary' : 'wide'}
+          disabled={busy || !trimmed}
+          onClick={() => run(() => createGame(transport, trimmed, defaultConfig))}
+        >
+          Create game
+        </button>
       </section>
 
       {err && (
