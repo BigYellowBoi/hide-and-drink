@@ -55,7 +55,6 @@ export interface PlayedCard {
   card: CardDef
   playedAt: number
   effectId: string | null
-  timeBonusS: number
 }
 
 export interface CardsState {
@@ -71,8 +70,6 @@ export interface CardsState {
   pileLeft: number | null
   played: PlayedCard[]
   effects: Effect[]
-  /** Banked time bonus this round. */
-  timeBonusS: number
   log: LogEntry[]
 }
 
@@ -86,7 +83,6 @@ export const emptyCards: CardsState = {
   pileLeft: null,
   played: [],
   effects: [],
-  timeBonusS: 0,
   log: [],
 }
 
@@ -202,12 +198,10 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
       if (!card || !instanceId) return state
       const playedAt = time(p.played_at, e.created_at)
       const effectId = str(p.effect_id)
-      const timeBonusS = num(p.time_bonus_s) ?? 0
       let next: CardsState = {
         ...state,
         hand: state.hand.filter((c) => c.instanceId !== instanceId),
-        played: [...state.played, { seq: e.seq, instanceId, card, playedAt, effectId, timeBonusS }],
-        timeBonusS: state.timeBonusS + timeBonusS,
+        played: [...state.played, { seq: e.seq, instanceId, card, playedAt, effectId }],
       }
       if (effectId && (card.behaviour === 'timed' || card.behaviour === 'until_cleared')) {
         const endsAt = card.behaviour === 'timed' ? time(p.ends_at, e.created_at) : null
@@ -231,8 +225,7 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
           ],
         }
       }
-      const extra = timeBonusS ? `: +${minutes(timeBonusS)} for the hider` : ''
-      return log({ kind: 'card', text: `${card.name} played${extra}`, colour: card.colour }, next)
+      return log({ kind: 'card', text: `${card.name} played`, colour: card.colour }, next)
     }
     case 'effect_clear_requested': {
       const id = str(p.effect_id)
@@ -310,8 +303,19 @@ export function effectTimer(e: Effect, now: number): [number, number] | null {
 }
 
 /** Behaviours play_card handles; others stay in the hand for now. */
-export const PLAYABLE = ['text', 'timed', 'until_cleared', 'time_bonus'] as const
+export const PLAYABLE = ['text', 'timed', 'until_cleared'] as const
 export const isPlayable = (c: CardDef) => (PLAYABLE as readonly string[]).includes(c.behaviour)
+
+/**
+ * Time bonus the hider would get if the round ended now: time_bonus cards count only while
+ * held in the hand at the end (they can't be played). Hider-only: seekers have no hand.
+ */
+export const handBonusS = (s: CardsState): number =>
+  s.hand.reduce((sum, c) => {
+    const card = cardOf(s, c.cardId)
+    const m = card.behaviour === 'time_bonus' ? num(card.params.minutes) : null
+    return sum + (m && m > 0 ? m * 60 : 0)
+  }, 0)
 
 /** Short facts for a card face: "20 min", "Blocks questions", "+2 min". */
 export function cardFacts(c: CardDef): string[] {

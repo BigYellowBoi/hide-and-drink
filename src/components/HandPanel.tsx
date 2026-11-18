@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { cardOf, isPlayable, type CardRef, type CardsState, type PendingDraw } from '../cards/state'
+import { cardOf, handBonusS, isPlayable, type CardRef, type CardsState, type PendingDraw } from '../cards/state'
 import { describeError } from '../lobby/messages'
 import type { GameSync } from '../sync/engine'
 import { LockIcon } from './BarPicker'
@@ -57,8 +57,10 @@ function Hand({ sync, cards, canAct }: Props) {
           {cards.pileLeft !== null ? ` · ${cards.pileLeft} left in the pile` : ` · ${cards.deckSize} in the deck`}
         </span>
       </h2>
-      {cards.timeBonusS > 0 && (
-        <p className="ok small-note">Time bonus banked: +{Math.round(cards.timeBonusS / 60)} min</p>
+      {handBonusS(cards) > 0 && (
+        <p className="ok small-note">
+          Time bonus in hand: +{Math.round(handBonusS(cards) / 60)} min. Counts if you still hold it when the round ends.
+        </p>
       )}
       {!current || !def ? (
         <p className="muted">No cards yet. Answering questions draws cards.</p>
@@ -74,6 +76,8 @@ function Hand({ sync, cards, canAct }: Props) {
                 onConfirm={() => void cast(current)}
               />
             </div>
+          ) : def.behaviour === 'time_bonus' ? (
+            <p className="muted small">Not played: it adds its time if it's still in your hand when the round ends.</p>
           ) : (
             <p className="muted small">This kind of card isn't in the app yet. Play it by hand for now.</p>
           )}

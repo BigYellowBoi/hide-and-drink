@@ -1,4 +1,5 @@
 -- Cards: deck snapshot, draw pile, draw/keep rewards, hand limit, playing cards and effects.
+-- Time bonuses are not playable (20261201090000_time_bonus_in_hand.sql).
 -- Players: H = host (seeker), A = hider, S = seeker.
 -- now() is fixed inside this transaction, so the clock is "moved" by backdating rows, and
 -- specific cards are put in the hand by moving rows directly (as the superuser).
@@ -364,15 +365,14 @@ select throws_ok(
 
 -- ---------------------------------------------------------------- time bonus, text, unsupported
 
-select is(
-  public.play_card(pg_temp.gid(), current_setting('test.bonus')::uuid, pg_temp.uid(80), pg_temp.seq()) ->> 'effect_id',
-  null, 'time bonus has no lasting effect'
+select throws_ok(
+  format($$ select public.play_card(pg_temp.gid(), %L, pg_temp.uid(80), pg_temp.seq()) $$, current_setting('test.bonus')),
+  'P0001', 'card_not_playable', 'time bonuses stay in the hand until the end of the round'
 );
-select is(
-  (select (payload ->> 'time_bonus_s')::int from public.events
-    where game_id = pg_temp.gid() and type = 'card_played' order by seq desc limit 1),
-  120, 'time bonus banks params.minutes'
-);
+reset role;
+select is((select location from public.card_instances where id = current_setting('test.bonus')::uuid), 'hand',
+  'the refused time bonus is still in the hand');
+set local role authenticated;
 select lives_ok(
   format($$ select public.play_card(pg_temp.gid(), %L, pg_temp.uid(81), pg_temp.seq()) $$, current_setting('test.cheers')),
   'text card is shown to everyone'

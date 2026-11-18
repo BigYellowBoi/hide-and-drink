@@ -252,14 +252,20 @@ function QuestionList({ questions }: { questions: readonly Question[] }) {
 
 type Clock = ReturnType<typeof roundClock>
 
-/** Main clock for the top bar: hiding countdown, then time spent seeking (server time). */
-export function TopbarClock({ sync, started }: { sync: GameSync; started: StartedRound }) {
+/**
+ * Main clock for the top bar: hiding countdown, then time spent seeking (server time). On the
+ * hider's phone only, bonusS is the time bonus held in hand, shown as "+X min".
+ */
+export function TopbarClock({ sync, started, bonusS = 0 }: { sync: GameSync; started: StartedRound; bonusS?: number }) {
   const now = useServerNow(sync)
   const clock = roundClock(started.startedAt, started.hidingPeriodS, now)
   return (
     <span className="topbar-clock">
       <span className="topbar-label">{clock.phase === 'hiding' ? 'Hiding' : 'Seeking'}</span>
-      <span className="topbar-time">{formatClock(clock.ms, { up: clock.phase === 'seeking' })}</span>
+      <span className="topbar-time">
+        {formatClock(clock.ms, { up: clock.phase === 'seeking' })}
+        {bonusS > 0 && <span className="topbar-bonus"> +{Math.round(bonusS / 60)} min</span>}
+      </span>
     </span>
   )
 }

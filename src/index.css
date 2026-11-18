@@ -2084,3 +2084,25 @@ button.pcard {
 .log-card .log-dot {
   background: var(--brand-red);
 }
+
+/* Hider-only: time bonus held in hand, next to the main clock. */
+.topbar-bonus {
+  color: var(--ok);
+  font-size: 0.6em;
+  font-weight: 600;
+}
+
+/* Crash fallback (ErrorScreen) */
+.error-screen {
+  display: grid;
+  gap: 16px;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: calc(env(safe-area-inset-top, 0px) + 64px) 16px 32px;
+}
+
+.error-screen h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 26px;
+}

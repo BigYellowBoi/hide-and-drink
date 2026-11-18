@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '../sync/types'
-import { cardFacts, deriveCards, effectPhase, effectTimer, FOLLOWUP_WINDOW_MS, liveEffects, questionsBlockedBy } from './state'
+import {
+  cardFacts,
+  deriveCards,
+  effectPhase,
+  effectTimer,
+  FOLLOWUP_WINDOW_MS,
+  handBonusS,
+  isPlayable,
+  liveEffects,
+  questionsBlockedBy,
+} from './state'
 
 let seq = 0
 const ev = (type: string, payload: Record<string, unknown>, visibility: GameEvent['visibility'] = 'all'): GameEvent => ({
@@ -132,13 +142,29 @@ describe('deriveCards', () => {
     expect(effectPhase(f.effects[0], t0 + 900_000)).toBe('over')
   })
 
-  it('time bonuses add up', () => {
-    const play = (i: string) =>
-      ev('card_played', { instance_id: i, card: deck[2], played_at: '2026-11-20T10:00:00Z', time_bonus_s: 240 })
-    const s = deriveCards([started, play('a'), play('b')])
-    expect(s.timeBonusS).toBe(480)
-    expect(s.effects).toEqual([])
-    expect(s.log.at(-1)?.text).toBe('BONUS played: +4 min for the hider')
+  it('time bonuses count only while held in the hand', () => {
+    const draw = ev(
+      'cards_drawn',
+      {
+        draw_id: 'd3',
+        pick: 2,
+        cards: [
+          { instance_id: 'b1', card_id: 'bonus' },
+          { instance_id: 'b2', card_id: 'bonus' },
+          { instance_id: 'c1', card_id: 'escape' },
+        ],
+      },
+      'hiders',
+    )
+    const keep = ev('cards_kept', { draw_id: 'd3', kept: ['b1', 'b2'], discarded: ['c1'] }, 'hiders')
+    const s = deriveCards([started, draw, keep])
+    expect(handBonusS(s)).toBe(480)
+    expect(isPlayable(s.deck.bonus)).toBe(false)
+    // Discarded to make room: no longer counts.
+    const later = ev('cards_drawn', { draw_id: 'd4', pick: 1, cards: [{ instance_id: 'c2', card_id: 'cuisine' }] }, 'hiders')
+    const swap = ev('cards_kept', { draw_id: 'd4', kept: ['c2'], discarded: ['b1'] }, 'hiders')
+    expect(handBonusS(deriveCards([started, draw, keep, later, swap]))).toBe(240)
+    expect(handBonusS(deriveCards([started]))).toBe(0)
   })
 
   it('a new round starts with an empty hand', () => {

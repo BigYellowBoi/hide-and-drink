@@ -45,7 +45,7 @@ export function EffectsPanel({ sync, cards, team, canAct, now }: Props) {
                 <span className="log-dot" style={{ background: p.card.colour }} aria-hidden="true" />
                 <span>
                   <strong>{p.card.name}</strong>
-                  {p.timeBonusS > 0 ? ` +${minutes(p.timeBonusS)}` : p.card.text ? `: ${p.card.text}` : ''}
+                  {p.card.text ? `: ${p.card.text}` : ''}
                 </span>
               </li>
             ))}

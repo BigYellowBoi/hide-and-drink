@@ -6,6 +6,7 @@ import { describeCode } from './lobby/messages'
 import { supabaseTransport } from './sync/supabaseTransport'
 import type { SyncTransport } from './sync/transport'
 import { useGameSync } from './sync/useGameSync'
+import { deriveCards, handBonusS } from './cards/state'
 import { ConnectionStatus } from './components/ConnectionStatus'
 import { Home } from './components/Home'
 import { Settings } from './components/Settings'
@@ -35,6 +36,8 @@ function GameScreen({ gameId, transport, onLeave }: { gameId: string; transport:
   const presence = useMemo(() => presenceOf(game.present, game.status === 'live'), [game.present, game.status])
   const locked = !game.canAct && game.status !== 'idle' && game.status !== 'error'
   const myTeam = lobby.players.find((p) => p.userId === game.userId)?.team ?? null
+  // Hider-only events: on seekers' phones the hand is always empty.
+  const bonusS = useMemo(() => handBonusS(deriveCards(game.events)), [game.events])
 
   return (
     <>
@@ -42,7 +45,7 @@ function GameScreen({ gameId, transport, onLeave }: { gameId: string; transport:
       <header className="topbar">
         <span className={`chip chip-${myTeam ?? 'none'}`}>{myTeam ? TEAM_CHIP[myTeam] : 'No team'}</span>
         {lobby.started && game.sync ? (
-          <TopbarClock sync={game.sync} started={lobby.started} />
+          <TopbarClock sync={game.sync} started={lobby.started} bonusS={myTeam === 'hiders' ? bonusS : 0} />
         ) : (
           <span className="topbar-label">{lobby.code ? 'Lobby' : ''}</span>
         )}
