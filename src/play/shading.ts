@@ -3,6 +3,7 @@ import type { AreaCollection } from '../map/playArea'
 import {
   applyConstraints,
   areaFeature,
+  clipTo,
   cutOut,
   distancesToArea,
   distanceM,
@@ -143,9 +144,11 @@ export function shade(playArea: AreaCollection, answered: readonly Question[], c
   const area = areaFeature(playArea)
   const constraints = answered.map((q) => cachedConstraint(q, ctx)).filter((c): c is Constraint => c !== null)
   if (!constraints.length) return { remaining: area, ruledOut: EMPTY }
-  const remaining = applyConstraints(area, constraints)
+  // Every step is clipped to the play area polygon (lon/lat, turf), so neither the hatch
+  // nor the remaining outline can leave it.
+  const remaining = clipTo(area, applyConstraints(area, constraints))
   if (!remaining) return { remaining: null, ruledOut: { type: 'FeatureCollection', features: [area] } }
-  const out = cutOut(area, remaining)
+  const out = clipTo(area, cutOut(area, remaining))
   return { remaining, ruledOut: { type: 'FeatureCollection', features: out ? [out] : [] } }
 }
 

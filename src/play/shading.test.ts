@@ -1,7 +1,10 @@
 import area from '@turf/area'
+import difference from '@turf/difference'
+import { featureCollection } from '@turf/helpers'
 import { describe, expect, it } from 'vitest'
+import brisbaneInner from '../../data/play-areas/brisbane-inner.geojson?raw'
 import type { AreaCollection } from '../map/playArea'
-import { distanceM, distancesToArea, projector, thermometerSide, type LngLat } from './geo'
+import { circleSteps, distanceM, distancesToArea, projector, radarCircle, thermometerHalf, thermometerSide, type Area, type LngLat } from './geo'
 import { remainingBars, shade, suggestAnswer } from './shading'
 import type { Question } from './state'
 
@@ -108,6 +111,85 @@ describe('shade', () => {
     ])
     expect(s.remaining).toBeNull()
     expect(s.ruledOut.features).toHaveLength(1)
+  })
+})
+
+describe('shading geometry', () => {
+  // An L-shaped play area (concave, so clipping matters) 4 km across.
+  const L: AreaCollection = {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[at(-2000, -2000), at(2000, -2000), at(2000, 0), at(0, 0), at(0, 2000), at(-2000, 2000), at(-2000, -2000)]],
+        },
+      },
+    ],
+  }
+  const lArea = L.features[0] as Area
+  const brisbane = JSON.parse(brisbaneInner) as AreaCollection
+  const bArea = brisbane.features[0] as Area
+  const vertices = (f: GeoJSON.Feature): GeoJSON.Position[] => {
+    const g = f.geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon
+    return (g.type === 'Polygon' ? [g.coordinates] : g.coordinates).flat(2)
+  }
+
+  it('circles keep within half a metre of the true circle at any radius', () => {
+    for (const r of [50, 777, 2500, 12_345, 40_000]) {
+      const ring = (radarCircle(O, r).geometry.coordinates[0] as LngLat[]).slice(0, -1)
+      expect(ring.length).toBe(circleSteps(r))
+      for (let i = 0; i < ring.length; i++) {
+        const a = ring[i]
+        const b = ring[(i + 1) % ring.length]
+        expect(distanceM(O, a)).toBeCloseTo(r, 0)
+        // Chord midpoint: how far the drawn edge sags inside the circle.
+        expect(r - distanceM(O, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2])).toBeLessThan(0.6)
+      }
+    }
+  })
+
+  it('thermometer bisector is densified', () => {
+    const ring = thermometerHalf(at(-500, 0), at(500, 0), 'end').geometry.coordinates[0] as LngLat[]
+    for (let i = 3; i < ring.length - 1; i++) expect(distanceM(ring[i], ring[i + 1])).toBeLessThan(101)
+  })
+
+  /** Hatch and remaining stay inside the play area, and together cover it exactly. */
+  function expectInside(pa: AreaCollection, paArea: Area, qs: Question[]) {
+    const s = shade(pa, qs)
+    for (const f of [...s.ruledOut.features, ...(s.remaining ? [s.remaining] : [])]) {
+      // Every vertex on or inside the boundary (1 cm), and nothing outside bigger than the
+      // zero-width float slivers turf's own difference leaves along shared edges.
+      const worst = Math.max(...distancesToArea(paArea, vertices(f) as LngLat[]))
+      expect(worst).toBeLessThan(0.01)
+      const spill = difference(featureCollection([f as Area, paArea]))
+      expect(spill ? area(spill) : 0).toBeLessThan(1)
+    }
+    const total = s.ruledOut.features.reduce((t, f) => t + area(f), 0) + (s.remaining ? area(s.remaining) : 0)
+    expect(total / area(paArea)).toBeCloseTo(1, 4)
+  }
+
+  it('clips to the real Brisbane area (thermometer plus a custom 2420 m radar spilled before)', () => {
+    expectInside(brisbane, bArea, [
+      q('thermometer', { start: [153.01796674468082, -27.474575611236418], end: [153.00434797688246, -27.448342490031745] }, 'colder'),
+      { ...q('radar', { center: [153.01182913456958, -27.49031979628464], distance_m: 2420 }, 'no'), id: 'r2' },
+    ])
+  })
+
+  it('never hatches outside the play area, for custom radar distances and thermometers', () => {
+    let seed = 7
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+    const pt = (): LngLat => at(-3000 + 6000 * rnd(), -3000 + 6000 * rnd())
+    for (let i = 0; i < 150; i++) {
+      const qs = Array.from({ length: 1 + Math.floor(rnd() * 3) }, () =>
+        rnd() < 0.5
+          ? q('radar', { center: pt(), distance_m: Math.round(50 + rnd() * 5000) }, rnd() < 0.5 ? 'yes' : 'no')
+          : q('thermometer', { start: pt(), end: pt() }, rnd() < 0.5 ? 'hotter' : 'colder'),
+      ).map((x, k) => ({ ...x, id: `${i}-${k}` }))
+      expectInside(L, lArea, qs)
+    }
   })
 })
 

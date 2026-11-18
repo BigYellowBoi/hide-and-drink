@@ -27,7 +27,27 @@ export function projector(origin: LngLat) {
   }
 }
 
-export const radarCircle = (center: LngLat, radiusM: number): Feature<Polygon> => circlePolygon(center, radiusM, 96)
+/** Max gap (m) between a drawn circle's edge and the true circle, so it holds at street zoom. */
+const CIRCLE_TOLERANCE_M = 0.5
+/** Max spacing (m) of points along a straight shading edge (MapLibre draws straight in Mercator). */
+const EDGE_STEP_M = 100
+
+/** Vertices a circle needs so its chords stay within CIRCLE_TOLERANCE_M of the true circle. */
+export function circleSteps(radiusM: number): number {
+  if (!(radiusM > CIRCLE_TOLERANCE_M)) return 64
+  const steps = Math.ceil(Math.PI / Math.acos(1 - CIRCLE_TOLERANCE_M / radiusM))
+  return Math.min(1024, Math.max(64, steps))
+}
+
+/** A radar circle built on the sphere (geodesic points), with enough vertices for any zoom. */
+export const radarCircle = (center: LngLat, radiusM: number): Feature<Polygon> =>
+  circlePolygon(center, radiusM, circleSteps(radiusM))
+
+/** a to b with extra points every EDGE_STEP_M (b itself not included). */
+function densify(a: [number, number], b: [number, number]): [number, number][] {
+  const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / EDGE_STEP_M))
+  return Array.from({ length: n }, (_, i) => [a[0] + ((b[0] - a[0]) * i) / n, a[1] + ((b[1] - a[1]) * i) / n])
+}
 
 /**
  * Everywhere closer to `toward` than to the other end of a thermometer, as a big polygon
@@ -45,12 +65,15 @@ export function thermometerHalf(start: LngLat, end: LngLat, toward: 'start' | 'e
   const nx = -uy
   const ny = ux
   const S = 50_000
-  const ring = [
+  const corners: [number, number][] = [
     [nx * S, ny * S],
     [nx * S + ux * S, ny * S + uy * S],
     [-nx * S + ux * S, -ny * S + uy * S],
     [-nx * S, -ny * S],
-  ].map((xy) => p.toLngLat(xy as [number, number]))
+  ]
+  // The bisector edge (last corner back to the first) is the one that crosses the play
+  // area: densify it so the clipped edge stays straight on the map at any zoom.
+  const ring = [...corners.slice(0, 3), ...densify(corners[3], corners[0])].map((xy) => p.toLngLat(xy))
   return { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[...ring, ring[0]]] } }
 }
 
@@ -80,6 +103,16 @@ export const keepIn = (a: Area | null, f: Area): Area | null =>
   a ? (intersect(featureCollection([a, f])) as Area | null) : null
 export const cutOut = (a: Area | null, f: Area): Area | null =>
   a ? (difference(featureCollection([a, f])) as Area | null) : null
+
+/** f clipped to the play area, so float slivers from earlier steps never draw outside it. */
+export function clipTo(area: Area, f: Area | null): Area | null {
+  if (!f) return null
+  try {
+    return keepIn(area, f)
+  } catch {
+    return f
+  }
+}
 
 /** Play area narrowed by every constraint. null: nothing left (answers contradict). */
 export function applyConstraints(area: Area, constraints: readonly Constraint[]): Area | null {
