@@ -3007,20 +3007,10 @@ button.preset-delete.danger {
   justify-self: end;
 }
 
-/* Custom venues: add form (lobby and bar picker), selected venue row, lists */
+/* Custom venues: add form in the bar picker */
 .add-venue {
   display: grid;
   gap: 8px;
-}
-.venue-selected {
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 8px;
-}
-.venue-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
 }
 
 /* Bar picker: what the other hiders are looking at (live, hiders only). */
