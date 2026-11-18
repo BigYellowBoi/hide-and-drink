@@ -3085,3 +3085,80 @@ button.preset-delete.danger {
   background: var(--seeker);
   color: var(--seeker-ink);
 }
+
+/* Host overrides: "Fix something" sheet, requests, timeline tag. */
+.fix-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 8px;
+}
+
+.fix-head {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fix-head h2 {
+  margin: 0;
+}
+
+.fix-group {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.fix-option {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+}
+
+.fix-option.on {
+  border-color: var(--text);
+}
+
+.fix-form {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.fix-field {
+  display: grid;
+  gap: 4px;
+}
+
+.fix-field > span {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fix-request button {
+  margin-top: 8px;
+}
+
+.log-override .log-dot {
+  background: var(--text-muted);
+}
+
+.tl-fix {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tl-undone {
+  text-decoration: line-through;
+}

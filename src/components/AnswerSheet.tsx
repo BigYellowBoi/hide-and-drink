@@ -10,7 +10,7 @@ import type { LayerLookup } from '../play/features'
 import type { VenueEdits } from '../venues/state'
 import { photoPath, shrinkPhoto, uploadPhoto } from '../play/photos'
 import { supabase } from '../lib/supabase'
-import { ANSWERS, answerText, candidatesOf, km, NULL_ANSWER, optionText, questionLabel, questionText, type Question } from '../play/state'
+import { ANSWERS, answerText, candidatesOf, km, NULL_ANSWER, optionText, questionLabel, questionText, shownEnd, type Question } from '../play/state'
 import { LockIcon, PrivateLabel } from './PrivateLabel'
 import { DeadlineRing } from './DeadlineRing'
 import { useTimerAlert } from '../lib/useTimerAlert'
@@ -74,7 +74,7 @@ export function AnswerSheet({
   const suggestion = useMemo(() => suggestAnswer(q, zone, layer), [q, zone, layer])
   const late = now > q.deadlineAt
   // Buzz the hider's phone a minute before the deadline and when it passes.
-  useTimerAlert(`answer:${q.id}`, q.deadlineAt - now)
+  useTimerAlert(`answer:${q.id}`, shownEnd(q.deadlineAt, q.pausedLeftMs, now) - now)
   const kind = q.type === 'bonus' ? String(q.params.answer_kind ?? 'text') : q.type
   const nullLabel = typeof q.params.null_answer === 'string' ? q.params.null_answer : null
 
@@ -182,7 +182,7 @@ export function AnswerSheet({
             </p>
           )}
         </div>
-        <DeadlineRing endsAt={q.deadlineAt} totalS={q.deadlineS} now={now} />
+        <DeadlineRing endsAt={shownEnd(q.deadlineAt, q.pausedLeftMs, now)} totalS={q.deadlineS} now={now} />
       </div>
 
       {(isLngLat(q.params.center) || isLngLat(q.params.start)) && (

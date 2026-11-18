@@ -1,7 +1,7 @@
 import { Suspense, useMemo, useState } from 'react'
 import type { FeatureCollection } from 'geojson'
 import type { LobbyState, StartedRound } from '../lobby/state'
-import { deriveHiding, formatClock, hidingZone, positionAge, roundClock, type HidingZoneConfig } from '../hiding/state'
+import { deriveHiding, formatClock, hidingPeriodAt, hidingZone, positionAge, roundClock, type HidingZoneConfig } from '../hiding/state'
 import type { GeoError } from '../hiding/useGeolocation'
 import { isDevMode } from '../hiding/devPosition'
 import { usePosition } from '../hiding/usePosition'
@@ -12,7 +12,10 @@ import { readLocal, writeLocal } from '../lib/storage'
 import { distanceM, formatDistance } from '../map/geo'
 import { questionTool } from '../play/overlays'
 import { shade, type HiderZone } from '../play/shading'
-import { derivePlay, questionLabel, shadable, type PlayState } from '../play/state'
+import { deriveOverrides, openRequests, type OverrideRequest } from '../overrides/state'
+import { optionOf } from '../overrides/catalogue'
+import { FixSomething } from './FixSomething'
+import { derivePlay, questionLabel, shadable, shownEnd, type PlayState } from '../play/state'
 import { useQuestionTypes } from '../play/useQuestionTypes'
 import { shadingBounds, type LayerLookup } from '../play/features'
 import { useCityLayers } from '../play/useCityLayers'
@@ -119,6 +122,9 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
   const play = useMemo(() => derivePlay(events), [events])
   const cards = useMemo(() => deriveCards(events), [events])
   const log = useMemo(() => [...play.log, ...cards.log].sort((a, b) => a.seq - b.seq), [play.log, cards.log])
+  const overrides = useMemo(() => deriveOverrides(events), [events])
+  /** The Fix something sheet: open (true), or carrying out a seeker host's request. */
+  const [fix, setFix] = useState<false | true | OverrideRequest>(false)
   const [tab, setTab] = useState<Tab>('map')
   /** A past question shown on the map from the timeline (its tool, candidates and distances). */
   const [shownId, setShownId] = useState<string | null>(null)
@@ -164,7 +170,7 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
 
   if (!started) return null
   const hiderCount = lobby.players.filter((p) => p.team === 'hiders').length
-  const clock = roundClock(started.startedAt, started.hidingPeriodS, now)
+  const clock = roundClock(started.startedAt, hidingPeriodAt(started, now), now)
   const team = lobby.players.find((p) => p.userId === userId)?.team ?? null
   const tabs = team ? TABS[team] : TABS.seekers
   const nameOf = (id: string | null) => lobby.players.find((p) => p.userId === id)?.name ?? 'a seeker'
@@ -187,8 +193,50 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
     userId,
   }
 
+  const requests = openRequests(overrides)
+  const canFix = shared.isHost || team === 'hiders'
+
   return (
     <HiderCountContext.Provider value={hiderCount}>
+      {team === 'hiders' &&
+        requests.map((r) => (
+          <div key={r.id} className="blocked-banner fix-request" role="status">
+            <strong>The host asks: {optionOf(r.kind)?.label ?? r.kind}</strong>
+            <p>“{r.reason}”. Only your team sees the details.</p>
+            <button className="small" disabled={!canAct} onClick={() => setFix(r)}>
+              Open
+            </button>
+          </div>
+        ))}
+      {team !== 'hiders' && shared.isHost &&
+        requests.map((r) => (
+          <div key={r.id} className="blocked-banner fix-request" role="status">
+            <strong>Waiting for a hider: {optionOf(r.kind)?.label ?? r.kind}</strong>
+            <p>A hider does this one. You'll see that it happened.</p>
+          </div>
+        ))}
+      {canFix && (
+        <div className="fix-bar">
+          <button className="small secondary" disabled={!canAct} onClick={() => setFix(true)}>
+            Fix something
+          </button>
+        </div>
+      )}
+      {fix && (
+        <FixSomething
+          sync={sync}
+          lobby={lobby}
+          play={play}
+          cards={cards}
+          overrides={overrides}
+          userId={userId}
+          team={team}
+          canAct={canAct}
+          layer={layer}
+          request={fix === true ? null : fix}
+          onClose={() => setFix(false)}
+        />
+      )}
       {team === 'hiders' ? (
         <HiderView sync={sync} lobby={lobby} started={started} zone={zone} canAct={canAct} events={events} clock={clock} {...shared} />
       ) : team === 'seekers' ? (
@@ -300,8 +348,8 @@ type Clock = ReturnType<typeof roundClock>
  */
 export function TopbarClock({ sync, started, bonusS = 0 }: { sync: GameSync; started: StartedRound; bonusS?: number }) {
   const now = useServerNow(sync)
-  const clock = roundClock(started.startedAt, started.hidingPeriodS, now)
-  const hidingLeft = clock.phase === 'hiding' ? clock.ms : started.startedAt + started.hidingPeriodS * 1000 - now
+  const clock = roundClock(started.startedAt, hidingPeriodAt(started, now), now)
+  const hidingLeft = clock.phase === 'hiding' ? clock.ms : started.startedAt + hidingPeriodAt(started, now) * 1000 - now
   // Buzz a minute before seeking starts and when it does (every phone, both teams).
   useTimerAlert(`hiding:${started.round}`, hidingLeft)
   const tone = clock.phase === 'hiding' ? timerTone(clock.ms) : 'ok'
@@ -618,9 +666,10 @@ function SeekerView({
             <p className="eyebrow">Waiting for the hiders</p>
             <h2>{questionLabel(pending)}</h2>
             <p className="muted small">Asked by {nameOf(pending.askedBy)}</p>
-            {now > pending.deadlineAt && <p className="flag">Deadline missed: hiders take a shot.</p>}
+            {now > pending.deadlineAt && !pending.penaltyCancelled && <p className="flag">Deadline missed: hiders take a shot.</p>}
+            {pending.pausedLeftMs !== null && <p className="muted small">Deadline paused by the host.</p>}
           </div>
-          <DeadlineRing endsAt={pending.deadlineAt} totalS={pending.deadlineS} now={now} />
+          <DeadlineRing endsAt={shownEnd(pending.deadlineAt, pending.pausedLeftMs, now)} totalS={pending.deadlineS} now={now} />
         </section>
       )}
 

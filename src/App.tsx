@@ -16,6 +16,7 @@ import { Round, TopbarClock } from './components/Round'
 import { StaleBanner } from './components/StaleBanner'
 import { presenceOf } from './sync/presence'
 import { isDevMode } from './hiding/devPosition'
+import { effectiveEvents } from './overrides/state'
 
 const transport = supabase ? supabaseTransport(supabase) : null
 const asset = (f: string) => `${import.meta.env.BASE_URL}${f}`
@@ -33,7 +34,8 @@ function GameScreen({
   onRejoin: (gameId: string) => void
 }) {
   const game = useGameSync(gameId, transport)
-  const events = game.events
+  // Undone host overrides drop out here, so every screen derives state without them.
+  const events = useMemo(() => effectiveEvents(game.events), [game.events])
   const lobby = useMemo(() => deriveLobby(events), [events])
   const [confirmLeave, setConfirmLeave] = useState(false)
   const [rejoin, setRejoin] = useState<{ busy: boolean; err: string | null }>({ busy: false, err: null })

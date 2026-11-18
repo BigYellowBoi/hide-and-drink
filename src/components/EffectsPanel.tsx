@@ -136,7 +136,7 @@ function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf,
       )}
       {clearable(e, now) &&
         (team === 'seekers' ? (
-          evidence && !evidence.path ? (
+          evidence && !evidence.path && !evidence.resolution ? (
             <EvidenceClear sync={sync} proof={evidence} canAct={canAct && !busy} onSent={() => act('clear_effect', {})} />
           ) : (
             <button className="small" disabled={busy || !canAct} onClick={() => void act('clear_effect', {})}>
