@@ -94,7 +94,7 @@ export function parseManualShading(v: unknown): ManualShading | null {
   return null
 }
 
-export type LogKind = 'seeking' | 'asked' | 'answered' | 'penalty' | 'bar' | 'draw' | 'card' | 'proof' | 'shading'
+export type LogKind = 'seeking' | 'asked' | 'answered' | 'penalty' | 'bar' | 'draw' | 'card' | 'proof' | 'shading' | 'undo'
 export interface LogEntry {
   seq: number
   kind: LogKind
@@ -152,6 +152,19 @@ export const km = (m: number) => (m >= 1000 ? `${+(m / 1000).toFixed(m % 1000 ? 
 export const optionText = (q: Pick<Question, 'params'>) => str(q.params.label)
 
 /** Short label for a question: "Radar 1 km", "Thermometer 500 m", "Matching · Park". */
+const UNDO_WHAT: Record<string, string> = {
+  question_asked: 'question asked',
+  question_answered: 'answer',
+  question_shading_set: 'shading by hand',
+  cards_drawn: 'reward draw',
+}
+
+/** What an undo took back: "Radar answer", "Question asked". */
+export function undoLabel(type: string, questionType: string | null): string {
+  const what = UNDO_WHAT[type] ?? 'action'
+  return questionType ? `${typeName(questionType)} ${what}` : what.charAt(0).toUpperCase() + what.slice(1)
+}
+
 export function questionLabel(q: Pick<Question, 'type' | 'params'>): string {
   const name = typeName(q.type)
   const label = optionText(q)
@@ -326,6 +339,13 @@ export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
       const action = isObject(p.card) && isObject(p.card.params) ? p.card.params.action : null
       if (!id || (action !== 'veto' && action !== 'randomize')) return state
       return update(state, id, (x) => ({ ...x, closedBy: action, answeredAt: time(p.played_at, e.created_at) }))
+    }
+    case 'action_undone': {
+      // The undone events never reach this reducer (play/undo.ts); this only logs the undo.
+      const type = str(p.type) ?? ''
+      const hidden = e.visibility !== 'all'
+      const text = hidden ? 'Reward draw put back on the pile' : `Host undid: ${undoLabel(type, str(p.question_type))}`
+      return { ...state, log: [...state.log, { seq: e.seq, kind: 'undo', at, text, by: str(p.by), private: hidden || undefined }] }
     }
     case 'hider_moved':
       return { ...state, movedSeq: e.seq }

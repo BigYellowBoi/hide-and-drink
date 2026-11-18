@@ -33,7 +33,7 @@ select is(
     'is_player', 'join_game', 'keep_cards', 'leave_game', 'mark_trivia',
     'my_team', 'play_card', 'remove_player', 'report_picking', 'report_position', 'roll_dice', 'save_card', 'save_category', 'save_deck_preset', 'save_play_area', 'server_time',
     'set_card_active', 'set_category_active', 'set_deck', 'set_play_area', 'set_question_shading', 'set_team', 'set_trivia', 'set_venue_hidden', 'settle_timers', 'spin_wheel', 'start_followup', 'start_game', 'submit_drink_proof', 'topic_for',
-    'update_config', 'veto_curse'
+    'undo_last_action', 'update_config', 'veto_curse'
   ],
   'signed-in clients can call only the allow-listed functions'
 );

@@ -1937,6 +1937,16 @@ button.link {
   background: var(--alert);
 }
 
+.log-undo .log-dot {
+  background: var(--text-muted);
+}
+
+.undo-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 /* "Showing Matching · Library" over the map (a past question picked from the timeline). */
 .shown-chip {
   display: flex;
