@@ -7,6 +7,7 @@ import { questionTool } from '../play/overlays'
 import { isLngLat } from '../play/geo'
 import { suggestAnswer, type HiderZone } from '../play/shading'
 import type { LayerLookup } from '../play/features'
+import type { VenueEdits } from '../venues/state'
 import { photoPath, shrinkPhoto, uploadPhoto } from '../play/photos'
 import { supabase } from '../lib/supabase'
 import { ANSWERS, answerText, candidatesOf, km, NULL_ANSWER, optionText, questionLabel, questionText, type Question } from '../play/state'
@@ -29,6 +30,8 @@ interface Props {
   now: number
   /** City pack features, for suggestions that need them (matching, bonus count rules). */
   layer?: LayerLookup
+  /** The game's venue edits, for the venue dots on the mini map. */
+  venues?: VenueEdits
   /** Veto / Randomize cards in the hand: play one instead of answering. */
   powerups?: readonly { instanceId: string; name: string; action: 'veto' | 'randomize' }[]
   /** The answer's reward is multiplied by this (next_question_modifier cards). */
@@ -57,6 +60,7 @@ export function AnswerSheet({
   canAct,
   now,
   layer,
+  venues,
   powerups = [],
   rewardMultiplier = 1,
 }: Props) {
@@ -180,7 +184,7 @@ export function AnswerSheet({
 
       {(isLngLat(q.params.center) || isLngLat(q.params.start)) && (
         <Suspense fallback={<div className="game-map mini-map" />}>
-          <LazyGameMap city={city} playArea={playArea} className="mini-map" overlay={overlay} tapNames={false} />
+          <LazyGameMap city={city} playArea={playArea} className="mini-map" overlay={overlay} tapNames={false} venues={venues} />
         </Suspense>
       )}
 

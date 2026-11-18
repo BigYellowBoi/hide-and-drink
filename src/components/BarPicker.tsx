@@ -6,6 +6,7 @@ import { barOptions, loadHidingBars } from '../hiding/bars'
 import type { HidingZoneConfig } from '../hiding/state'
 import type { Fix } from '../hiding/useGeolocation'
 import { loadCityPack, type CityPack } from '../map/cityPack'
+import { packWithVenues, type VenueEdits } from '../venues/state'
 import { formatDistance } from '../map/geo'
 import type { GameSync } from '../sync/engine'
 import type { MapDot } from './GameMap'
@@ -26,13 +27,18 @@ interface Props {
   late: boolean
   /** Seekers' positions, with name tags. */
   seekers?: readonly MapDot[]
+  /** The game's venue edits (lobby adds and hides, and bars added here). */
+  venues: VenueEdits
 }
 
 const NO_DOTS: readonly MapDot[] = []
 
 /** Hider: pick a bar from the valid ones (nearest first), preview its circle, slide to lock in. */
-export function BarPicker({ sync, city, started, zone, canAct, fix, onLongPress, timeNote, late, seekers = NO_DOTS }: Props) {
-  const [pack, setPack] = useState<CityPack | null>(null)
+export function BarPicker({ sync, city, started, zone, canAct, fix, onLongPress, timeNote, late, seekers = NO_DOTS, venues }: Props) {
+  const [basePack, setPack] = useState<CityPack | null>(null)
+  const pack = useMemo(() => (basePack ? packWithVenues(basePack, venues) : null), [basePack, venues])
+  /** "Not listed?" form: the pin (defaults to this phone's position) and the bar's name. */
+  const [adding, setAdding] = useState<{ name: string; pin: [number, number] | null } | null>(null)
   const [validIds, setValidIds] = useState<string[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -61,16 +67,53 @@ export function BarPicker({ sync, city, started, zone, canAct, fix, onLongPress,
   const all = useMemo(() => (pack && validIds ? barOptions(pack, validIds, from) : []), [pack, validIds, from])
   const shown = useMemo(() => (pack && validIds ? barOptions(pack, validIds, from, search) : []), [pack, validIds, from, search])
   const chosen = all.find((b) => b.id === selected) ?? null
+  const isAdding = adding !== null
+  const dropped = adding?.pin ?? null
+  const pin = useMemo<[number, number] | null>(
+    () => (isAdding ? (dropped ?? (fix ? [fix.lng, fix.lat] : null)) : null),
+    [isAdding, dropped, fix],
+  )
 
   const overlay = useMemo(
     () => ({
       bars: all,
       selectedBar: selected,
-      zone: chosen ? { lng: chosen.lng, lat: chosen.lat, radiusM: zone.barRadiusM, team: 'hiders' as const } : null,
-      dots: [...seekers, ...(fix ? [{ id: 'me', lng: fix.lng, lat: fix.lat, team: 'hiders' as const, me: true }] : [])],
+      zone: pin
+        ? { lng: pin[0], lat: pin[1], radiusM: zone.barRadiusM, team: 'hiders' as const }
+        : chosen
+          ? { lng: chosen.lng, lat: chosen.lat, radiusM: zone.barRadiusM, team: 'hiders' as const }
+          : null,
+      dots: [
+        ...seekers,
+        ...(fix ? [{ id: 'me', lng: fix.lng, lat: fix.lat, team: 'hiders' as const, me: true }] : []),
+        ...(pin ? [{ id: 'pin', lng: pin[0], lat: pin[1], team: 'hiders' as const, name: 'New bar' }] : []),
+      ],
     }),
-    [all, selected, chosen, zone.barRadiusM, fix, seekers],
+    [all, selected, chosen, zone.barRadiusM, fix, seekers, pin],
   )
+
+  const addBar = async () => {
+    if (!adding || !pin || !adding.name.trim()) return
+    setBusy(true)
+    setError(null)
+    try {
+      const res = (await sync.action('add_venue', { p_name: adding.name.trim(), p_lng: pin[0], p_lat: pin[1] })) as {
+        feature_id?: unknown
+      } | null
+      const id = typeof res?.feature_id === 'string' ? res.feature_id : null
+      if (id) {
+        // The server accepted it, so choose_bar will too. Its details arrive with the
+        // hider-only venue_added event.
+        setValidIds((ids) => (ids && !ids.includes(id) ? [...ids, id] : ids))
+        setSelected(id)
+      }
+      setAdding(null)
+    } catch (e) {
+      setError(describeError(e))
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const lockIn = async () => {
     if (!chosen) return
@@ -106,13 +149,56 @@ export function BarPicker({ sync, city, started, zone, canAct, fix, onLongPress,
             playArea={started.playArea}
             className="picker-map"
             overlay={overlay}
-            onBarTap={setSelected}
-            focus={chosen ? { lng: chosen.lng, lat: chosen.lat } : null}
+            onBarTap={adding ? undefined : setSelected}
+            onTap={adding ? (p) => setAdding((a) => (a ? { ...a, pin: p } : a)) : undefined}
+            focus={adding ? null : chosen ? { lng: chosen.lng, lat: chosen.lat } : null}
             hideVenues
             onLongPress={onLongPress}
           />
         </Suspense>
       </section>
+
+      {adding ? (
+        <section className="card add-venue">
+          <h3>Add a bar that isn't listed</h3>
+          <p className="muted small-note">
+            {pin
+              ? 'Tap anywhere on the map to put the pin on the bar. It starts at your position and must be inside the play area.'
+              : 'Tap the map where the bar is to drop the pin.'}{' '}
+            Only your team sees it until the round ends.
+          </p>
+          <label className="field">
+            <span>Name</span>
+            <input
+              value={adding.name}
+              maxLength={60}
+              placeholder="e.g. The Laneway Bar"
+              onChange={(e) => setAdding({ ...adding, name: e.target.value })}
+            />
+          </label>
+          <div className="row">
+            <button className="small" disabled={!canAct || busy || !pin || !adding.name.trim()} onClick={() => void addBar()}>
+              Add bar
+            </button>
+            {adding.pin && fix && (
+              <button className="small secondary" disabled={busy} onClick={() => setAdding({ ...adding, pin: null })}>
+                Use my location
+              </button>
+            )}
+            <button className="small secondary" disabled={busy} onClick={() => setAdding(null)}>
+              Cancel
+            </button>
+          </div>
+        </section>
+      ) : (
+        validIds && (
+          <div className="row">
+            <button className="small secondary" disabled={!canAct} onClick={() => setAdding({ name: '', pin: null })}>
+              Not listed? Add a bar here
+            </button>
+          </div>
+        )
+      )}
 
       <section className="card">
         {loadError ? (
@@ -120,7 +206,7 @@ export function BarPicker({ sync, city, started, zone, canAct, fix, onLongPress,
         ) : !validIds ? (
           <p className="muted">Loading bars…</p>
         ) : all.length === 0 ? (
-          <p className="bad">No bars in this play area. Ask the host to check the map.</p>
+          <p className="bad">No bars in this play area. Add one above, or ask the host to check the map.</p>
         ) : (
           <>
             <label className="field">

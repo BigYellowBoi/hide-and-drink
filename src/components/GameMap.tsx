@@ -4,11 +4,12 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import type { FeatureCollection } from 'geojson'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { supabase } from '../lib/supabase'
-import { loadCityPack, type CityPack } from '../map/cityPack'
+import { layerCollection, loadCityPack, type CityPack } from '../map/cityPack'
 import { circlePolygon, distanceM, formatDistance } from '../map/geo'
 import { boundsOf, outsideMask, type AreaCollection } from '../map/playArea'
 import { resetGestures } from '../map/gestures'
-import { hatchImage, MAP_COLORS, mapStyle, TAPPABLE_LAYERS } from '../map/style'
+import { hatchImage, MAP_COLORS, mapStyle, PACK_SOURCES, TAPPABLE_LAYERS } from '../map/style'
+import { packWithVenues, type VenueEdits } from '../venues/state'
 
 /** Game things drawn over the city: a zone circle, candidate bars and people. */
 export interface MapOverlay {
@@ -69,6 +70,8 @@ interface Props {
   onTap?: (lngLat: [number, number]) => void
   /** Called with [lng, lat] on a long press (touch hold or right click), e.g. to set a playtest position. */
   onLongPress?: (lngLat: [number, number]) => void
+  /** The game's venue edits: hidden venues drop off the venue dots, custom ones appear. */
+  venues?: VenueEdits
 }
 
 const LONG_PRESS_MS = 500
@@ -99,7 +102,7 @@ function describeFeature(layer: string, props: Record<string, unknown>): string 
 }
 
 /** MapLibre map of the city pack: streets, water, transit lines, stations, venues and the play area. */
-export function GameMap({ city, playArea, onReady, className, tapNames = true, overlay, onBarTap, focus, hideVenues = false, onTap, onLongPress }: Props) {
+export function GameMap({ city, playArea, onReady, className, tapNames = true, overlay, onBarTap, focus, hideVenues = false, onTap, onLongPress, venues }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   /** The play area the view was last fitted to (JSON). */
@@ -369,6 +372,13 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
     if (!map || !loaded) return
     map.setLayoutProperty('venues', 'visibility', hideVenues ? 'none' : 'visible')
   }, [hideVenues, loaded])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !loaded || !pack || !venues) return
+    const merged = packWithVenues(pack, venues)
+    ;(map.getSource('venues') as GeoJSONSource | undefined)?.setData(layerCollection(merged, [...PACK_SOURCES.venues]))
+  }, [venues, pack, loaded])
 
   const focusLng = focus?.lng
   const focusLat = focus?.lat

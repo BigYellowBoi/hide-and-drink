@@ -2521,3 +2521,19 @@ button.preset-delete.danger {
 .sheet-page .editor-bar > :last-child {
   justify-self: end;
 }
+
+/* Custom venues: add form (lobby and bar picker), selected venue row, lists */
+.add-venue {
+  display: grid;
+  gap: 8px;
+}
+.venue-selected {
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+.venue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
