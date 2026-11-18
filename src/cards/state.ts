@@ -33,12 +33,32 @@ export interface PendingDraw {
 
 export type EffectStatus = 'active' | 'clear_requested' | 'cleared' | 'vetoed'
 
-/** A played timed or until_cleared card. */
+/** One question of a trivia curse, public to both teams. */
+export interface TriviaQuestion {
+  question: string
+  /** The answer waiting for the hider's mark; null when the seekers owe one. */
+  answer: string | null
+  answeredBy: string | null
+  correct: boolean
+  /** Earlier answers the hider marked wrong, oldest first. */
+  wrong: string[]
+}
+
+/** A trivia curse: the hider's questions (null until sent) and how many it needs. */
+export interface Trivia {
+  count: number
+  topic: string | null
+  questions: TriviaQuestion[] | null
+  /** The host marked everything right by hand. */
+  forced: boolean
+}
+
+/** A played timed, until_cleared or trivia card. */
 export interface Effect {
   id: string
   seq: number
   card: CardDef
-  behaviour: 'timed' | 'until_cleared'
+  behaviour: 'timed' | 'until_cleared' | 'trivia'
   playedAt: number
   /** Timed: server ms the countdown ends. */
   endsAt: number | null
@@ -47,6 +67,8 @@ export interface Effect {
   followupEndsAt: number | null
   blocksQuestions: boolean
   status: EffectStatus
+  /** Trivia curses only. */
+  trivia: Trivia | null
 }
 
 export interface PlayedCard {
@@ -276,7 +298,7 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
         bans: [...state.bans, ...bans],
         moving: state.moving || powerupAction(card) === 'move',
       }
-      if (effectId && (card.behaviour === 'timed' || card.behaviour === 'until_cleared')) {
+      if (effectId && (card.behaviour === 'timed' || card.behaviour === 'until_cleared' || card.behaviour === 'trivia')) {
         const endsAt = card.behaviour === 'timed' ? time(p.ends_at, e.created_at) : null
         next = {
           ...next,
@@ -294,6 +316,10 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
               followupEndsAt: null,
               blocksQuestions: p.blocks_questions === true,
               status: 'active',
+              trivia:
+                card.behaviour === 'trivia'
+                  ? { count: num(p.count) ?? triviaCount(card), topic: triviaTopic(card), questions: null, forced: false }
+                  : null,
             },
           ],
         }
@@ -402,6 +428,43 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
       const name = next.effects.find((x) => x.id === id)?.card.name ?? 'Curse'
       return log({ kind: 'card', text: `${name} cleared` }, next)
     }
+    case 'trivia_set': {
+      const id = str(p.effect_id)
+      const questions = strings(p.questions).map((question): TriviaQuestion => ({ question, answer: null, answeredBy: null, correct: false, wrong: [] }))
+      const next = updateTrivia(state, id, (t) => ({ ...t, questions }))
+      return log({ kind: 'card', text: `${effectName(next, id)}: hider sent ${questions.length} questions` }, next)
+    }
+    case 'trivia_answered': {
+      const id = str(p.effect_id)
+      const i = num(p.index) ?? -1
+      const answer = str(p.answer) ?? ''
+      const next = updateTriviaQ(state, id, i, (q) => ({ ...q, answer, answeredBy: str(p.by) }))
+      return log({ kind: 'card', text: `${effectName(next, id)} Q${i + 1}: seekers answered "${answer}"` }, next)
+    }
+    case 'trivia_marked': {
+      const id = str(p.effect_id)
+      const i = num(p.index) ?? -1
+      const correct = p.correct === true
+      const answer = str(p.answer) ?? ''
+      const next = updateTriviaQ(state, id, i, (q) =>
+        correct ? { ...q, answer: q.answer ?? answer, correct: true } : { ...q, answer: null, answeredBy: null, wrong: [...q.wrong, answer] },
+      )
+      return log(
+        correct
+          ? { kind: 'card', text: `${effectName(next, id)} Q${i + 1}: "${answer}" is right` }
+          : { kind: 'penalty', text: `${effectName(next, id)} Q${i + 1}: "${answer}" is wrong, try again` },
+        next,
+      )
+    }
+    case 'trivia_force_cleared': {
+      const id = str(p.effect_id)
+      const next = updateTrivia(state, id, (t) => ({
+        ...t,
+        forced: true,
+        questions: t.questions?.map((q) => ({ ...q, correct: true })) ?? null,
+      }))
+      return log({ kind: 'card', text: `Host marked ${effectName(next, id)} all correct` }, next)
+    }
     case 'effect_followup_started': {
       const id = str(p.effect_id)
       const endsAt = time(p.ends_at, e.created_at)
@@ -414,6 +477,38 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
       return state
   }
 }
+
+const updateTrivia = (s: CardsState, id: string | null, f: (t: Trivia) => Trivia): CardsState =>
+  updateEffect(s, id, (x) => (x.trivia ? { ...x, trivia: f(x.trivia) } : x))
+
+const updateTriviaQ = (s: CardsState, id: string | null, i: number, f: (q: TriviaQuestion) => TriviaQuestion): CardsState =>
+  updateTrivia(s, id, (t) => ({ ...t, questions: t.questions?.map((q, j) => (j === i ? f(q) : q)) ?? null }))
+
+const effectName = (s: CardsState, id: string | null) => s.effects.find((x) => x.id === id)?.card.name ?? 'Trivia'
+
+/** How many questions a trivia card needs (params.count, default 3), as the server reads it. */
+export function triviaCount(c: CardDef): number {
+  const n = num(c.params.count)
+  return n !== null && n >= 1 && n <= 10 ? Math.floor(n) : 3
+}
+export const triviaTopic = (c: CardDef): string | null => {
+  const t = str(c.params.topic)?.trim()
+  return t ? t : null
+}
+
+/** What a team has to do for a trivia curse now: write, mark or answer. null: nothing. */
+export function triviaTodo(e: Effect, team: 'hiders' | 'seekers'): 'write' | 'mark' | 'answer' | null {
+  const t = e.trivia
+  if (!t || e.status !== 'active') return null
+  if (team === 'hiders') {
+    if (!t.questions) return 'write'
+    return t.questions.some((q) => !q.correct && q.answer !== null) ? 'mark' : null
+  }
+  return t.questions?.some((q) => !q.correct && q.answer === null) ? 'answer' : null
+}
+
+/** Trivia curses waiting on this team. */
+export const triviaWaiting = (s: CardsState, team: 'hiders' | 'seekers') => s.effects.filter((e) => triviaTodo(e, team) !== null)
 
 export const deriveCards = (events: readonly GameEvent[]): CardsState => events.reduce(applyCardEvent, emptyCards)
 
@@ -432,6 +527,7 @@ export type EffectPhase =
 /** Where an effect is at this (server) time. */
 export function effectPhase(e: Effect, now: number): EffectPhase {
   if (e.status === 'vetoed') return 'over'
+  if (e.behaviour === 'trivia') return e.status === 'cleared' ? 'over' : 'until_cleared'
   if (e.behaviour === 'until_cleared') {
     return e.status === 'cleared' ? 'over' : e.status === 'clear_requested' ? 'awaiting_confirm' : 'until_cleared'
   }
@@ -449,7 +545,7 @@ export function effectPhase(e: Effect, now: number): EffectPhase {
  * ones with a follow-on (a task with a deadline, e.g. Escape) until the follow-on starts.
  */
 export function clearable(e: Effect, now: number): boolean {
-  if (e.status !== 'active') return false
+  if (e.status !== 'active' || e.behaviour === 'trivia') return false
   const phase = effectPhase(e, now)
   if (e.behaviour === 'until_cleared') return phase === 'until_cleared'
   return e.followupS !== null && e.followupEndsAt === null && (phase === 'running' || phase === 'followup_available')
@@ -482,7 +578,7 @@ export const powerupAction = (c: CardDef): PowerupAction | null => {
 }
 
 /** Behaviours play_card handles (time bonuses stay in the hand). */
-export const PLAYABLE = ['text', 'timed', 'until_cleared', 'next_question_modifier', 'question_ban', 'powerup'] as const
+export const PLAYABLE = ['text', 'timed', 'until_cleared', 'trivia', 'next_question_modifier', 'question_ban', 'powerup'] as const
 export const isPlayable = (c: CardDef) =>
   (PLAYABLE as readonly string[]).includes(c.behaviour) && (c.behaviour !== 'powerup' || powerupAction(c) !== null)
 
@@ -615,6 +711,11 @@ export function cardFacts(c: CardDef): string[] {
   const f = num(c.params.followup_s)
   if (c.behaviour === 'timed' && d) out.push(f ? `${minutes(d)}, then ${minutes(f)} if missed` : minutes(d))
   if (c.behaviour === 'until_cleared') out.push(c.params.blocks_questions === true ? 'Blocks questions' : 'Until done')
+  if (c.behaviour === 'trivia') {
+    const n = triviaCount(c)
+    out.push(`${n} trivia question${n > 1 ? 's' : ''}${triviaTopic(c) ? ` (${triviaTopic(c)})` : ''}`)
+    if (c.params.blocks_questions === true) out.push('Blocks questions')
+  }
   if (c.behaviour === 'time_bonus' && num(c.params.minutes)) out.push(`+${num(c.params.minutes)} min`)
   if (c.behaviour === 'next_question_modifier') out.push(`Next reward ×${num(c.params.reward_multiplier) ?? 2}`)
   if (c.behaviour === 'question_ban') {
@@ -658,6 +759,7 @@ const BEHAVIOUR_LABEL: Record<string, string> = {
   text: 'Shown to everyone',
   timed: 'Timed',
   until_cleared: 'Until the seekers do it',
+  trivia: 'Trivia: the hider asks, the seekers answer',
   time_bonus: 'Time bonus',
   next_question_modifier: 'Changes the next reward',
   question_ban: 'Bans questions',
@@ -700,6 +802,6 @@ export function cardDetails(c: CardDef): { label: string; value: string }[] {
   }
   const facts = cardFacts(c).filter((f) => !/ proof$/.test(f) && f !== "Can't veto")
   if (facts.length) rows.push({ label: 'Rules', value: facts.join(' · ') })
-  if (c.behaviour === 'until_cleared' && typeof c.params.blocks === 'string') rows.push({ label: 'Blocks', value: cap(c.params.blocks) })
+  if ((c.behaviour === 'until_cleared' || c.behaviour === 'trivia') && typeof c.params.blocks === 'string') rows.push({ label: 'Blocks', value: cap(c.params.blocks) })
   return rows
 }

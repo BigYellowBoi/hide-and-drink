@@ -2700,3 +2700,51 @@ button.preset-delete.danger {
   color: var(--hider);
   font-weight: 600;
 }
+
+/* Trivia curses: questions, answers and marks inside the curse card */
+.trivia,
+.trivia-write {
+  display: grid;
+  gap: 8px;
+  align-self: stretch;
+}
+
+.trivia-list {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 12px;
+}
+
+.trivia-list li {
+  display: grid;
+  gap: 4px;
+}
+
+.trivia-q {
+  font-weight: 600;
+}
+
+.trivia-wrong {
+  color: var(--seeker-on-dark);
+  text-decoration: line-through;
+}
+
+.trivia-mark,
+.trivia-answer {
+  display: grid;
+  gap: 6px;
+}
+
+.trivia-answer {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.trivia-mark .confirm-row {
+  margin-top: 0;
+}
+
+.trivia .small {
+  margin-top: 0;
+}

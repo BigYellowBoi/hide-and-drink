@@ -5,6 +5,7 @@ export type Behaviour =
   | 'text'
   | 'timed'
   | 'until_cleared'
+  | 'trivia'
   | 'time_bonus'
   | 'next_question_modifier'
   | 'powerup'

@@ -26,6 +26,7 @@
     "text",
     "timed",
     "until_cleared",
+    "trivia",
     "time_bonus",
     "next_question_modifier",
     "powerup",
@@ -508,12 +509,14 @@
       "id": "moll",
       "name": "Curse of Moll",
       "category": "curse",
-      "behaviour": "until_cleared",
+      "behaviour": "trivia",
       "copies": 1,
       "text": "Seekers must correctly answer 3 Harry Potter trivia questions before using transport. No Googling.",
       "params": {
         "blocks_questions": false,
-        "blocks": "transport"
+        "blocks": "transport",
+        "count": 3,
+        "topic": "Harry Potter"
       },
       "active": true,
       "cast_cost": "drink",

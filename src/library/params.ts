@@ -22,6 +22,7 @@ export const BEHAVIOURS: { id: string; label: string; hint: string }[] = [
   { id: 'text', label: 'Text', hint: 'Do what the card says. Nothing to track.' },
   { id: 'timed', label: 'Timed', hint: 'Runs for a set time, shown to both teams.' },
   { id: 'until_cleared', label: 'Until cleared', hint: 'Lasts until the seekers do it and the hider confirms.' },
+  { id: 'trivia', label: 'Trivia', hint: 'The hider writes questions, the seekers answer until all are right.' },
   { id: 'time_bonus', label: 'Time bonus', hint: 'Never played: adds time while held at the end of the round.' },
   { id: 'next_question_modifier', label: 'Next question', hint: 'Multiplies the next answer\'s draw and keep.' },
   { id: 'powerup', label: 'Powerup', hint: 'Veto, randomize, duplicate, move or discard/draw.' },
@@ -39,6 +40,11 @@ const BY_BEHAVIOUR: Record<string, ParamField[]> = {
     { key: 'followup_s', label: 'Then a lock of', kind: 'minutes', hint: 'Optional follow-on timer if the task is missed' },
   ],
   until_cleared: [{ key: 'blocks_questions', label: 'Blocks questions until done', kind: 'bool' }],
+  trivia: [
+    { key: 'count', label: 'Questions', kind: 'int', hint: 'Default 3' },
+    { key: 'topic', label: 'Topic', kind: 'text', hint: 'e.g. Harry Potter' },
+    { key: 'blocks_questions', label: 'Blocks questions until done', kind: 'bool' },
+  ],
   time_bonus: [{ key: 'minutes', label: 'Minutes added', kind: 'number', required: true }],
   next_question_modifier: [{ key: 'reward_multiplier', label: 'Reward multiplier', kind: 'number', hint: 'Default 2' }],
   powerup: [

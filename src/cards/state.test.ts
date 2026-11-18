@@ -26,6 +26,8 @@ import {
   isPlayable,
   liveEffects,
   questionsBlockedBy,
+  triviaTodo,
+  triviaWaiting,
 } from './state'
 
 let seq = 0
@@ -407,5 +409,54 @@ describe('cardDetails', () => {
     expect(c.Veto).toBeUndefined()
     expect(c.Drinks).toBe('Hiders and seekers drink when it\'s played')
     expect(c.Proof).toBe('Photo of each drink')
+  })
+})
+
+describe('trivia curses', () => {
+  const moll = card('moll', 'trivia', { blocks_questions: false, blocks: 'transport', count: 3, topic: 'Harry Potter' })
+  const start = () => [
+    ev('game_started', { round: 1, deck: [moll] }),
+    ev('card_played', { round: 1, instance_id: 'i1', card: moll, effect_id: 'e1', blocks_questions: false, count: 3 }),
+  ]
+
+  it('waits for the hider to write the questions, without blocking questions', () => {
+    const s = deriveCards(start())
+    const e = s.effects[0]
+    expect(e.trivia).toEqual({ count: 3, topic: 'Harry Potter', questions: null, forced: false })
+    expect(triviaTodo(e, 'hiders')).toBe('write')
+    expect(triviaTodo(e, 'seekers')).toBeNull()
+    expect(questionsBlockedBy(s)).toEqual([])
+    expect(clearable(e, 0)).toBe(false)
+    expect(liveEffects(s, 0)).toHaveLength(1)
+    expect(cardFacts(parseCard(moll)!)).toContain('3 trivia questions (Harry Potter)')
+    expect(isPlayable(parseCard(moll)!)).toBe(true)
+  })
+
+  it('answers go to the hider, wrong ones back to the seekers, all right clears it', () => {
+    const events = [
+      ...start(),
+      ev('trivia_set', { effect_id: 'e1', questions: ['Owl?', 'Gift?', 'Dog?'] }),
+      ev('trivia_answered', { effect_id: 'e1', index: 0, answer: 'Hedwig', by: 's1' }),
+      ev('trivia_answered', { effect_id: 'e1', index: 1, answer: 'Hat', by: 's1' }),
+    ]
+    let s = deriveCards(events)
+    expect(triviaTodo(s.effects[0], 'hiders')).toBe('mark')
+    expect(triviaTodo(s.effects[0], 'seekers')).toBe('answer')
+    expect(triviaWaiting(s, 'hiders')).toHaveLength(1)
+
+    events.push(ev('trivia_marked', { effect_id: 'e1', index: 0, correct: true, answer: 'Hedwig' }))
+    events.push(ev('trivia_marked', { effect_id: 'e1', index: 1, correct: false, answer: 'Hat' }))
+    s = deriveCards(events)
+    const qs = s.effects[0].trivia!.questions!
+    expect(qs[0]).toMatchObject({ correct: true, answer: 'Hedwig' })
+    expect(qs[1]).toMatchObject({ correct: false, answer: null, wrong: ['Hat'] })
+    expect(triviaTodo(s.effects[0], 'hiders')).toBeNull()
+    expect(s.log.map((l) => l.text)).toContain('MOLL Q2: "Hat" is wrong, try again')
+
+    events.push(ev('trivia_force_cleared', { effect_id: 'e1' }), ev('effect_cleared', { effect_id: 'e1' }))
+    s = deriveCards(events)
+    expect(s.effects[0].trivia!.questions!.every((q) => q.correct)).toBe(true)
+    expect(effectPhase(s.effects[0], 0)).toBe('over')
+    expect(triviaWaiting(s, 'seekers')).toEqual([])
   })
 })
