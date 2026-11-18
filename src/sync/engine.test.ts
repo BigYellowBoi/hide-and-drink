@@ -26,11 +26,17 @@ class FakeServer implements SyncTransport {
   calls: Array<{ fn: string; args: Record<string, unknown> }> = []
   nextResults: ActionResult[] = []
 
+  failStart = 0
+  member = true
   async signIn() {
+    if (this.failStart > 0) {
+      this.failStart--
+      throw new Error('Failed to fetch')
+    }
     return ME
   }
   async membership() {
-    return { team: this.team }
+    return this.member ? { team: this.team } : null
   }
   async fetchEvents(_gameId: string, after: number) {
     this.fetchCount++
@@ -238,6 +244,36 @@ describe('GameSync', () => {
     await vi.advanceTimersByTimeAsync(2100)
     expect(sync.getSnapshot().status).toBe('live')
     expect(sync.getSnapshot().lastSeq).toBe(1)
+    sync.stop()
+  })
+
+  it('reopened with no signal: stays offline and gets back into the game by itself', async () => {
+    const server = new FakeServer()
+    server.append('game_created')
+    server.failStart = 2
+    const sync = new GameSync(GAME, server, { gapGraceMs: 100, pollIntervalMs: 60_000 })
+    await sync.start()
+    expect(sync.getSnapshot().status).toBe('offline')
+    expect(sync.getSnapshot().error).toBeNull()
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(sync.getSnapshot().status).toBe('offline')
+    // Coming back online retries straight away rather than waiting for the backoff.
+    sync.setOnline(true)
+    await flush()
+    server.ackAll()
+    await flush()
+    expect(sync.getSnapshot().status).toBe('live')
+    expect(sync.getSnapshot().events.map((e) => e.type)).toEqual(['game_created'])
+    sync.stop()
+  })
+
+  it('not being a player is still final', async () => {
+    const server = new FakeServer()
+    server.member = false
+    const sync = new GameSync(GAME, server)
+    await sync.start()
+    expect(sync.getSnapshot().status).toBe('error')
+    expect(sync.getSnapshot().error).toBe('not_a_player')
     sync.stop()
   })
 

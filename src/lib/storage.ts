@@ -18,3 +18,6 @@ export function writeLocal(key: string, value: string | null): void {
 
 export const GAME_KEY = 'hd.gameId'
 export const NAME_KEY = 'hd.name'
+
+/** The join code of the last game this phone was in, so it can rejoin after losing its session. */
+export const LAST_CODE_KEY = 'hd.lastCode'

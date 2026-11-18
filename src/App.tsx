@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './lib/supabase'
-import { GAME_KEY, readLocal, writeLocal } from './lib/storage'
+import { GAME_KEY, LAST_CODE_KEY, NAME_KEY, readLocal, writeLocal } from './lib/storage'
+import { joinGame } from './sync/actions'
 import { deriveLobby } from './lobby/state'
-import { describeCode } from './lobby/messages'
+import { describeCode, describeError } from './lobby/messages'
 import { supabaseTransport } from './sync/supabaseTransport'
 import type { SyncTransport } from './sync/transport'
 import { useGameSync } from './sync/useGameSync'
@@ -20,10 +21,39 @@ const transport = supabase ? supabaseTransport(supabase) : null
 const asset = (f: string) => `${import.meta.env.BASE_URL}${f}`
 const TEAM_CHIP = { hiders: 'Hider', seekers: 'Seeker' } as const
 
-function GameScreen({ gameId, transport, onLeave }: { gameId: string; transport: SyncTransport; onLeave: () => void }) {
+function GameScreen({
+  gameId,
+  transport,
+  onLeave,
+  onRejoin,
+}: {
+  gameId: string
+  transport: SyncTransport
+  onLeave: () => void
+  onRejoin: (gameId: string) => void
+}) {
   const game = useGameSync(gameId, transport)
   const lobby = useMemo(() => deriveLobby(game.events), [game.events])
   const [confirmLeave, setConfirmLeave] = useState(false)
+  const [rejoin, setRejoin] = useState<{ busy: boolean; err: string | null }>({ busy: false, err: null })
+
+  // Remember this game's code: if the phone ever loses its player session, it can rejoin.
+  useEffect(() => {
+    if (lobby.code) writeLocal(LAST_CODE_KEY, lobby.code)
+  }, [lobby.code])
+  const savedCode = readLocal(LAST_CODE_KEY)
+  const savedName = readLocal(NAME_KEY)
+  const canRejoin = game.status === 'error' && game.error === 'not_a_player' && !!savedCode && !!savedName
+  const doRejoin = async () => {
+    if (!savedCode || !savedName) return
+    setRejoin({ busy: true, err: null })
+    try {
+      const res = await joinGame(transport, savedCode, savedName)
+      onRejoin(res.game_id)
+    } catch (e) {
+      setRejoin({ busy: false, err: describeError(e) })
+    }
+  }
 
   // In a lobby, leaving removes you on the server too (the last one out deletes the lobby).
   // A running game has locked teams, so there it only forgets the game on this phone. If the
@@ -65,7 +95,17 @@ function GameScreen({ gameId, transport, onLeave }: { gameId: string; transport:
       {/* Locked: nothing on the game screen can be tapped until this phone is caught up. */}
       <div className={`game-body${locked ? ` locked lock-${game.status}` : ''}`} inert={locked}>
         {game.status === 'error' ? (
-          <p className="bad">{describeCode(game.error ?? 'error')}</p>
+          <>
+            <p className="bad">{describeCode(game.error ?? 'error')}</p>
+            {canRejoin && (
+              <>
+                <button className="wide" disabled={rejoin.busy} onClick={() => void doRejoin()}>
+                  {rejoin.busy ? 'Rejoining…' : `Rejoin ${savedCode} as ${savedName}`}
+                </button>
+                {rejoin.err && <p className="bad">{rejoin.err}</p>}
+              </>
+            )}
+          </>
         ) : !game.sync || !lobby.code ? (
           <p className="muted">Loading game…</p>
         ) : lobby.status === 'lobby' ? (
@@ -114,6 +154,8 @@ export default function App() {
   const [gameId, setGameId] = useState<string | null>(() => readLocal(GAME_KEY))
   const [settings, setSettings] = useState(false)
 
+  const [attempt, setAttempt] = useState(0)
+
   const enter = (id: string | null) => {
     writeLocal(GAME_KEY, id)
     setGameId(id)
@@ -130,7 +172,16 @@ export default function App() {
             <p className="bad">Backend not configured (see .env.example).</p>
           </>
         ) : gameId ? (
-          <GameScreen key={gameId} gameId={gameId} transport={transport} onLeave={() => enter(null)} />
+          <GameScreen
+            key={`${gameId}:${attempt}`}
+            gameId={gameId}
+            transport={transport}
+            onLeave={() => enter(null)}
+            onRejoin={(id) => {
+              enter(id)
+              setAttempt((n) => n + 1)
+            }}
+          />
         ) : settings ? (
           <Settings transport={transport} onBack={() => setSettings(false)} />
         ) : (
