@@ -68,9 +68,15 @@ export interface Question {
   late: boolean
   /** The missed-deadline penalty has been logged. */
   overdue: boolean
+  /** Closed by a powerup instead of an answer. */
+  closedBy: 'veto' | 'randomize' | null
+  /** Randomize: the question this one replaced. */
+  randomizedFrom: string | null
+  /** Final reward when a modifier changed it (question_answered). */
+  rewardMultiplier: number | null
 }
 
-export type LogKind = 'seeking' | 'asked' | 'answered' | 'penalty' | 'bar' | 'draw' | 'card'
+export type LogKind = 'seeking' | 'asked' | 'answered' | 'penalty' | 'bar' | 'draw' | 'card' | 'proof'
 export interface LogEntry {
   seq: number
   kind: LogKind
@@ -78,8 +84,10 @@ export interface LogEntry {
   text: string
   /** Hider-only entry (shown with a lock). */
   private?: boolean
-  /** Storage path of an answer photo. */
+  /** Storage path of a photo (answer photo, or drink proof with photoBucket). */
   photo?: string
+  /** Bucket of the photo; default the answer-photo bucket. */
+  photoBucket?: string
   /** Dot colour (card category), when the kind's own colour doesn't fit. */
   colour?: string
 }
@@ -92,6 +100,8 @@ export interface PlayState {
   questions: Question[]
   pending: Question | null
   penalties: number
+  /** Seq of the last hider_moved: answers before it describe the old bar. */
+  movedSeq: number
   log: LogEntry[]
 }
 
@@ -102,6 +112,7 @@ export const emptyPlay: PlayState = {
   questions: [],
   pending: null,
   penalties: 0,
+  movedSeq: 0,
   log: [],
 }
 
@@ -185,9 +196,11 @@ export function thermometerParams(q: Pick<Question, 'type' | 'params'>): Thermom
     : null
 }
 
+const isOpen = (q: Question) => q.answer === null && q.closedBy === null
+
 function update(state: PlayState, id: string | null, f: (q: Question) => Question): PlayState {
   const questions = state.questions.map((q) => (q.id === id ? f(q) : q))
-  return { ...state, questions, pending: questions.find((q) => q.answer === null) ?? null }
+  return { ...state, questions, pending: questions.find(isOpen) ?? null }
 }
 
 export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
@@ -232,6 +245,9 @@ export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
         answeredAt: null,
         late: false,
         overdue: false,
+        closedBy: null,
+        randomizedFrom: str(p.randomized_from),
+        rewardMultiplier: null,
       }
       return {
         ...state,
@@ -239,7 +255,7 @@ export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
         seekingStarted: true,
         questions: [...state.questions, q],
         pending: q,
-        log: [...state.log, { seq: e.seq, kind: 'asked', at, text: `${questionLabel(q)} asked` }],
+        log: [...state.log, { seq: e.seq, kind: 'asked', at, text: q.randomizedFrom ? `Randomized into ${questionLabel(q)}` : `${questionLabel(q)} asked` }],
       }
     }
     case 'question_answered': {
@@ -252,6 +268,8 @@ export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
         answer,
         answeredAt: time(p.answered_at, e.created_at),
         late: p.late === true,
+        rewardMultiplier: num(p.reward_multiplier),
+        reward: isObject(p.reward) ? { draw: num(p.reward.draw) ?? x.reward.draw, pick: num(p.reward.pick) ?? x.reward.pick } : x.reward,
       }))
       const label = q ? questionLabel(q) : 'Question'
       return {
@@ -268,6 +286,15 @@ export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
         ],
       }
     }
+    case 'card_played': {
+      // Veto and Randomize close the pending question (Randomize's new one follows as question_asked).
+      const id = str(p.question_id)
+      const action = isObject(p.card) && isObject(p.card.params) ? p.card.params.action : null
+      if (!id || (action !== 'veto' && action !== 'randomize')) return state
+      return update(state, id, (x) => ({ ...x, closedBy: action, answeredAt: time(p.played_at, e.created_at) }))
+    }
+    case 'hider_moved':
+      return { ...state, movedSeq: e.seq }
     case 'answer_overdue': {
       const id = str(p.question_id)
       const next = update(state, id, (x) => ({ ...x, overdue: true }))
@@ -284,9 +311,13 @@ export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
 
 export const derivePlay = (events: readonly GameEvent[]): PlayState => events.reduce(applyPlayEvent, emptyPlay)
 
-/** Answered questions of this round the app can shade. */
+/** Answered questions of this round the app can shade (only since the hider's last move). */
 export const shadable = (s: PlayState) =>
-  s.questions.filter((q) => q.round === s.round && q.answer !== null && isSupportedType(q.type))
+  s.questions.filter((q) => q.round === s.round && q.answer !== null && q.seq > s.movedSeq && isSupportedType(q.type))
+
+/** What happened to a question, in words, for lists. */
+export const outcomeText = (q: Question): string =>
+  q.closedBy === 'veto' ? 'Vetoed' : q.closedBy === 'randomize' ? 'Randomized' : q.answer ? answerText(q, q.answer) : 'Waiting'
 
 /** What a phone should ask the server to settle now (null: nothing due). Server decides. */
 export function dueTimer(s: PlayState, serverNow: number): string | null {

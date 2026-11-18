@@ -20,12 +20,13 @@ export async function shrinkPhoto(file: Blob): Promise<Blob> {
   )
 }
 
-export const photoPath = (gameId: string, questionId: string, fileId: string = crypto.randomUUID()) =>
-  `${gameId}/${questionId}/${fileId.replace(/[^A-Za-z0-9_-]/g, '')}.jpg`
+/** <game_id>/<question or proof id>/<file>.jpg */
+export const photoPath = (gameId: string, ownerId: string, fileId: string = crypto.randomUUID()) =>
+  `${gameId}/${ownerId}/${fileId.replace(/[^A-Za-z0-9_-]/g, '')}.jpg`
 
 /** Upload; returns the path to send with answer_question. Upserts so a retry is harmless. */
-export async function uploadPhoto(client: SupabaseClient, path: string, photo: Blob): Promise<string> {
-  const { error } = await client.storage.from(PHOTO_BUCKET).upload(path, photo, { contentType: 'image/jpeg', upsert: false })
+export async function uploadPhoto(client: SupabaseClient, path: string, photo: Blob, bucket = PHOTO_BUCKET): Promise<string> {
+  const { error } = await client.storage.from(bucket).upload(path, photo, { contentType: 'image/jpeg', upsert: false })
   if (error && !/exists|duplicate/i.test(error.message)) throw new Error(error.message)
   return path
 }
@@ -33,18 +34,19 @@ export async function uploadPhoto(client: SupabaseClient, path: string, photo: B
 const urls = new Map<string, Promise<string>>()
 
 /** Signed URL (1 h) for showing a photo; cached per session. */
-export function photoUrl(client: SupabaseClient, path: string): Promise<string> {
-  let p = urls.get(path)
+export function photoUrl(client: SupabaseClient, path: string, bucket = PHOTO_BUCKET): Promise<string> {
+  const key = `${bucket}/${path}`
+  let p = urls.get(key)
   if (!p) {
     p = client.storage
-      .from(PHOTO_BUCKET)
+      .from(bucket)
       .createSignedUrl(path, 3600)
       .then(({ data, error }) => {
         if (error || !data) throw new Error(error?.message ?? 'Photo not available')
         return data.signedUrl
       })
-    urls.set(path, p)
-    p.catch(() => urls.delete(path))
+    urls.set(key, p)
+    p.catch(() => urls.delete(key))
   }
   return p
 }

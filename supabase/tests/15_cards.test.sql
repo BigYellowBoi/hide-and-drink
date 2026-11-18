@@ -379,7 +379,7 @@ select lives_ok(
 );
 select throws_ok(
   format($$ select public.play_card(pg_temp.gid(), %L, pg_temp.uid(82), pg_temp.seq()) $$, current_setting('test.veto')),
-  'P0001', 'card_behaviour_not_supported', 'powerups are not in the app yet'
+  'P0001', 'no_pending_question', 'a veto needs a pending question'
 );
 
 -- ---------------------------------------------------------------- short and empty pile

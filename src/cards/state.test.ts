@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '../sync/types'
 import {
+  banKey,
+  bannedSet,
   cardFacts,
+  cardUtility,
+  castBlocker,
+  castChoice,
   deriveCards,
+  lockedUntil,
+  nextVetoLockS,
+  openProofs,
+  vetoable,
+  vetoLock,
   effectPhase,
   effectTimer,
   FOLLOWUP_WINDOW_MS,
@@ -180,5 +190,135 @@ describe('cardFacts', () => {
     expect(cardFacts(s.deck.escape)).toEqual(['3 min, then 10 min if missed', "Can't veto"])
     expect(cardFacts(s.deck.cuisine)).toEqual(['Blocks questions'])
     expect(cardFacts(s.deck.bonus)).toEqual(['+4 min'])
+  })
+})
+
+describe('powerups, bans, vetoes, utilities and drink proofs', () => {
+  const pu = (id: string, params: Record<string, unknown>, behaviour = 'powerup') =>
+    card(id, behaviour, params, { category: 'powerup', cast_cost: null, can_veto: null })
+  const deck2 = [
+    ...deck,
+    pu('veto', { action: 'veto' }),
+    pu('dup', { action: 'duplicate' }),
+    pu('dd', { action: 'discard_draw', discard: 1, draw: 2 }),
+    pu('move', { action: 'move' }),
+    pu('double', { reward_multiplier: 2, cost: 'shot' }, 'next_question_modifier'),
+    card('brain', 'question_ban', { count: 3, distinct_types: true, until: 'end_of_run' }, { can_veto: false }),
+    card('jam', 'timed', { duration_s: 1800, utility: 'dice', dice: 2 }),
+  ]
+  const s0 = ev('game_started', { round: 1, deck: deck2, hand_limit: 6 })
+  const hand = ev(
+    'cards_drawn',
+    {
+      draw_id: 'h',
+      pick: 3,
+      cards: [
+        { instance_id: 'a', card_id: 'dup' },
+        { instance_id: 'b', card_id: 'cuisine' },
+        { instance_id: 'c', card_id: 'dd' },
+      ],
+    },
+    'hiders',
+  )
+  const keepAll = ev('cards_kept', { draw_id: 'h', kept: ['a', 'b', 'c'], discarded: [] }, 'hiders')
+  const played = (instance: string, id: string, extra: Record<string, unknown> = {}, vis: GameEvent['visibility'] = 'all') =>
+    ev('card_played', { instance_id: instance, card: deck2.find((c) => c.card_id === id), played_at: '2026-11-20T10:00:00Z', ...extra }, vis)
+
+  it('duplicate adds a copy to the hand; discard/draw removes the discarded cards', () => {
+    const dup = played('a', 'dup', { duplicate: { of: 'b', instance_id: 'b2', card_id: 'cuisine' } }, 'hiders')
+    const s = deriveCards([s0, hand, keepAll, dup])
+    expect(s.hand.map((c) => c.instanceId)).toEqual(['b', 'c', 'b2'])
+    expect(s.log.at(-1)).toMatchObject({ text: 'Duplicated CUISINE', private: true })
+    const dd = played('c', 'dd', { discarded: ['b'] }, 'hiders')
+    expect(deriveCards([s0, hand, keepAll, dup, dd]).hand.map((c) => c.instanceId)).toEqual(['b2'])
+  })
+
+  it('cast choices and blockers follow the card', () => {
+    const s = deriveCards([s0])
+    expect(castChoice(s.deck.dup)).toEqual({ kind: 'target' })
+    expect(castChoice(s.deck.dd)).toEqual({ kind: 'discard', count: 1 })
+    expect(castChoice(s.deck.brain)).toEqual({ kind: 'bans', count: 3, distinctTypes: true })
+    const ctx = { pendingQuestion: false, barChosen: true, moving: false, handSize: 3 }
+    expect(castBlocker(s.deck.veto, ctx)).toMatch(/question/)
+    expect(castBlocker(s.deck.veto, { ...ctx, pendingQuestion: true })).toBeNull()
+    expect(castBlocker(s.deck.move, { ...ctx, barChosen: false })).toMatch(/bar/)
+    expect(castBlocker(s.deck.dd, { ...ctx, handSize: 1 })).toMatch(/discard/)
+    expect(isPlayable(s.deck.veto)).toBe(true)
+    expect(isPlayable({ ...s.deck.veto, params: { action: 'teleport' } })).toBe(false)
+  })
+
+  it('a modifier waits for the next answer', () => {
+    const s = deriveCards([s0, played('x', 'double', { reward_multiplier: 2 })])
+    expect(s.nextRewardMultiplier).toBe(2)
+    expect(deriveCards([s0, played('x', 'double', { reward_multiplier: 2 }), ev('question_answered', {})]).nextRewardMultiplier).toBe(1)
+  })
+
+  it('bans are listed until vetoed', () => {
+    const ban = played('z', 'brain', { bans: [{ type: 'radar', option_id: '1km', label: '1 km' }] })
+    const s = deriveCards([s0, ban])
+    expect([...bannedSet(s)]).toEqual([banKey('radar', '1km')])
+    expect(s.log.at(-1)?.text).toBe('BRAIN played: banned 1 km')
+  })
+
+  it('move holds questions until hider_moved', () => {
+    const s = deriveCards([s0, played('m', 'move')])
+    expect(s.moving).toBe(true)
+    expect(deriveCards([s0, played('m', 'move'), ev('hider_moved', {})]).moving).toBe(false)
+  })
+
+  it('a veto ends the curse and chains bar locks', () => {
+    const t0 = Date.parse('2026-11-20T10:00:00Z')
+    const curse = played('k', 'cuisine', { effect_id: 'e1', blocks_questions: true })
+    const veto = ev('curse_vetoed', {
+      instance_id: 'k',
+      effect_id: 'e1',
+      name: 'CUISINE',
+      veto_number: 1,
+      lock_s: 600,
+      lock_starts_at: '2026-11-20T10:00:00Z',
+      lock_ends_at: '2026-11-20T10:10:00Z',
+      penalty: 'each seeker drinks',
+    })
+    const before = deriveCards([s0, curse])
+    expect(vetoable(before, before.played[0], t0)).toBe(true)
+    const s = deriveCards([s0, curse, veto])
+    expect(s.effects[0].status).toBe('vetoed')
+    expect(questionsBlockedBy(s)).toEqual([])
+    expect(liveEffects(s, t0)).toEqual([])
+    expect(vetoable(s, s.played[0], t0)).toBe(false)
+    expect(vetoLock(s, t0 + 60_000)?.name).toBe('CUISINE')
+    expect(lockedUntil(s, t0 + 60_000)).toBe(t0 + 600_000)
+    expect(lockedUntil(s, t0 + 600_000)).toBeNull()
+    expect(nextVetoLockS(s, { veto: { base_lock_s: 600, step_s: 300 } })).toBe(900)
+    expect(nextVetoLockS(s, {})).toBe(1200)
+    // Can't-veto curses and non-curses are never vetoable.
+    const brain = deriveCards([s0, played('z', 'brain', { bans: [] })])
+    expect(vetoable(brain, brain.played[0], t0)).toBe(false)
+  })
+
+  it('dice and wheel results are kept per card', () => {
+    const jam = played('j', 'jam', { effect_id: 'e9', ends_at: '2026-11-20T10:30:00Z', duration_s: 1800 })
+    const roll = ev('dice_rolled', { instance_id: 'j', name: 'JAM', dice: [3, 5], total: 8, by: 'u1' })
+    const s = deriveCards([s0, jam, roll])
+    expect(cardUtility(s.deck.jam)).toEqual({ kind: 'dice', dice: 2 })
+    expect(s.rolls[0]).toMatchObject({ kind: 'dice', dice: [3, 5], total: 8 })
+    expect(s.log.at(-1)?.text).toBe('JAM: rolled 3 + 5 = 8')
+    const spin = ev('wheel_spun', { instance_id: 'j', name: 'JAM', result: 'Pirate' })
+    expect(deriveCards([s0, spin]).rolls[0]).toMatchObject({ kind: 'wheel', result: 'Pirate' })
+    expect(cardUtility({ ...s.deck.jam, params: { utility: 'wheel', wheel_url: 'https://x' } })).toEqual({
+      kind: 'wheel',
+      options: [],
+      url: 'https://x',
+    })
+  })
+
+  it('drink proofs stay open until a photo is sent', () => {
+    const due = ev('drink_due', { proof_id: 'p1', team: 'seekers', cost: 'drink', label: 'Cheers' })
+    const s = deriveCards([s0, due])
+    expect(openProofs(s, 'seekers').map((p) => p.id)).toEqual(['p1'])
+    expect(openProofs(s, 'hiders')).toEqual([])
+    const done = deriveCards([s0, due, ev('drink_proved', { proof_id: 'p1', team: 'seekers', path: 'g/p1/x.jpg' })])
+    expect(openProofs(done, 'seekers')).toEqual([])
+    expect(done.log.at(-1)).toMatchObject({ kind: 'proof', photo: 'g/p1/x.jpg', photoBucket: 'drink-photos' })
   })
 })

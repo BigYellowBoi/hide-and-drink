@@ -188,7 +188,12 @@
       "behaviour": "text",
       "copies": 2,
       "text": "One team member from each team must drink asap.",
-      "params": {},
+      "params": {
+        "drinks": [
+          "hiders",
+          "seekers"
+        ]
+      },
       "active": true
     },
     {
@@ -198,7 +203,12 @@
       "behaviour": "text",
       "copies": 1,
       "text": "Everyone on both teams must drink asap.",
-      "params": {},
+      "params": {
+        "drinks": [
+          "hiders",
+          "seekers"
+        ]
+      },
       "active": true
     },
     {

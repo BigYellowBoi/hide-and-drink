@@ -27,12 +27,13 @@ select is(
     order by 1
   ),
   array[
-    'answer_question', 'ask_question', 'can_join_topic', 'can_read_question_photo', 'can_see', 'can_see_seeker_position',
-    'can_upload_question_photo', 'can_use_presence',
+    'answer_question', 'ask_question', 'can_join_topic', 'can_read_drink_photo', 'can_read_question_photo', 'can_see', 'can_see_seeker_position',
+    'can_upload_drink_photo', 'can_upload_question_photo', 'can_use_presence',
     'choose_bar', 'clear_effect', 'confirm_clear', 'create_game', 'delete_play_area', 'get_city_pack', 'hiding_bars',
     'is_player', 'join_game', 'keep_cards', 'leave_game',
-    'my_team', 'play_card', 'remove_player', 'report_position', 'save_play_area', 'server_time', 'set_play_area', 'set_team',
-    'settle_timers', 'start_followup', 'start_game', 'topic_for', 'update_config'
+    'my_team', 'play_card', 'remove_player', 'report_position', 'roll_dice', 'save_play_area', 'server_time', 'set_play_area',
+    'set_team', 'settle_timers', 'spin_wheel', 'start_followup', 'start_game', 'submit_drink_proof', 'topic_for',
+    'update_config', 'veto_curse'
   ],
   'signed-in clients can call only the allow-listed functions'
 );

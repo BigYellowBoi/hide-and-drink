@@ -5,6 +5,7 @@ import { describeError } from '../lobby/messages'
 import type { GameSync } from '../sync/engine'
 import type { Team } from '../sync/types'
 import { CardFace } from './CardFace'
+import { BanList, CardUtility, LockBanner, VetoButton, VetoSummary } from './CardExtras'
 
 interface Props {
   sync: GameSync
@@ -12,18 +13,29 @@ interface Props {
   team: Team
   canAct: boolean
   now: number
+  /** Game config (veto lock lengths). */
+  config: Record<string, unknown>
+  nameOf: (userId: string | null) => string
 }
 
 const minutes = (s: number | null) => (s ? `${Math.round(s / 60)} min` : '')
 
 /** Cards in play: blocked banner, curses with timers or We did it, then what's been played. */
-export function EffectsPanel({ sync, cards, team, canAct, now }: Props) {
+export function EffectsPanel(props: Props) {
+  const { sync, cards, team, canAct, now, config, nameOf } = props
   const live = liveEffects(cards, now)
   const blocked = questionsBlockedBy(cards)
   const others = [...cards.played].filter((p) => !p.effectId).reverse()
   return (
     <>
       {blocked.length > 0 && <BlockedBanner effects={blocked} team={team} />}
+      <LockBanner cards={cards} team={team} now={now} />
+      {cards.moving && (
+        <div className="blocked-banner" role="status">
+          <strong>Hider is moving</strong>
+          <p>Questions wait until they lock in a new bar.</p>
+        </div>
+      )}
       <section className="card">
         <h2>In play</h2>
         {live.length === 0 ? (
@@ -31,11 +43,13 @@ export function EffectsPanel({ sync, cards, team, canAct, now }: Props) {
         ) : (
           <div className="effect-list">
             {live.map((e) => (
-              <EffectCard key={e.id} sync={sync} effect={e} team={team} canAct={canAct} now={now} />
+              <EffectCard key={e.id} {...props} effect={e} />
             ))}
           </div>
         )}
+        <VetoSummary cards={cards} config={config} />
       </section>
+      <BanList cards={cards} />
       {others.length > 0 && (
         <section className="card">
           <h2>Played this round</h2>
@@ -46,6 +60,9 @@ export function EffectsPanel({ sync, cards, team, canAct, now }: Props) {
                 <span>
                   <strong>{p.card.name}</strong>
                   {p.card.text ? `: ${p.card.text}` : ''}
+                  {cards.vetoes.some((v) => v.instanceId === p.instanceId) && <span className="penalty"> · vetoed</span>}
+                  <CardUtility sync={sync} cards={cards} instanceId={p.instanceId} card={p.card} canAct={canAct} nameOf={nameOf} />
+                  {team === 'seekers' && <VetoButton sync={sync} cards={cards} played={p} config={config} canAct={canAct} now={now} />}
                 </span>
               </li>
             ))}
@@ -68,11 +85,12 @@ export function BlockedBanner({ effects, team }: { effects: readonly Effect[]; t
   )
 }
 
-function EffectCard({ sync, effect: e, team, canAct, now }: Omit<Props, 'cards'> & { effect: Effect }) {
+function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf }: Props & { effect: Effect }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const phase = effectPhase(e, now)
   const timer = effectTimer(e, now)
+  const played = cards.played.find((p) => p.effectId === e.id)
 
   const act = async (fn: string, params: Record<string, unknown>) => {
     setBusy(true)
@@ -108,6 +126,8 @@ function EffectCard({ sync, effect: e, team, canAct, now }: Omit<Props, 'cards'>
       {phase === 'awaiting_confirm' && (
         <span className="muted small">{team === 'seekers' ? 'Waiting for the hider to confirm.' : 'Seekers say they did it. Confirm above.'}</span>
       )}
+      {played && <CardUtility sync={sync} cards={cards} instanceId={played.instanceId} card={e.card} canAct={canAct} nameOf={nameOf} />}
+      {played && team === 'seekers' && <VetoButton sync={sync} cards={cards} played={played} config={config} canAct={canAct} now={now} />}
       {err && <span className="bad small">{err}</span>}
     </CardFace>
   )

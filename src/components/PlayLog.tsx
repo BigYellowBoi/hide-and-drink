@@ -25,7 +25,7 @@ export function PlayLog({ log, lobby }: Props) {
               <span className="log-time">+{formatClock(l.at - roundStart, { up: true })}</span>
               <span>
                 {l.text}
-                {l.photo && <PhotoThumb path={l.photo} />}
+                {l.photo && <PhotoThumb path={l.photo} bucket={l.photoBucket} alt={l.photoBucket ? 'Drink photo' : 'Answer photo'} />}
                 {l.private && (
                   <span className="muted small">
                     {' '}

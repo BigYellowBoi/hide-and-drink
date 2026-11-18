@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '../sync/types'
-import { derivePlay, dueTimer, questionLabel, shadable } from './state'
+import { derivePlay, dueTimer, outcomeText, questionLabel, shadable } from './state'
 
 let seq = 0
 const ev = (type: string, payload: Record<string, unknown>, visibility: GameEvent['visibility'] = 'all'): GameEvent => ({
@@ -80,5 +80,47 @@ describe('dueTimer', () => {
 
     const done = derivePlay([started, ev('seeking_started', {}), asked, ev('answer_overdue', { question_id: 'q1' })])
     expect(dueTimer(done, Date.parse('2026-11-20T09:50:00Z'))).toBeNull()
+  })
+})
+
+describe('powerups on questions', () => {
+  const vetoCard = { card_id: 'veto', name: 'Veto', behaviour: 'powerup', params: { action: 'veto' } }
+  const randCard = { card_id: 'randomize', name: 'Randomize', behaviour: 'powerup', params: { action: 'randomize' } }
+
+  it('a vetoed question closes with no answer and is not shaded', () => {
+    const s = derivePlay([started, asked, ev('card_played', { card: vetoCard, question_id: 'q1', played_at: '2026-11-20T09:41:00Z' })])
+    expect(s.pending).toBeNull()
+    expect(s.questions[0].closedBy).toBe('veto')
+    expect(outcomeText(s.questions[0])).toBe('Vetoed')
+    expect(shadable(s)).toEqual([])
+  })
+
+  it('randomize closes the question and the new one is pending', () => {
+    const next = ev('question_asked', {
+      ...asked.payload,
+      question_id: 'q2',
+      option_id: '3km',
+      params: { center: [153, -27], distance_m: 3000 },
+      randomized_from: 'q1',
+    })
+    const s = derivePlay([started, asked, ev('card_played', { card: randCard, question_id: 'q1' }), next])
+    expect(s.questions.map((q) => q.closedBy)).toEqual(['randomize', null])
+    expect(s.pending?.id).toBe('q2')
+    expect(s.log.at(-1)?.text).toBe('Randomized into Radar 3 km')
+  })
+
+  it('answers from before a move are not shaded', () => {
+    const answered = ev('question_answered', { question_id: 'q1', answer: 'yes' })
+    expect(shadable(derivePlay([started, asked, answered]))).toHaveLength(1)
+    expect(shadable(derivePlay([started, asked, answered, ev('hider_moved', {})]))).toEqual([])
+  })
+
+  it('a doubled reward is kept on the answer', () => {
+    const s = derivePlay([
+      started,
+      asked,
+      ev('question_answered', { question_id: 'q1', answer: 'yes', reward_multiplier: 2, reward: { draw: 4, pick: 2 } }),
+    ])
+    expect(s.questions[0]).toMatchObject({ rewardMultiplier: 2, reward: { draw: 4, pick: 2 } })
   })
 })
