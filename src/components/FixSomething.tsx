@@ -75,7 +75,7 @@ function Num({ label, value, onChange, min, max }: { label: string; value: numbe
 export function FixSomething({ sync, lobby, play, cards, overrides, userId, team, canAct, layer, request, onClose }: Props) {
   const isHost = !!userId && userId === lobby.hostId
   const isHider = team === 'hiders'
-  const options = useMemo(() => availableOverrides(isHost, isHider), [isHost, isHider])
+  const options = useMemo(() => availableOverrides(isHost, isHider, team !== null), [isHost, isHider, team])
   const [kind, setKind] = useState<string | null>(request?.kind ?? null)
   const [params, setParams] = useState<Params>(request?.params ?? {})
   const [reason, setReason] = useState('')
@@ -97,7 +97,13 @@ export function FixSomething({ sync, lobby, play, cards, overrides, userId, team
         p_reason: request ? null : reason,
         p_request_id: request?.id ?? null,
       })) as { pending?: boolean } | null
-      setDone(res?.pending ? 'Sent to the hiders: a hider does this one (you only see that it happened).' : 'Done. It shows in the timeline.')
+      setDone(
+        option.kind === 'undo'
+          ? 'Asked. The undo happens once a player on the other team agrees.'
+          : res?.pending
+            ? 'Sent to the hiders: a hider does this one (you only see that it happened).'
+            : 'Done. It shows in the timeline.',
+      )
     } catch (e) {
       setErr(describeError(e))
     } finally {
@@ -374,7 +380,7 @@ export function FixSomething({ sync, lobby, play, cards, overrides, userId, team
                 disabled={busy || !canAct || (!request && !reason.trim())}
                 onClick={() => void submit(toHiders && option.private ? {} : sendParams)}
               >
-                {busy ? 'Saving…' : toHiders ? 'Ask the hiders' : 'Do it'}
+                {busy ? 'Saving…' : toHiders ? 'Ask the hiders' : option.kind === 'undo' ? 'Ask both teams' : 'Do it'}
               </button>
             </div>
           </>

@@ -10,11 +10,15 @@ This is the audit of `supabase/migrations/` (up to `20261213090000_host_override
 - **Who:** the host, for every kind. Any hider, for the hider-only kinds (below). A seeker who isn't host: none (`host_only`).
 - **Reason:** required, 1 to 120 characters (`invalid_reason`). Shown to everyone.
 - **Record:** a public `override` event with `override_id`, `kind`, `reason`, `by`, `summary` (one line) and `private`. It's a "Host fix" row in the timeline.
-- **Hider-only kinds** (`set_bar`, `give_card`, `remove_card`, `draw_cards`, `reshuffle`, `move_player` onto the hiders, and `undo` of one of these):
+- **Hider-only kinds** (`set_bar`, `give_card`, `remove_card`, `draw_cards`, `reshuffle`, `move_player` onto the hiders):
   - A hider does them directly.
   - A seeker host only files a request: public `override_requested` with the kind and reason, no details. The hiders get a banner. A hider carries it out by calling `host_override` with `request_id` and picks the details. Or they decline it (kind `decline`; the host can withdraw their own request the same way).
   - The public `override` event then says only what kind of thing changed (for example "Changed the hider's bar") with empty `params`. The details go in a hiders-only `override_detail` event. Leak test: `supabase/tests/24_host_overrides.test.sql`.
-- **Undo** (kind `undo`, `params.override_id`):
+- **Undo** (kind `undo`, `params.override_id`) needs both teams to agree (`20261214090000_undo_both_teams.sql`):
+  - Any player on a team asks, with a reason. That files a public `override_requested` (kind `undo`) and counts as their team's yes. One open undo request per fix (`undo_already_requested`).
+  - A player on the other team agrees with `host_override` kind `confirm` and the `request_id` (`override_confirmed`), or either team says no with kind `decline`. A second yes from the same team is refused (`already_confirmed`).
+  - Phones show the request as a banner with Agree / No to the team that still has to answer.
+  - Once each team has said yes, the undo runs. Its `override` event records `confirmed_by` (one player per team). Undoing a hider-only fix shows seekers only its public summary, never the details.
   - Every row an override changes is captured (`override_changes`, by a trigger while `hd.override_id` is set).
   - Every event it appends carries `payload.override_id`.
   - Undo restores the rows, newest change first. It refuses `undo_conflict` if any of those rows has changed since. Then it logs `override_undone`.
@@ -54,7 +58,7 @@ This is the audit of `supabase/migrations/` (up to `20261213090000_host_override
 | `reshuffle` (hider-only) | none | Discards back into the pile, shuffled | `deck_reshuffled` (hiders) |
 | `move_player` | `user_id`, `team` | Mid-game team change. Onto the hiders is hider-only (needs a hider) | `team_changed` |
 | `set_host` | `user_id` | Reassigns the host | `host_changed` |
-| `undo` | `override_id` | See above | `override_undone` |
+| `undo` | `override_id` | Asks to undo; runs once both teams agree (see above) | `override_requested`, `override_confirmed`, `override_undone` |
 
 ## Automatic events
 
@@ -134,4 +138,4 @@ These refuse bad input in the lobby or the shared library. Correcting the input 
 
 ### Refusals of `host_override` itself
 
-`invalid_reason`, `unknown_override`, `invalid_override`, `request_not_open`, `no_penalty`, `proof_not_found`, `timer_paused`, `timer_not_paused`, `timer_not_running`, `no_timer`, `veto_not_found`, `already_void`, `ban_not_found`, `effect_active`, `not_moving`, `same_team`, `already_host`, `override_not_found`, `already_undone`, `undo_conflict`. Each is a "that's already the case" or "pick something else" answer. None of them blocks play.
+`invalid_reason`, `unknown_override`, `invalid_override`, `request_not_open`, `no_penalty`, `proof_not_found`, `timer_paused`, `timer_not_paused`, `timer_not_running`, `no_timer`, `veto_not_found`, `already_void`, `ban_not_found`, `effect_active`, `not_moving`, `same_team`, `already_host`, `override_not_found`, `already_undone`, `undo_conflict`, `undo_already_requested`, `already_confirmed`. Each is a "that's already the case" or "pick something else" answer. None of them blocks play.
