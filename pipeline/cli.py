@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 from pipeline import pack as pack_mod
 from pipeline import to_sql
@@ -38,9 +39,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"wrote {pack_path.relative_to(ROOT)} ({pack_path.stat().st_size / 1e6:.1f} MB)")
         print(pack_mod.summary(pack))
     else:
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+        stamp = next_stamp(datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S"), ROOT / "supabase" / "migrations")
         out = ROOT / (args.out or f"supabase/migrations/{stamp}_city_pack_{args.city}.sql")
         to_sql.write(pack_path, out, ROOT)
         layers = json.loads(pack_path.read_text())["pack"]["layers"]
         print(f"wrote {out.relative_to(ROOT)} ({sum(x['count'] for x in layers)} features)")
     return 0
+
+
+def next_stamp(now: str, migrations: Path) -> str:
+    """UTC now, or just after the newest migration if that sorts later: a migration stamped before
+    one already applied would be skipped."""
+    stamps = [p.name.split("_", 1)[0] for p in migrations.glob("*.sql")]
+    latest = max((s for s in stamps if s.isdigit() and len(s) == 14), default="0")
+    return now if now > latest else str(int(latest) + 100)

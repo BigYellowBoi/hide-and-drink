@@ -253,7 +253,7 @@ export function AskPanel({
       {(MAP_TYPES.includes(type) || type === 'thermometer') && (
         <>
       <Suspense fallback={<div className="game-map ask-map" />}>
-        <LazyGameMap city={city} playArea={playArea} className="ask-map" overlay={overlay} onTap={setTapped} onLongPress={onLongPress} tapNames={false} />
+        <LazyGameMap city={city} playArea={playArea} className="ask-map" overlay={overlay} onTap={setTapped} onLongPress={onLongPress} tapNames={false} hideVenues />
       </Suspense>
       <p className="muted small">
         {tapped ? (

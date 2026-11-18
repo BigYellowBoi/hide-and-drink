@@ -1645,32 +1645,6 @@ button.link {
   padding: 8px 16px 12px;
 }
 
-.remaining-list {
-  list-style: none;
-  margin: 12px 0 0;
-  padding: 0;
-  display: grid;
-  gap: 4px;
-  max-height: 320px;
-  overflow-y: auto;
-}
-
-.remaining-row {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  min-height: 44px;
-  padding: 8px 12px;
-  border-radius: 12px;
-  background: var(--surface-2);
-  border: 2px solid transparent;
-  color: var(--text);
-  font-weight: 400;
-  text-align: left;
-}
-
 .play-log {
   list-style: none;
   margin: 0;

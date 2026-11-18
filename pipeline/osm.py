@@ -56,8 +56,9 @@ def rule_keys(layers: list[dict]) -> set[str]:
     return keys
 
 
-def overpass_query(layers: list[dict], area) -> str:
-    """One Overpass query fetching every element any layer could match inside the area."""
+def overpass_query(layers: list[dict], area, include: frozenset[str] = frozenset()) -> str:
+    """One Overpass query fetching every element any layer could match inside the area, plus the
+    venue `include` ids (fetched by id, so their tags need not match any rule)."""
     minx, miny, maxx, maxy = area.bounds
     bbox = f"{miny:.6f},{minx:.6f},{maxy:.6f},{maxx:.6f}"
     parts = []
@@ -71,6 +72,12 @@ def overpass_query(layers: list[dict], area) -> str:
                     vals = "|".join(re.escape(x) for x in v)
                     sel += f'["{k}"~"(^|;)({vals})(;|$)"]'
             parts.append(f"  nwr{sel}({bbox});")
+    by_type: dict[str, list[str]] = defaultdict(list)
+    for fid in include:
+        kind, _, num = fid.removeprefix("osm:").partition("/")
+        by_type[kind].append(num)
+    for kind, nums in by_type.items():
+        parts.append(f"  {kind}(id:{','.join(sorted(nums, key=int))});")
     body = "\n".join(sorted(set(parts)))
     return f"[out:json][timeout:240];\n(\n{body}\n);\nout geom qt;"
 
@@ -123,19 +130,30 @@ def from_overpass(body: dict) -> list[dict]:
     return out
 
 
-def from_pbf(path: Path, layers: list[dict], area) -> list[dict]:
-    """Read a .osm.pbf extract with pyosmium, keeping only elements a layer could match."""
+def from_pbf(path: Path, layers: list[dict], area, include: frozenset[str] = frozenset()) -> list[dict]:
+    """Read a .osm.pbf extract with pyosmium, keeping only elements a layer could match (or `include` ids)."""
     import osmium
     from shapely import wkb
 
     keys = rule_keys(layers)
+    if include:
+        keys = keys | {"name"}  # forced venues may carry none of the rule keys
+    rule_keys_only = rule_keys(layers)
     minx, miny, maxx, maxy = area.bounds
     bbox = shapely.box(minx, miny, maxx, maxy)
     factory = osmium.geom.WKBFactory()
     out = []
 
-    def wanted(tags) -> bool:
-        return any(k in tags for k in keys)
+    def wanted(obj, tags) -> bool:
+        if any(k in tags for k in rule_keys_only):
+            return True
+        if not include:
+            return False
+        if obj.is_area():
+            oid = f"osm:way/{obj.orig_id()}" if obj.from_way() else f"osm:relation/{obj.orig_id()}"
+        else:
+            oid = f"osm:{'node' if obj.is_node() else 'way'}/{obj.id}"
+        return oid in include
 
     fp = (
         osmium.FileProcessor(str(path))
@@ -145,7 +163,7 @@ def from_pbf(path: Path, layers: list[dict], area) -> list[dict]:
     )
     for obj in fp:
         tags = dict(obj.tags)
-        if not wanted(tags):
+        if not wanted(obj, tags):
             continue
         try:
             if obj.is_node():
@@ -189,10 +207,17 @@ def _kind(tags: dict, layer: dict) -> str | None:
     return None
 
 
-def build_point_layer(layer: dict, elements: list[dict], area, prepared, projector: Projector) -> list[dict]:
+def build_point_layer(layer: dict, elements: list[dict], area, prepared, projector: Projector,
+                      include: frozenset[str] = frozenset()) -> list[dict]:
+    """Elements matching the layer's rules, plus `include` ids (e.g. "osm:node/1") whatever their tags."""
     features = {}
     for el in elements:
-        if el["kind"] == "way" or not layer_matches(el["tags"], layer):
+        if el["kind"] == "way":
+            continue
+        forced = f"osm:{el['id']}" in include
+        if not forced and not layer_matches(el["tags"], layer):
+            continue
+        if not el["tags"].get("name"):
             continue
         g = el["geom"]
         point = g if g.geom_type == "Point" else g.point_on_surface()
@@ -266,8 +291,16 @@ def build_polygon_layer(layer: dict, elements: list[dict], area, prepared, proje
     return features
 
 
+def edit_ids(entries) -> frozenset[str]:
+    """Ids from a venue edit list: plain strings or {"id": ..., "note": ...}."""
+    return frozenset(e["id"] if isinstance(e, dict) else str(e) for e in entries or [])
+
+
 def apply_venue_edits(features: list[dict], edits: dict, area, prepared) -> list[dict]:
-    excluded = set(edits.get("exclude", []))
+    excluded = edit_ids(edits.get("exclude"))
+    clash = excluded & edit_ids(edits.get("include"))
+    if clash:
+        raise ValueError(f"venue ids both included and excluded: {sorted(clash)}")
     out = [f for f in features if f["id"] not in excluded]
     for add in edits.get("add", []):
         if not str(add["id"]).startswith("manual:"):
@@ -285,7 +318,15 @@ def apply_venue_edits(features: list[dict], edits: dict, area, prepared) -> list
     return out
 
 
-def build_layers(layers: list[dict], elements: list[dict], area, prepared, projector, simplify_m, venue_edits):
+def unmatched_edits(features: list[dict], edits: dict) -> dict[str, list[str]]:
+    """Include/exclude ids that matched nothing in this build: gone from OSM, or outside the pack."""
+    seen = {f["id"] for f in features}
+    return {k: sorted(edit_ids(edits.get(k)) - seen) for k in ("include", "exclude")
+            if edit_ids(edits.get(k)) - seen}
+
+
+def build_layers(layers: list[dict], elements: list[dict], area, prepared, projector, simplify_m, venue_edits,
+                 log=print):
     out = []
     for layer in layers:
         if layer["geometry"] == "line":
@@ -293,8 +334,11 @@ def build_layers(layers: list[dict], elements: list[dict], area, prepared, proje
         elif layer["geometry"] == "polygon":
             feats = build_polygon_layer(layer, elements, area, prepared, projector, simplify_m)
         else:
-            feats = build_point_layer(layer, elements, area, prepared, projector)
+            include = edit_ids(venue_edits.get("include")) if layer["id"] == "venues" else frozenset()
+            feats = build_point_layer(layer, elements, area, prepared, projector, include)
         if layer["id"] == "venues":
+            for k, ids in unmatched_edits(feats, venue_edits).items():
+                log(f"warning: venue {k} ids not in this build (gone from OSM, or outside the pack): {', '.join(ids)}")
             feats = apply_venue_edits(feats, venue_edits, area, prepared)
         out.extend(feats)
     return out

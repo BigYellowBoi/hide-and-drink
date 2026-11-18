@@ -11,11 +11,10 @@ import { useWakeLock } from '../hiding/useWakeLock'
 import { readLocal, writeLocal } from '../lib/storage'
 import { distanceM, formatDistance } from '../map/geo'
 import { questionTool } from '../play/overlays'
-import { remainingBars, shade, type HiderZone } from '../play/shading'
+import { shade, type HiderZone } from '../play/shading'
 import { derivePlay, outcomeText, questionLabel, shadable, type PlayState, type Question } from '../play/state'
 import { shadingBounds, type LayerLookup } from '../play/features'
 import { useCityLayers } from '../play/useCityLayers'
-import { useHidingVenues } from '../play/useHidingVenues'
 import { useSettleTimers } from '../play/useSettleTimers'
 import {
   bannedSet,
@@ -116,11 +115,6 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
     [layer, playArea, zone.barRadiusM],
   )
   const shading = useMemo(() => (playArea ? shade(playArea, answered, ctx) : null), [playArea, answered, ctx])
-  const venues = useHidingVenues(lobby.city, sync.gameId)
-  const left = useMemo(
-    () => (playArea && shading ? remainingBars(venues, playArea, shading.remaining, zone.barRadiusM) : []),
-    [venues, playArea, shading, zone.barRadiusM],
-  )
   // Only while a question is open: once answered, the white outline of what's left says it all.
   const tool = useMemo(() => (play.pending ? questionTool(play.pending) : undefined), [play.pending])
 
@@ -177,27 +171,6 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
         <section className="card">
           <p className="muted">You are not on a team this round.</p>
         </section>
-      )}
-
-      {tab === 'map' && answered.length > 0 && (
-        // No count: the venue data isn't complete enough for a number to be trusted.
-        <details className="card remaining">
-          <summary>
-            <h2>Bars still possible</h2>
-          </summary>
-          {shading && !shading.remaining ? (
-            <p className="muted">The answers contradict each other: no bar fits them all.</p>
-          ) : (
-            <ul className="remaining-list">
-              {left.map((b) => (
-                <li key={b.id} className="remaining-row">
-                  <span>{b.name}</span>
-                  {!b.inside && <span className="muted small">edge</span>}
-                </li>
-              ))}
-            </ul>
-          )}
-        </details>
       )}
 
       {tab === 'questions' && <QuestionList questions={play.questions} />}
@@ -591,6 +564,8 @@ function SeekerView({
               className="play-map"
               overlay={overlay}
               onLongPress={place}
+              // Bar dots are for the hider only; seekers work it out from the answers.
+              hideVenues
             />
           </Suspense>
           <p className="muted small">

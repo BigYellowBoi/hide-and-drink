@@ -5,7 +5,6 @@ import {
   areaFeature,
   clipTo,
   cutOut,
-  distancesToArea,
   distanceM,
   holeFree,
   isLngLat,
@@ -151,37 +150,6 @@ export function shade(playArea: AreaCollection, answered: readonly Question[], c
   if (!remaining) return { remaining: null, ruledOut: { type: 'FeatureCollection', features: holeFree(area) } }
   const out = clipTo(area, cutOut(area, remaining))
   return { remaining, ruledOut: { type: 'FeatureCollection', features: holeFree(out) } }
-}
-
-export interface Venue {
-  id: string
-  name: string
-  point: LngLat
-}
-
-export interface RemainingBar extends Venue {
-  /** Metres from the hider zone's edge to the remaining area (0: centre is inside it). */
-  inside: boolean
-}
-
-/**
- * Bars still possible: a bar stays while any part of its hiding circle overlaps the
- * remaining area (docs/spec.md §3). Only bars inside the play area count at all.
- */
-export function remainingBars(
-  venues: readonly Venue[],
-  playArea: AreaCollection,
-  remaining: Area | null,
-  radiusM: number,
-): RemainingBar[] {
-  const inPlay = distancesToArea(areaFeature(playArea), venues.map((v) => v.point))
-  const candidates = venues.filter((_, i) => inPlay[i] === 0)
-  const d = distancesToArea(remaining, candidates.map((v) => v.point))
-  return candidates
-    .map((v, i) => ({ ...v, inside: d[i] === 0, d: d[i] }))
-    .filter((v) => v.d <= radiusM)
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map(({ d: _d, ...v }) => v)
 }
 
 export interface Suggestion {

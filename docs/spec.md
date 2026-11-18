@@ -89,11 +89,11 @@ Utilities: `params.utility` = `dice` (with `params.dice` count) or `wheel` (`par
 | Layer | Brisbane | Sydney |
 | --- | --- | --- |
 | Transit | TransLink SEQ GTFS (direct zip) | TfNSW Timetables Complete GTFS (free API key) |
-| Venues | OSM: amenity=bar/pub/biergarten/nightclub, craft=brewery/winery, plus licensed restaurants added by hand | same |
+| Venues | OSM: amenity=bar/pub/biergarten/nightclub, craft=brewery/winery, plus licensed restaurants added by hand; hand include/exclude lists by OSM id (`data/venues/<city>.json`) | same |
 | Matching/Tentacles | OSM categories; ABS suburbs/localities and LGAs | same |
 | Play area | Drawn in lobby or `data/play-areas/*.geojson` | same |
 
-Pipeline (`pipeline/`): download, clip to play area, merge stations, tag venues, export a city pack, load into PostGIS. Host curates venues in the lobby.
+Pipeline (`pipeline/`): download, clip to the play areas plus the city's `coverage` circles (so hosts can draw new areas anywhere in them), merge stations, tag venues, export a city pack, load into PostGIS. Host curates venues in the lobby. `save_play_area` refuses areas reaching past the pack (`play_area_outside_map_data`).
 
 Reuse: taibeled/JetLagHideAndSeek (MIT) for question geometry and OSM queries; keep its licence notice in any ported files. Its share links (`?hzc=`) are base64url zlib-compressed JSON (GeoJSON + settings), so they're importable.
 
