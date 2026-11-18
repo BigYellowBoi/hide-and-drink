@@ -130,8 +130,10 @@ export function mapStyle(pack: CityPack, opts: { glyphs?: string } = {}): StyleS
       zone: { type: 'geojson', data: EMPTY },
       bars: { type: 'geojson', data: EMPTY },
       dots: { type: 'geojson', data: EMPTY },
-      ruled: { type: 'geojson', data: EMPTY },
-      remaining: { type: 'geojson', data: EMPTY },
+      // tolerance 0: simplification at some zooms made thin hatch pieces self-intersect,
+      // and earcut then filled the hole they wrap (hatch spilling into the remaining area).
+      ruled: { type: 'geojson', data: EMPTY, tolerance: 0 },
+      remaining: { type: 'geojson', data: EMPTY, tolerance: 0 },
       tool: { type: 'geojson', data: EMPTY },
     },
     layers: [
