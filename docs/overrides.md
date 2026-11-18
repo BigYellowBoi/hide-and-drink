@@ -2,7 +2,7 @@
 
 Rule: every decision the app makes automatically has a manual override, so a bug never stops a game.
 
-This is the audit of `supabase/migrations/` (up to `20261212090000_host_overrides.sql`): every event the server writes on its own and every refusal an action can raise, with the fix for each.
+This is the audit of `supabase/migrations/` (up to `20261213090000_host_overrides.sql`): every event the server writes on its own and every refusal an action can raise, with the fix for each.
 
 ## How overrides work
 

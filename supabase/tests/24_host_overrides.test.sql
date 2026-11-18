@@ -1,4 +1,4 @@
--- Host overrides (20261212090000_host_overrides.sql): one test block per override, undo, and
+-- Host overrides (20261213090000_host_overrides.sql): one test block per override, undo, and
 -- the leak test for hider-only overrides requested by a seeker host.
 -- Players: H = host (seeker), A = hider, S = seeker.
 

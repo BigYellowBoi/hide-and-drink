@@ -167,7 +167,7 @@ describe('reducers', () => {
 
 describe('catalogue', () => {
   it('offers every override kind the server accepts, and only those', () => {
-    const sql = readFileSync('supabase/migrations/20261212090000_host_overrides.sql', 'utf8')
+    const sql = readFileSync('supabase/migrations/20261213090000_host_overrides.sql', 'utf8')
     const list = sql.match(/if v_kind is null or v_kind not in \(([\s\S]*?)\) then/)![1]
     const kinds = [...list.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort()
     expect(OVERRIDES.map((o) => o.kind).sort()).toEqual(kinds)
