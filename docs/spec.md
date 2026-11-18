@@ -92,7 +92,7 @@ Utilities: `params.utility` = `dice` (with `params.dice` count) or `wheel` (`par
 | Matching/Tentacles | OSM categories; ABS suburbs/localities and LGAs | same |
 | Play area | Drawn in lobby or `data/play-areas/*.geojson` | same |
 
-Pipeline (`pipeline/`): download, clip to the play areas plus the city's `coverage` circles (so hosts can draw new areas anywhere in them), merge stations, tag venues, export a city pack, load into PostGIS. Host curates venues in the lobby. `save_play_area` refuses areas reaching past the pack (`play_area_outside_map_data`).
+Pipeline (`pipeline/`): download, clip to the play areas plus the city's `coverage` circles (so hosts can draw new areas anywhere in them), merge stations, tag venues, export a city pack, load into PostGIS. Host curates venues in the lobby: adds venues (pin or location, plus a name) and hides any listed one; these are public and snapshotted at start. During a round the hider can add a bar that isn't listed (inside the play area); it stays hider-only until the round ends, then everyone sees it. `save_play_area` refuses areas reaching past the pack (`play_area_outside_map_data`).
 
 Reuse: taibeled/JetLagHideAndSeek (MIT) for question geometry and OSM queries; keep its licence notice in any ported files. Its share links (`?hzc=`) are base64url zlib-compressed JSON (GeoJSON + settings), so they're importable.
 

@@ -5,7 +5,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(37);
+select plan(39);
 
 insert into auth.users (id) values
   ('11111111-1111-1111-1111-111111111111'),
@@ -172,13 +172,29 @@ select is(
 
 -- ---------------------------------------------------------------- what each team can read
 
+-- The hider also adds a bar that isn't on the list (hider-only until the round ends).
 set local role authenticated;
+select pg_temp.as_user('11111111-1111-1111-1111-111111111111');
+select public.add_venue(current_setting('test.game_id')::uuid, 'Hidden Gem', 153.024, -27.469,
+  'dddddddd-0000-0000-0000-000000000099', pg_temp.last_seq());
+
 select pg_temp.as_user('22222222-2222-2222-2222-222222222222');
 select is(
   (select count(*)::int from public.events
-    where game_id = current_setting('test.game_id')::uuid and type in ('bar_chosen', 'freeze_changed')),
-  0, 'seekers cannot read the bar or freeze events'
+    where game_id = current_setting('test.game_id')::uuid and type in ('bar_chosen', 'freeze_changed', 'venue_added')),
+  0, 'seekers cannot read the bar, freeze or hider venue events'
 );
+select throws_ok($$ select * from public.game_venues $$, '42501', null, 'seekers cannot read game_venues');
+reset role;
+select is(
+  (select count(*)::int from realtime.messages
+    where topic like 'game:' || current_setting('test.game_id') || '%'
+      and topic <> 'game:' || current_setting('test.game_id') || ':hiders'
+      and payload::text like '%Hidden Gem%'),
+  0, 'the hider venue is never broadcast outside the hiders topic'
+);
+set local role authenticated;
+select pg_temp.as_user('22222222-2222-2222-2222-222222222222');
 select throws_ok($$ select * from public.hider_bars $$, '42501', null, 'seekers cannot read hider_bars');
 
 select pg_temp.as_user('33333333-3333-3333-3333-333333333333');
@@ -189,8 +205,8 @@ select is((select count(*)::int from public.seeker_positions), 1, 'the hider see
 select throws_ok($$ select * from public.hider_bars $$, '42501', null, 'not even hiders read hider_bars directly');
 select is(
   (select count(*)::int from public.events
-    where game_id = current_setting('test.game_id')::uuid and type in ('bar_chosen', 'freeze_changed')),
-  2, 'the hider reads the bar and freeze events'
+    where game_id = current_setting('test.game_id')::uuid and type in ('bar_chosen', 'freeze_changed', 'venue_added')),
+  3, 'the hider reads the bar, freeze and venue events'
 );
 
 -- ---------------------------------------------------------------- report_position

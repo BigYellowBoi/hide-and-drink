@@ -109,7 +109,7 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
 
   const playArea = started?.playArea ?? null
   const answered = useMemo(() => shadable(play), [play])
-  const layer = useCityLayers(lobby.city)
+  const layer = useCityLayers(lobby.city, lobby.venues)
   const ctx = useMemo(
     () => (layer && playArea ? { layer, bounds: shadingBounds(playArea), barRadiusM: zone.barRadiusM } : undefined),
     [layer, playArea, zone.barRadiusM],
@@ -365,6 +365,7 @@ function HiderView({
           canAct={canAct}
           now={now}
           layer={layer ?? undefined}
+          venues={lobby.venues}
         />
       )}
       {cards.effects
@@ -424,6 +425,7 @@ function HiderView({
         (picking || !bar ? (
           <BarPicker
             seekers={seekerDots}
+            venues={lobby.venues}
             sync={sync}
             city={lobby.city}
             started={started}
@@ -467,6 +469,7 @@ function HiderView({
                   overlay={overlay}
                   focus={focus}
                   onLongPress={place}
+                  venues={lobby.venues}
                 />
               </Suspense>
               <p className="muted small">

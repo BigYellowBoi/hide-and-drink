@@ -1,5 +1,6 @@
 import type { GameEvent, Team } from '../sync/types'
 import { asAreaCollection, type AreaCollection } from '../map/playArea'
+import { applyVenueEvent, noVenueEdits, type VenueEdits } from '../venues/state'
 
 export interface LobbyPlayer {
   userId: string
@@ -30,6 +31,8 @@ export interface LobbyState {
   players: LobbyPlayer[]
   status: GameStatus
   started: StartedRound | null
+  /** Venues the host added or hid, and (hider phones only) bars the hider added. */
+  venues: VenueEdits
 }
 
 export const emptyLobby: LobbyState = {
@@ -42,6 +45,7 @@ export const emptyLobby: LobbyState = {
   players: [],
   status: 'lobby',
   started: null,
+  venues: noVenueEdits,
 }
 
 const str = (v: unknown): string | null => (typeof v === 'string' ? v : null)
@@ -58,6 +62,12 @@ function upsertPlayer(players: LobbyPlayer[], p: LobbyPlayer): LobbyPlayer[] {
 
 /** Apply one event. Unknown event types are ignored, so later phases can add their own. */
 export function applyLobbyEvent(state: LobbyState, e: GameEvent): LobbyState {
+  const next = applyCoreEvent(state, e)
+  const venues = applyVenueEvent(next.venues, e)
+  return venues === next.venues ? next : { ...next, venues }
+}
+
+function applyCoreEvent(state: LobbyState, e: GameEvent): LobbyState {
   const p = e.payload
   switch (e.type) {
     case 'game_created': {

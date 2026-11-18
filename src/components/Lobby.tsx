@@ -17,6 +17,8 @@ import type { SyncTransport } from '../sync/transport'
 import { useLibrary } from '../library/useLibrary'
 import { deckTotals, matchesPreset, parseDeck } from '../library/library'
 import { CardLibrary } from './CardLibrary'
+import { VenueEditor } from './VenueEditor'
+import { isDevMode } from '../hiding/devPosition'
 
 const TEAMS: { id: Team; label: string }[] = [
   { id: 'hiders', label: 'Hiders' },
@@ -261,6 +263,16 @@ export function Lobby({ sync, transport, lobby, userId, canAct, presence }: Prop
           </div>
         )}
       </section>
+
+      <VenueEditor
+        sync={sync}
+        city={lobby.city}
+        playArea={current?.area ?? null}
+        venues={lobby.venues}
+        isHost={isHost}
+        canAct={canAct}
+        dev={isDevMode(lobby.config)}
+      />
 
       {editing && isHost && (
         <Suspense fallback={<div className="editor" />}>
