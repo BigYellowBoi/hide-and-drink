@@ -231,15 +231,15 @@ describe('cardFacts', () => {
 })
 
 describe('cast costs', () => {
-  it('a curse costs the seekers, anything else the hider, unless params.cost_team says', () => {
+  it('the hider pays to cast any card, curses included, unless params.cost_team says', () => {
     const s = deriveCards([started])
     const curse = { ...s.deck.escape, castCost: 'drink' as const }
     expect(castCost(curse)).toBe('drink')
-    expect(costPayer(curse)).toBe('seekers')
+    expect(costPayer(curse)).toBe('hiders')
     const dbl = { ...s.deck.cuisine, category: 'drink', castCost: null, params: { cost: 'shot' } }
     expect(castCost(dbl)).toBe('shot')
     expect(costPayer(dbl)).toBe('hiders')
-    expect(costPayer({ ...curse, params: { cost_team: 'hiders' } })).toBe('hiders')
+    expect(costPayer({ ...curse, params: { cost_team: 'seekers' } })).toBe('seekers')
     expect(castCost({ ...curse, castCost: 'free' })).toBeNull()
   })
 })
@@ -399,7 +399,7 @@ describe('cardDetails', () => {
   it('lists cast cost, veto status, drinks, proof and rules', () => {
     const curse = parseCard(card('cuisine', 'until_cleared', { blocks_questions: true, proof: 'photo' }))!
     const rows = Object.fromEntries(cardDetails(curse).map((r) => [r.label, r.value]))
-    expect(rows['Cast cost']).toBe('Drink, paid by the seekers')
+    expect(rows['Cast cost']).toBe('Drink, paid by the hiders')
     expect(rows.Veto).toMatch(/can veto/)
     expect(rows.Proof).toMatch(/before they can say they did it/)
     expect(rows.Rules).toBe('Blocks questions')

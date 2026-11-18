@@ -57,6 +57,8 @@ export interface Trivia {
 export interface Effect {
   id: string
   seq: number
+  /** The played card that started it. */
+  instanceId: string
   card: CardDef
   behaviour: 'timed' | 'until_cleared' | 'trivia'
   playedAt: number
@@ -125,6 +127,8 @@ export interface DrinkProof {
   label: string
   path: string | null
   effectId: string | null
+  /** The played card it is for (cast cost, card drinks, curse evidence), when known. */
+  instanceId: string | null
 }
 
 export interface CardsState {
@@ -311,6 +315,7 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
             {
               id: effectId,
               seq: e.seq,
+              instanceId,
               card,
               behaviour: card.behaviour,
               playedAt,
@@ -335,6 +340,7 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
           text: playedText(state, card, p),
           colour: card.colour,
           private: e.visibility === 'hiders',
+          instanceId,
           ...(closes ? { questionId: closes } : {}),
         },
         next,
@@ -364,7 +370,7 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
         str(p.effect_id),
         (x) => ({ ...x, status: 'vetoed' }),
       )
-      return log({ kind: 'penalty', text: `Seekers vetoed ${veto.name}: locked at a bar for ${minutes(lockS)}, ${veto.penalty}` }, next)
+      return log({ kind: 'penalty', text: `Seekers vetoed ${veto.name}: locked at a bar for ${minutes(lockS)}, ${veto.penalty}`, instanceId }, next)
     }
     case 'dice_rolled':
     case 'wheel_spun': {
@@ -382,7 +388,7 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
         by: str(p.by),
       }
       const text = roll.kind === 'dice' ? `${roll.name}: rolled ${dice.join(' + ')}${dice.length > 1 ? ` = ${roll.total}` : ''}` : `${roll.name}: wheel says ${roll.result}`
-      return log({ kind: 'card', text }, { ...state, rolls: [...state.rolls, roll] })
+      return log({ kind: 'card', text, instanceId }, { ...state, rolls: [...state.rolls, roll] })
     }
     case 'drink_due': {
       const id = str(p.proof_id)
@@ -397,16 +403,21 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
         label: str(p.label) ?? 'Drink',
         path: null,
         effectId: null,
+        instanceId: str(p.instance_id),
       }
       const who = team === 'hiders' ? 'Hiders' : 'Seekers'
-      return log({ kind: 'penalty', text: `${who}: ${proof.cost} (${proof.label}). Photo proof needed` }, { ...state, proofs: [...state.proofs, proof] })
+      return log(
+        { kind: 'penalty', text: `${who}: ${proof.cost} (${proof.label}). Photo proof needed`, ...linkTo(proof.instanceId) },
+        { ...state, proofs: [...state.proofs, proof] },
+      )
     }
     case 'proof_due': {
       const id = str(p.proof_id)
       const effectId = str(p.effect_id)
       if (!id || !effectId) return state
       const team = p.team === 'hiders' ? 'hiders' : 'seekers'
-      const proof: DrinkProof = { id, seq: e.seq, team, kind: 'evidence', cost: 'drink', label: str(p.label) ?? 'Curse', path: null, effectId }
+      const instanceId = state.effects.find((x) => x.id === effectId)?.instanceId ?? null
+      const proof: DrinkProof = { id, seq: e.seq, team, kind: 'evidence', cost: 'drink', label: str(p.label) ?? 'Curse', path: null, effectId, instanceId }
       return { ...state, proofs: [...state.proofs, proof] }
     }
     case 'drink_proved': {
@@ -417,13 +428,13 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
       const next = { ...state, proofs: state.proofs.map((x) => (x.id === id ? { ...x, path } : x)) }
       const who = p.team === 'hiders' ? 'Hiders' : 'Seekers'
       const text = proof?.kind === 'evidence' ? `${who} sent proof: ${proof.label}` : `${who} drank: ${proof?.label ?? 'drink'}`
-      return log({ kind: 'proof', text, photo: path, photoBucket: DRINK_BUCKET }, next)
+      return log({ kind: 'proof', text, photo: path, photoBucket: DRINK_BUCKET, ...linkTo(proof?.instanceId) }, next)
     }
     case 'effect_clear_requested': {
       const id = str(p.effect_id)
       const next = updateEffect(state, id, (x) => ({ ...x, status: 'clear_requested' }))
       const name = next.effects.find((x) => x.id === id)?.card.name ?? 'Curse'
-      return log({ kind: 'card', text: `Seekers say ${name} is done` }, next)
+      return log({ kind: 'card', text: `Seekers say ${name} is done`, ...effectLink(next, id) }, next)
     }
     case 'effect_clear_rejected': {
       const id = str(p.effect_id)
@@ -434,19 +445,19 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
         (x) => ({ ...x, status: 'active' }),
       )
       const name = next.effects.find((x) => x.id === id)?.card.name ?? 'Curse'
-      return log({ kind: 'penalty', text: `Hider says ${name} is not done yet` }, next)
+      return log({ kind: 'penalty', text: `Hider says ${name} is not done yet`, ...effectLink(next, id) }, next)
     }
     case 'effect_cleared': {
       const id = str(p.effect_id)
       const next = updateEffect(state, id, (x) => ({ ...x, status: 'cleared' }))
       const name = next.effects.find((x) => x.id === id)?.card.name ?? 'Curse'
-      return log({ kind: 'card', text: `${name} cleared` }, next)
+      return log({ kind: 'card', text: `${name} cleared`, ...effectLink(next, id) }, next)
     }
     case 'trivia_set': {
       const id = str(p.effect_id)
       const questions = strings(p.questions).map((question): TriviaQuestion => ({ question, answer: null, answeredBy: null, correct: false, wrong: [] }))
       const next = updateTrivia(state, id, (t) => ({ ...t, questions }))
-      return log({ kind: 'card', text: `${effectName(next, id)}: hider sent ${questions.length} questions` }, next)
+      return log({ kind: 'card', text: `${effectName(next, id)}: hider sent ${questions.length} questions`, ...effectLink(next, id) }, next)
     }
     case 'trivia_answered': {
       // One answer per question, null for questions already right.
@@ -458,7 +469,7 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
         questions: t.questions?.map((q, i) => (answers[i] && !q.correct ? { ...q, answer: answers[i], answeredBy: by } : q)) ?? null,
       }))
       const sent = answers.map((x, i) => (x ? `Q${i + 1} "${x}"` : null)).filter(Boolean)
-      return log({ kind: 'card', text: `${effectName(next, id)}: seekers answered ${sent.join(', ')}` }, next)
+      return log({ kind: 'card', text: `${effectName(next, id)}: seekers answered ${sent.join(', ')}`, ...effectLink(next, id) }, next)
     }
     case 'trivia_marked': {
       // One mark per question ({correct, answer}), null for questions already right.
@@ -481,7 +492,7 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
       const wrong = marks.flatMap((m, i) => (m && !m.correct ? [`Q${i + 1} "${m.answer}"`] : []))
       const parts = [right.length ? `${right.join(', ')} right` : null, wrong.length ? `${wrong.join(', ')} wrong, try again` : null]
       return log(
-        { kind: wrong.length ? 'penalty' : 'card', text: `${effectName(next, id)}: ${parts.filter(Boolean).join('; ')}` },
+        { kind: wrong.length ? 'penalty' : 'card', text: `${effectName(next, id)}: ${parts.filter(Boolean).join('; ')}`, ...effectLink(next, id) },
         next,
       )
     }
@@ -492,7 +503,7 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
         forced: true,
         questions: t.questions?.map((q) => ({ ...q, correct: true })) ?? null,
       }))
-      return log({ kind: 'card', text: `Host marked ${effectName(next, id)} all correct` }, next)
+      return log({ kind: 'card', text: `Host marked ${effectName(next, id)} all correct`, ...effectLink(next, id) }, next)
     }
     case 'effect_followup_started': {
       const id = str(p.effect_id)
@@ -500,12 +511,16 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
       const next = updateEffect(state, id, (x) => ({ ...x, followupEndsAt: endsAt }))
       const effect = next.effects.find((x) => x.id === id)
       const len = effect?.followupS ? ` (${minutes(effect.followupS)})` : ''
-      return log({ kind: 'penalty', text: `${effect?.card.name ?? 'Curse'}: missed, follow-on timer started${len}` }, next)
+      return log({ kind: 'penalty', text: `${effect?.card.name ?? 'Curse'}: missed, follow-on timer started${len}`, ...effectLink(next, id) }, next)
     }
     default:
       return state
   }
 }
+
+/** Log fields tying an entry to the played card it belongs to (shown on its timeline card). */
+const linkTo = (instanceId: string | null | undefined) => (instanceId ? { instanceId } : {})
+const effectLink = (s: CardsState, effectId: string | null) => linkTo(s.effects.find((x) => x.id === effectId)?.instanceId)
 
 const updateTrivia = (s: CardsState, id: string | null, f: (t: Trivia) => Trivia): CardsState =>
   updateEffect(s, id, (x) => (x.trivia ? { ...x, trivia: f(x.trivia) } : x))
@@ -779,12 +794,12 @@ export function castCost(c: CardDef): 'drink' | 'shot' | null {
 
 /**
  * Who drinks a card's cast cost (and owes the photo proof), as play_card decides: the
- * card's params.cost_team, else the seekers for a curse and the hiders for anything else.
+ * card's params.cost_team, else the hiders, who pay to cast any card, curses included.
  */
 export function costPayer(c: CardDef): 'hiders' | 'seekers' {
   const t = c.params.cost_team
   if (t === 'hiders' || t === 'seekers') return t
-  return c.category === 'curse' ? 'seekers' : 'hiders'
+  return 'hiders'
 }
 
 /** params.proof: 'photo' (the app collects it) or 'video' (shown in person). */

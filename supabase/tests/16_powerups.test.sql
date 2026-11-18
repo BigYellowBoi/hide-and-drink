@@ -269,7 +269,7 @@ select is((select jsonb_array_length(payload -> 'bans') from pg_temp.last_event(
   'the bans are public');
 select is(array(select team::text || ':' || cost from public.drink_proofs
                   where game_id = pg_temp.gid() and label = 'Curse of Drained Brain'),
-  array['seekers:shot'], 'its shot cast cost opens a proof for the seekers, who pay a curse''s cost');
+  array['hiders:shot'], 'its shot cast cost opens a proof for the hiders, who pay to cast');
 set local role authenticated;
 select throws_ok($$ select pg_temp.ask(34, '500m') $$, 'P0001', 'question_banned', 'a banned question is refused');
 select pg_temp.seeker();

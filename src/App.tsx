@@ -16,6 +16,7 @@ import { Round, TopbarClock } from './components/Round'
 import { StaleBanner } from './components/StaleBanner'
 import { presenceOf } from './sync/presence'
 import { isDevMode } from './hiding/devPosition'
+import { PlaytestTools } from './components/PlaytestTools'
 
 const transport = supabase ? supabaseTransport(supabase) : null
 const asset = (f: string) => `${import.meta.env.BASE_URL}${f}`
@@ -90,6 +91,7 @@ function GameScreen({
         <div className="dev-banner" role="status">
           <strong>Playtest mode</strong>
           <span>GPS is off: long-press the map to set your position.</span>
+          {game.sync && <PlaytestTools sync={game.sync} status={lobby.status} team={myTeam} canAct={game.canAct} />}
         </div>
       )}
 

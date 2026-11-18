@@ -8,10 +8,16 @@ import { outcomeText, questionText, typeName, type LogEntry, type Question } fro
 import { HiderCountContext } from './hiderCount'
 import { LockIcon } from './PrivateLabel'
 import { PhotoThumb } from './PhotoThumb'
+import { CardInfoButton } from './CardFace'
+import { castCost, costPayer, COST_LABEL, effectPhase, type CardsState, type PlayedCard } from '../cards/state'
 
 interface Props {
   questions: readonly Question[]
   log: readonly LogEntry[]
+  /** Card state: curses played, their effects, vetoes and bans. */
+  cards: CardsState
+  /** Server time now, for running curse timers. */
+  now: number
   lobby: LobbyState
   types: readonly QuestionType[] | null
   /** This phone's team: seekers can shade answers by hand. */
@@ -33,9 +39,9 @@ const FALLBACK = '#A9B4BF'
  * cards drawn and played for it, photo) and a row for everything else (cards played, curses
  * cleared, drink proofs, penalties in amber). Hider-only rows carry a lock.
  */
-export function Timeline({ questions, log, lobby, types, team, round, canAct, shownId, onShow, onShade, nameOf }: Props) {
+export function Timeline({ questions, log, cards, now, lobby, types, team, round, canAct, shownId, onShow, onShade, nameOf }: Props) {
   const roundStart = lobby.started?.startedAt ?? 0
-  const items = buildTimeline(questions, log)
+  const items = buildTimeline(questions, log, cards.played)
   return (
     <section className="card">
       <h2>Timeline</h2>
@@ -46,6 +52,8 @@ export function Timeline({ questions, log, lobby, types, team, round, canAct, sh
           {items.map((it) =>
             it.kind === 'entry' ? (
               <Row key={`e${it.seq}`} entry={it.entry} roundStart={roundStart} />
+            ) : it.kind === 'curse' ? (
+              <CurseCard key={`c${it.played.instanceId}`} played={it.played} entries={it.entries} cards={cards} now={now} roundStart={roundStart} />
             ) : (
               <QuestionCard
                 key={it.question.id}
@@ -79,6 +87,84 @@ function Private() {
       {' '}
       <LockIcon /> {hiders > 1 ? 'only your team' : 'only you'}
     </span>
+  )
+}
+
+/** Where a played curse is now, in words. */
+function curseStatus(p: PlayedCard, cards: CardsState, now: number): string {
+  if (cards.vetoes.some((v) => v.instanceId === p.instanceId)) return 'Vetoed by the seekers'
+  const bans = cards.bans.filter((b) => b.instanceId === p.instanceId).map((b) => b.label)
+  if (bans.length) return `Banned for the run: ${bans.join(', ')}`
+  const e = p.effectId ? cards.effects.find((x) => x.id === p.effectId) : null
+  if (!e) return 'Played'
+  switch (effectPhase(e, now)) {
+    case 'running':
+      return `Running: ${formatClock(Math.max(0, (e.endsAt ?? now) - now))} left`
+    case 'followup_available':
+      return 'Time is up'
+    case 'followup':
+      return `Follow-on running: ${formatClock(Math.max(0, (e.followupEndsAt ?? now) - now))} left`
+    case 'until_cleared':
+      if (e.trivia) return 'Trivia in progress'
+      return e.blocksQuestions ? "In force: seekers can't ask questions until they do it" : 'In force until the seekers do it'
+    case 'awaiting_confirm':
+      return 'Seekers say they did it: waiting for the hider to confirm'
+    case 'over':
+      return e.status === 'cleared' ? 'Done' : 'Over'
+  }
+}
+
+/** A played curse: the card, what casting it cost and who drinks, its status, and the replies. */
+function CurseCard({
+  played: p,
+  entries,
+  cards,
+  now,
+  roundStart,
+}: {
+  played: PlayedCard
+  entries: readonly LogEntry[]
+  cards: CardsState
+  now: number
+  roundStart: number
+}) {
+  const c = p.card
+  const cost = castCost(c)
+  const status = curseStatus(p, cards, now)
+  const live = !/^(Done|Over|Vetoed)/.test(status)
+  return (
+    <li className={`tl-question tl-curse${live ? ' tl-open' : ''}`} style={{ '--type': c.colour } as CSSProperties}>
+      <div className="tl-head">
+        <span className="tl-type">{c.categoryName || 'Curse'}</span>
+        <span className="tl-head-end">
+          <Time at={p.playedAt} roundStart={roundStart} />
+          <CardInfoButton card={c} />
+        </span>
+      </div>
+      <p className="tl-text">{c.name}</p>
+      {c.text && <p className="tl-card-text">{c.text}</p>}
+      <p className="small">
+        Cast cost: <strong>{cost ? `${COST_LABEL[cost]}, drunk by the ${costPayer(c)}` : 'Free'}</strong>
+        {c.canVeto === false && <span className="muted"> · Can't veto</span>}
+      </p>
+      <p className="tl-answer">
+        <strong>{status}</strong>
+      </p>
+      {entries.length > 0 && (
+        <ul className="tl-sub">
+          {entries.map((l) => (
+            <li key={l.seq} className={`log-${l.kind}`}>
+              <span className="log-dot" style={l.colour ? { background: l.colour } : undefined} aria-hidden="true" />
+              <span>
+                {l.text} <span className="muted small">+{formatClock(Math.max(0, l.at - roundStart), { up: true })}</span>
+                {l.photo && <PhotoThumb path={l.photo} bucket={l.photoBucket} alt="Proof photo" />}
+                {l.private && <Private />}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
   )
 }
 

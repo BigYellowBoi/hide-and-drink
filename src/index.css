@@ -1956,6 +1956,18 @@ button.link {
   gap: 8px;
 }
 
+.tl-head-end {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tl-card-text {
+  font-size: 15px;
+  color: var(--text-muted);
+  white-space: pre-line;
+}
+
 .tl-manual {
   color: var(--alert);
 }
@@ -2678,6 +2690,15 @@ button.pcard {
   color: var(--alert);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+.dev-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
 }
 
 .dev-note {

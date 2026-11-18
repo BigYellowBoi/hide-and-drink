@@ -219,6 +219,8 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
           <Timeline
             questions={play.questions}
             log={log}
+            cards={cards}
+            now={now}
             lobby={lobby}
             types={questionTypes}
             team={team}

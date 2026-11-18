@@ -112,6 +112,8 @@ export interface LogEntry {
   photoBucket?: string
   /** Dot colour (card category), when the kind's own colour doesn't fit. */
   colour?: string
+  /** The played card this entry belongs to (a curse's replies, proofs, veto): shown on its timeline card. */
+  instanceId?: string
 }
 
 export interface PlayState {
@@ -237,9 +239,13 @@ export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
     case 'seeking_started':
       return {
         ...state,
+        // Playtest skips end hiding early: the event says when seeking really started.
+        seekingAt: time(p.at, e.created_at),
         seekingStarted: true,
         log: [...state.log, { seq: e.seq, kind: 'seeking', at: time(p.at, e.created_at), text: 'Seeking started' }],
       }
+    case 'hiding_skipped':
+      return { ...state, log: [...state.log, { seq: e.seq, kind: 'seeking', at, text: 'Hiding skipped (playtest)', by: str(e.actor_id) }] }
     case 'bar_chosen':
       // Hiders-only event; the bar itself comes from src/hiding/state.ts.
       return {

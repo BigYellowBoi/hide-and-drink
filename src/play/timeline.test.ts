@@ -51,7 +51,7 @@ describe('buildTimeline', () => {
 
   it('puts each question on one card with what followed from it, newest first', () => {
     const items = buildTimeline(play.questions, log)
-    expect(items.map((i) => (i.kind === 'question' ? i.question.id : i.entry.kind))).toEqual(['q2', 'q1', 'seeking'])
+    expect(items.map((i) => (i.kind === 'question' ? i.question.id : i.kind === 'entry' ? i.entry.kind : 'curse'))).toEqual(['q2', 'q1', 'seeking'])
     const q1 = items[1]
     expect(q1.kind === 'question' && q1.entries.map((l) => l.kind)).toEqual(['draw', 'shading'])
   })
@@ -77,5 +77,43 @@ describe('buildTimeline', () => {
   it('clearing manual shading goes back to the app', () => {
     const s = derivePlay([...events, ev('question_shading_set', { question_id: 'q1', shading: null })])
     expect(s.questions[0].manualShading).toBeNull()
+  })
+})
+
+describe('curses on the timeline', () => {
+  const curse = {
+    card_id: 'bridge',
+    name: 'Curse of Bridge',
+    category: 'curse',
+    category_name: 'Curse',
+    colour: '#c00',
+    behaviour: 'until_cleared',
+    text: 'Ask your next question from under a bridge.',
+    params: {},
+    cast_cost: 'drink',
+    can_veto: true,
+  }
+  const events = [
+    ev('game_started', { round: 1, started_at: '2026-11-20T09:00:00Z', hiding_period_s: 1800, deck: [{ ...curse, copies: 1 }] }),
+    ev('card_played', { round: 1, instance_id: 'i1', card: curse, effect_id: 'e1', blocks_questions: false }),
+    ev('drink_due', { proof_id: 'p1', team: 'hiders', cost: 'drink', label: 'Curse of Bridge', instance_id: 'i1' }),
+    ev('drink_proved', { proof_id: 'p1', team: 'hiders', path: 'g/p1/a.jpg' }),
+    ev('effect_clear_requested', { effect_id: 'e1' }),
+    ev('effect_cleared', { effect_id: 'e1' }),
+    ev('drink_due', { proof_id: 'p2', team: 'hiders', cost: 'shot', label: 'Missed answer deadline' }),
+  ]
+  const cards = deriveCards(events)
+  const items = buildTimeline([], cards.log, cards.played)
+
+  it('shows a curse as one card with its cost drink, proof and replies', () => {
+    expect(items.map((i) => i.kind)).toEqual(['entry', 'curse'])
+    const c = items[1]
+    expect(c.kind === 'curse' && c.played.card.name).toBe('Curse of Bridge')
+    expect(c.kind === 'curse' && c.entries.map((l) => l.text)).toEqual([
+      'Hiders: drink (Curse of Bridge). Photo proof needed',
+      'Hiders drank: Curse of Bridge',
+      'Seekers say Curse of Bridge is done',
+      'Curse of Bridge cleared',
+    ])
   })
 })

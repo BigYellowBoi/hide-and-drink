@@ -84,7 +84,7 @@ export const COMMON_FIELDS: ParamField[] = [
     ],
     hint: 'Used when the card has no cast cost',
   },
-  { key: 'cost_team', label: 'Who pays the cost', kind: 'select', options: TEAM_OPTIONS, hint: 'Default: seekers for curses, else hiders' },
+  { key: 'cost_team', label: 'Who pays the cost', kind: 'select', options: TEAM_OPTIONS, hint: 'Default: the hiders (they pay to cast)' },
   { key: 'drinks', label: 'Teams that drink when played', kind: 'teams' },
   {
     key: 'utility',
