@@ -6,6 +6,9 @@ export const defaultConfig = defaults as Record<string, unknown>
 /** Keys that describe the config rather than configure the game. */
 const META_KEYS = new Set(['schema_version', 'todo'])
 
+/** Top-level keys with their own editor: the deck builder owns config.deck. */
+const OWN_EDITOR_KEYS = new Set(['deck'])
+
 export type Unit = 'min' | 'km' | null
 
 export type FieldKind = 'number' | 'boolean' | 'text' | 'list' | 'unset'
@@ -63,6 +66,7 @@ export function configGroups(config: Record<string, unknown>): ConfigGroup[] {
     groups.push(group)
     for (const [key, value] of Object.entries(obj)) {
       if (META_KEYS.has(key)) continue
+      if (path.length === 0 && OWN_EDITOR_KEYS.has(key)) continue
       if (isObject(value)) {
         walk(value, [...path, key], unitFor(key) ?? inherited)
         continue

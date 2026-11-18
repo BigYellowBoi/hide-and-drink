@@ -109,7 +109,7 @@ function GameScreen({
         ) : !game.sync || !lobby.code ? (
           <p className="muted">Loading game…</p>
         ) : lobby.status === 'lobby' ? (
-          <Lobby sync={game.sync} lobby={lobby} userId={game.userId} canAct={game.canAct} presence={presence} />
+          <Lobby sync={game.sync} transport={transport} lobby={lobby} userId={game.userId} canAct={game.canAct} presence={presence} />
         ) : (
           <Round
             sync={game.sync}

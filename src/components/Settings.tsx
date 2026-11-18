@@ -5,10 +5,12 @@ import { deletePlayArea, isBuiltIn, listPlayAreas, madeBy, type PlayAreaSummary 
 import { describeError } from '../lobby/messages'
 import { areaKm2, formatKm2 } from '../map/playArea'
 import { LazyGameMap } from './lazyMap'
+import { useLibrary } from '../library/useLibrary'
+import { CardLibrary } from './CardLibrary'
 
 const cityLabel = (c: string) => c.charAt(0).toUpperCase() + c.slice(1).replace(/_/g, ' ')
 
-/** App settings, opened from the cog on Home. For now: tidy up the saved maps list. */
+/** App settings, opened from the cog on Home: the shared card library and the saved maps list. */
 export function Settings({ transport, onBack }: { transport: SyncTransport; onBack: () => void }) {
   const [areas, setAreas] = useState<PlayAreaSummary[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -16,6 +18,8 @@ export function Settings({ transport, onBack }: { transport: SyncTransport; onBa
   /** Area whose delete button has been tapped once (tap again to confirm). */
   const [arming, setArming] = useState<string | null>(null)
   const [open, setOpen] = useState<string | null>(null)
+  const [libraryOpen, setLibraryOpen] = useState(false)
+  const { library, error: libraryError } = useLibrary(transport)
 
   useEffect(() => {
     if (areas || !supabase) return
@@ -60,6 +64,34 @@ export function Settings({ transport, onBack }: { transport: SyncTransport; onBa
         <h1 className="settings-title">Settings</h1>
         <span />
       </header>
+
+      <section className="card">
+        <h2>Card library</h2>
+        <p className="muted small-note">
+          Add, edit and retire cards and categories. Shared with everyone and live on every phone; games already running
+          keep their own copy.
+        </p>
+        <p className="deck-total">
+          {library
+            ? `${library.cards.filter((c) => c.active).length} cards in ${library.categories.filter((c) => c.active).length} categories`
+            : 'Loading…'}
+        </p>
+        <div className="row">
+          <button className="small secondary" onClick={() => setLibraryOpen(true)}>
+            Edit card library
+          </button>
+        </div>
+      </section>
+
+      {libraryOpen && (
+        <CardLibrary
+          transport={transport}
+          library={library}
+          loadError={libraryError}
+          canAct
+          onClose={() => setLibraryOpen(false)}
+        />
+      )}
 
       <section className="card">
         <h2>Saved maps</h2>
