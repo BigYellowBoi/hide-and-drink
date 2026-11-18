@@ -45,6 +45,8 @@ export interface Setting {
   id: string
   path: string[]
   group: GroupId
+  /** Folded together under this title inside the group. */
+  subgroup?: string
   label: string
   /** One line under the label. */
   description: string
@@ -62,6 +64,7 @@ const deadlineOverrides: Setting[] = questionTypes.map((t) => ({
   id: `answer_deadline_s.${t.type}`,
   path: ['answer_deadline_s', t.type],
   group: 'questions',
+  subgroup: 'Answer time per question type',
   label: `Answer time: ${typeName(t.type)}`,
   description: `Answer time for ${t.type} questions, if it should differ.`,
   info: `Off: ${t.type} questions use the question type's own time if it has one, else the answer time above. On: they get this long instead.`,

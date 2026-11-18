@@ -183,9 +183,27 @@ export function ConfigEditor({ config, editable, busy, onSave }: Props) {
               {g.title}
               {changed > 0 && <span className="setting-group-count"> · {changed} changed</span>}
             </legend>
-            {settings.map((s) => (
-              <SettingRow key={s.id} s={s} config={shown} editable={editable} error={errors.get(s.id)} onChange={edit} />
-            ))}
+            {settings
+              .filter((s) => !s.subgroup)
+              .map((s) => (
+                <SettingRow key={s.id} s={s} config={shown} editable={editable} error={errors.get(s.id)} onChange={edit} />
+              ))}
+            {[...new Set(settings.flatMap((s) => (s.subgroup ? [s.subgroup] : [])))].map((title) => {
+              const inner = settings.filter((s) => s.subgroup === title)
+              const n = inner.filter((s) => isChanged(s, shown)).length
+              const bad = inner.some((s) => errors.has(s.id))
+              return (
+                <details key={title} className="setting-sub" open={bad || undefined}>
+                  <summary>
+                    {title}
+                    {n > 0 && <span className="badge setting-badge">{n} changed</span>}
+                  </summary>
+                  {inner.map((s) => (
+                    <SettingRow key={s.id} s={s} config={shown} editable={editable} error={errors.get(s.id)} onChange={edit} />
+                  ))}
+                </details>
+              )
+            })}
           </fieldset>
         )
       })}

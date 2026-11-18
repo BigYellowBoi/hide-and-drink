@@ -730,6 +730,39 @@ details.card > summary h2 {
   margin-top: 16px;
 }
 
+.setting-sub {
+  border-top: 1px solid var(--line);
+}
+
+.setting-sub > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.setting-sub > summary::after {
+  content: '›';
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 22px;
+}
+
+.setting-sub[open] > summary::after {
+  transform: rotate(90deg);
+}
+
+.setting-sub > .setting {
+  padding-left: 12px;
+}
+
+/* Push alerts toggle */
+.push-toggle .setting-head button {
+  flex: 0 0 auto;
+}
+
 /* Game settings (src/lobby/config.ts schema) */
 .setting-summary {
   font-size: 13px;

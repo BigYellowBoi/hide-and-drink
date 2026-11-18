@@ -7,6 +7,7 @@ import { areaKm2, formatKm2 } from '../map/playArea'
 import { LazyGameMap } from './lazyMap'
 import { useLibrary } from '../library/useLibrary'
 import { CardLibrary } from './CardLibrary'
+import { PushToggle } from './PushToggle'
 
 const cityLabel = (c: string) => c.charAt(0).toUpperCase() + c.slice(1).replace(/_/g, ' ')
 
@@ -64,6 +65,10 @@ export function Settings({ transport, onBack }: { transport: SyncTransport; onBa
         <h1 className="settings-title">Settings</h1>
         <span />
       </header>
+
+      <section className="card">
+        <PushToggle transport={transport} />
+      </section>
 
       <section className="card">
         <h2>Card library</h2>

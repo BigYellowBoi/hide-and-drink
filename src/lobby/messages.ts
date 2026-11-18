@@ -24,6 +24,7 @@ const MESSAGES: Record<string, string> = {
   play_area_required: 'Choose a play area.',
   hiding_period_required: 'Set the hiding period (in Hiding settings).',
   nothing_to_undo: 'Nothing to undo.',
+  invalid_push_subscription: 'This browser gave an unusable alert subscription. Try again.',
   cannot_undo: 'Only the last question, answer or shading by hand can be undone, and something else happened since.',
   cards_already_kept: 'The hiders already kept cards from that answer, so it can\'t be undone.',
   not_live: 'Not connected. Wait for the live dot.',

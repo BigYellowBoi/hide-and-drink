@@ -122,6 +122,7 @@ function GameScreen({
             events={events}
             positions={game.positions}
             presence={presence}
+            transport={transport}
           />
         )}
       </div>

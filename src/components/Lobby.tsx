@@ -6,6 +6,7 @@ import { isBuiltIn, listPlayAreas, madeBy, type PlayAreaSummary } from '../lobby
 import { describeCode, describeError } from '../lobby/messages'
 import { startBlockers, type LobbyPlayer, type LobbyState } from '../lobby/state'
 import { ConfigEditor } from './ConfigEditor'
+import { PushToggle } from './PushToggle'
 import { JoinCode } from './JoinCode'
 import type { Presence } from '../sync/presence'
 import { PresenceDot } from './PresenceDot'
@@ -310,6 +311,10 @@ export function Lobby({ sync, transport, lobby, userId, canAct, presence }: Prop
           }}
         />
       )}
+
+      <section className="card">
+        <PushToggle transport={transport} />
+      </section>
 
       <details className="card">
         <summary>

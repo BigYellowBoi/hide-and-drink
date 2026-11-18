@@ -71,7 +71,7 @@ Question tools on the map are seeker red (`--seeker-on-dark`): radar circle, the
 | Card style | Playing card: tall, category colour band on top, cost badge (Free / Drink / Shot), text below. Every card (and library row) has an info button: bottom sheet with the full text, cast cost, veto status and params facts |
 | Map shading | Grey hatch over ruled-out area. No bar count until the venue list is comprehensive (the list of bars still possible stays). Seekers can shade any answer by hand instead (fallback) |
 | Points | Tapping any point (station, venue, person, candidate) opens a popup with its name and "Open in Google Maps"; the selected bar in the picker, the hider's bar and a point tapped in Ask show the same link |
-| Timers | Ring + digits for deadlines; digits in the top bar for the main clock; thin bar for running curses |
+| Timers | Ring + digits for deadlines; digits in the top bar for the main clock; thin bar for running curses. All tick on the same server second; amber under a minute, pulsing under 10 s; a missed deadline reads "Late +m:ss"; the phone buzzes at a minute left and at zero (main clock; the hider's answer deadline) |
 | Top bar (every in-game screen) | Team chip left, main timer centre with a small caps label, status dot right |
 
 ## Screens

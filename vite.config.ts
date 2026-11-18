@@ -14,7 +14,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'logo.svg', 'mark.svg', 'wordmark.svg'],
       // Precache the bundled fonts and map label glyphs too, so the app looks right offline.
-      workbox: { globPatterns: ['**/*.{js,mjs,css,html,woff2,pbf}'] },
+      // push-sw.js (public/) adds the push alert handlers to the generated service worker.
+      workbox: { globPatterns: ['**/*.{js,mjs,css,html,woff2,pbf}'], importScripts: ['push-sw.js'] },
       manifest: {
         name: 'Hide + Drink',
         short_name: 'Hide+Drink',
