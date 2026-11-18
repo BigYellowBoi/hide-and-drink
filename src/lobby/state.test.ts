@@ -63,6 +63,15 @@ describe('deriveLobby', () => {
     expect(s.players.map((p) => p.name)).toEqual(['Hana', 'Sam'])
   })
 
+  it('a skipped hiding period moves the round clock to when seeking started', () => {
+    const start = ev('game_started', { round: 1, started_at: '2026-11-17T10:05:00Z', hiding_period_s: 1800, players: [] })
+    const s = deriveLobby([...lobbyEvents(), start, ev('seeking_started', { round: 1, at: '2026-11-17T10:07:00Z' })])
+    expect(s.status).toBe('seeking')
+    expect(s.started?.hidingPeriodS).toBe(120)
+    const onTime = deriveLobby([...lobbyEvents(), start, ev('seeking_started', { round: 1, at: '2026-11-17T10:35:00Z' })])
+    expect(onTime.started?.hidingPeriodS).toBe(1800)
+  })
+
   it('records the start and the locked teams', () => {
     const s = deriveLobby([
       ...lobbyEvents(),

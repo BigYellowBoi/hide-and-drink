@@ -155,8 +155,15 @@ function applyCoreEvent(state: LobbyState, e: GameEvent): LobbyState {
         },
       }
     }
-    case 'seeking_started':
-      return state.status === 'hiding' ? { ...state, status: 'seeking' } : state
+    case 'seeking_started': {
+      if (state.status !== 'hiding') return state
+      // A playtest skip ends hiding early: the clock follows when seeking really started.
+      const at = Date.parse(typeof e.payload.at === 'string' ? e.payload.at : '')
+      const started = state.started
+      if (!started || Number.isNaN(at)) return { ...state, status: 'seeking' }
+      const hidingPeriodS = Math.max(0, Math.min(started.hidingPeriodS, Math.round((at - started.startedAt) / 1000)))
+      return { ...state, status: 'seeking', started: { ...started, hidingPeriodS } }
+    }
     case 'host_changed': {
       const hostId = str(p.user_id)
       if (!hostId) return state
