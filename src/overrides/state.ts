@@ -61,6 +61,10 @@ export interface OverrideRequest {
   reason: string
   by: string | null
   params: Record<string, unknown>
+  /** Undo requests: what would be undone. */
+  summary: string | null
+  /** Undo requests need a yes from each team (the asker's counts for theirs). */
+  confirmed: { hiders: boolean; seekers: boolean }
   /** null while open. */
   resolution: 'approved' | 'declined' | null
 }
@@ -89,8 +93,14 @@ export function deriveOverrides(events: readonly GameEvent[]): OverridesState {
         reason: str(p.reason) ?? '',
         by: str(p.by),
         params: isObject(p.params) ? p.params : {},
+        summary: str(p.summary),
+        confirmed: { hiders: p.team === 'hiders', seekers: p.team === 'seekers' },
         resolution: null,
       })
+    }
+    if (e.type === 'override_confirmed') {
+      const r = requests.get(str(p.request_id) ?? '')
+      if (r && (p.team === 'hiders' || p.team === 'seekers')) r.confirmed = { ...r.confirmed, [p.team]: true }
     }
     if (e.type === 'override_declined') {
       const r = requests.get(str(p.request_id) ?? '')
@@ -123,3 +133,7 @@ export function deriveOverrides(events: readonly GameEvent[]): OverridesState {
 }
 
 export const openRequests = (s: OverridesState) => s.requests.filter((r) => r.resolution === null)
+
+/** Undo requests waiting on this team's yes (or no). */
+export const undoVotesFor = (s: OverridesState, team: 'hiders' | 'seekers' | null) =>
+  team ? openRequests(s).filter((r) => r.kind === 'undo' && !r.confirmed[team]) : []

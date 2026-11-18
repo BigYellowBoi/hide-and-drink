@@ -6,7 +6,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(122);
+select plan(131);
 
 insert into auth.users (id) values
   ('11111111-1111-1111-1111-111111111111'),
@@ -32,6 +32,10 @@ create function pg_temp.seeker() returns void language sql as $$ select pg_temp.
 create function pg_temp.ov(p_kind text, p_params jsonb default '{}', p_reason text default 'test fix', p_request uuid default null)
 returns jsonb language sql as $$
   select public.host_override(pg_temp.gid(), p_kind, p_params, p_reason, pg_temp.n(), pg_temp.seq(), p_request);
+$$;
+-- Agree to (or turn down) a request as the current user.
+create function pg_temp.vote(p_request uuid, p_kind text default 'confirm') returns jsonb language sql as $$
+  select public.host_override(pg_temp.gid(), p_kind, null, null, pg_temp.n(), pg_temp.seq(), p_request);
 $$;
 create function pg_temp.last_event(p_type text) returns public.events language sql security definer as $$
   select * from public.events where game_id = pg_temp.gid() and type = p_type order by seq desc limit 1;
@@ -129,9 +133,27 @@ select pg_temp.host();
 select throws_ok(format($$ select pg_temp.ov('cancel_penalty', '{"question_id":"%s"}') $$, current_setting('test.q1')),
   'P0001', 'no_penalty', 'a penalty cannot be cancelled twice');
 
--- undo restores it
-select lives_ok(format($$ select pg_temp.ov('undo', '{"override_id":"%s"}') $$, current_setting('test.ov1')), 'undo');
+-- undo needs both teams: any player asks (their team's yes), the other team agrees
+select pg_temp.seeker();
+select set_config('test.ureq', (pg_temp.ov('undo', format('{"override_id":"%s"}', current_setting('test.ov1'))::jsonb, 'wrong question'))
+  ->> 'request_id', true);
 reset role;
+select ok((pg_temp.q(current_setting('test.q1')::uuid)).penalty_cancelled, 'asking to undo changes nothing yet');
+select is((select array[payload ->> 'kind', payload ->> 'team', payload #>> '{params,override_id}'] from pg_temp.last_event('override_requested')),
+  array['undo', 'seekers', current_setting('test.ov1')], 'a seeker who is not host can ask for an undo');
+set local role authenticated;
+select pg_temp.host();
+select throws_ok(format($$ select pg_temp.vote(%L) $$, current_setting('test.ureq')), 'P0001', 'already_confirmed',
+  'the asker''s own team has already agreed');
+select throws_ok(format($$ select pg_temp.ov('undo', '{"override_id":"%s"}') $$, current_setting('test.ov1')),
+  'P0001', 'undo_already_requested', 'one undo request per fix at a time');
+select pg_temp.hider();
+select lives_ok(format($$ select pg_temp.vote(%L) $$, current_setting('test.ureq')), 'a hider agrees');
+reset role;
+select is((select payload ->> 'team' from pg_temp.last_event('override_confirmed')), 'hiders', 'override_confirmed names the team');
+select is((select array[payload ->> 'kind', payload #>> '{confirmed_by,hiders}', payload #>> '{confirmed_by,seekers}'] from pg_temp.last_event('override')),
+  array['undo', '22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333'],
+  'the undo records who agreed for each team');
 select ok(not (pg_temp.q(current_setting('test.q1')::uuid)).penalty_cancelled, 'undo: the penalty is back');
 select is((select proved_at from public.drink_proofs where id = current_setting('test.proof1')::uuid), null,
   'undo: the shot proof is open again');
@@ -435,8 +457,17 @@ select pg_temp.hider();
 select lives_ok(format($$ select pg_temp.ov('remove_card', '{"instance_id":"%s"}', 'dup') $$, current_setting('test.inst')),
   'a hider removes a card directly');
 select is(pg_temp.loc(current_setting('test.inst')::uuid), 'discarded', 'remove_card discards it');
-select throws_ok(format($$ select pg_temp.ov('undo', '{"override_id":"%s"}') $$, current_setting('test.given')),
+select set_config('test.ureq2', (pg_temp.ov('undo', format('{"override_id":"%s"}', current_setting('test.given'))::jsonb, 'no'))
+  ->> 'request_id', true);
+select pg_temp.seeker();
+select throws_ok(format($$ select pg_temp.vote(%L) $$, current_setting('test.ureq2')),
   'P0001', 'undo_conflict', 'undo refuses when the rows changed since');
+select lives_ok(format($$ select pg_temp.vote(%L, 'decline') $$, current_setting('test.ureq2')), 'either team can turn an undo down');
+reset role;
+select is((select resolution from public.override_requests where id = current_setting('test.ureq2')::uuid), 'declined', 'turned down');
+set local role authenticated;
+select pg_temp.hider();
+select throws_ok(format($$ select pg_temp.vote(%L) $$, current_setting('test.ureq2')), 'P0001', 'request_not_open', 'a closed request takes no votes');
 select lives_ok($$ select pg_temp.ov('reshuffle', '{}', 'deck empty') $$, 'reshuffle');
 reset role;
 select is(pg_temp.loc(current_setting('test.inst')::uuid), 'pile', 'discards go back in the pile');

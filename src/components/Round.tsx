@@ -14,6 +14,7 @@ import { questionTool } from '../play/overlays'
 import { shade, type HiderZone } from '../play/shading'
 import { deriveOverrides, openRequests, type OverrideRequest } from '../overrides/state'
 import { optionOf } from '../overrides/catalogue'
+import { describeError } from '../lobby/messages'
 import { FixSomething } from './FixSomething'
 import { derivePlay, questionLabel, shadable, shownEnd, type PlayState } from '../play/state'
 import { useQuestionTypes } from '../play/useQuestionTypes'
@@ -125,6 +126,7 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
   const overrides = useMemo(() => deriveOverrides(events), [events])
   /** The Fix something sheet: open (true), or carrying out a seeker host's request. */
   const [fix, setFix] = useState<false | true | OverrideRequest>(false)
+  const [voteErr, setVoteErr] = useState<{ id: string; msg: string } | null>(null)
   const [tab, setTab] = useState<Tab>('map')
   /** A past question shown on the map from the timeline (its tool, candidates and distances). */
   const [shownId, setShownId] = useState<string | null>(null)
@@ -193,8 +195,15 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
     userId,
   }
 
-  const requests = openRequests(overrides)
-  const canFix = shared.isHost || team === 'hiders'
+  const requests = openRequests(overrides).filter((r) => r.kind !== 'undo')
+  const undos = openRequests(overrides).filter((r) => r.kind === 'undo')
+  const canFix = shared.isHost || team !== null
+  const vote = (id: string, kind: 'confirm' | 'decline') => {
+    setVoteErr(null)
+    sync
+      .action('host_override', { p_kind: kind, p_params: null, p_reason: null, p_request_id: id })
+      .catch((e: unknown) => setVoteErr({ id, msg: describeError(e) }))
+  }
 
   return (
     <HiderCountContext.Provider value={hiderCount}>
@@ -215,6 +224,28 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
             <p>A hider does this one. You'll see that it happened.</p>
           </div>
         ))}
+      {undos.map((r) => {
+        const mine = team !== null && r.confirmed[team]
+        return (
+          <div key={r.id} className="blocked-banner fix-request" role="status">
+            <strong>{mine ? 'Waiting for the other team: ' : 'Undo? '}{r.summary ?? 'a host fix'}</strong>
+            <p>
+              {nameOf(r.by)} asks: “{r.reason}”. Both teams have to agree.
+            </p>
+            {voteErr?.id === r.id && <p className="bad">{voteErr.msg}</p>}
+            {!mine && team && (
+              <div className="row">
+                <button className="small" disabled={!canAct} onClick={() => vote(r.id, 'confirm')}>
+                  Agree
+                </button>
+                <button className="small secondary" disabled={!canAct} onClick={() => vote(r.id, 'decline')}>
+                  No
+                </button>
+              </div>
+            )}
+          </div>
+        )
+      })}
       {canFix && (
         <div className="fix-bar">
           <button className="small secondary" disabled={!canAct} onClick={() => setFix(true)}>

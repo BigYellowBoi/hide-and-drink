@@ -62,17 +62,20 @@ export const OVERRIDES: readonly OverrideOption[] = [
   { kind: 'reshuffle', group: 'Cards', private: true, label: 'Reshuffle the deck', line: 'Discards go back into the draw pile, shuffled (for an empty deck).' },
   { kind: 'move_player', group: 'Players', private: false, label: 'Move a player', line: 'Swap someone to the other team mid-game (onto the hiders needs a hider to agree).' },
   { kind: 'set_host', group: 'Players', private: false, label: 'Make someone else host', line: 'Hand the host controls to another player.' },
-  { kind: 'undo', group: 'Undo', private: false, label: 'Undo a fix', line: 'Put things back as they were before an earlier fix.' },
+  { kind: 'undo', group: 'Undo', private: false, label: 'Undo a fix', line: 'Put things back as they were before a fix. Both teams have to agree.' },
 ]
 
 export const optionOf = (kind: string) => OVERRIDES.find((o) => o.kind === kind) ?? null
 
-/** What this phone may do: the host everything, other hiders only the hider-only fixes. */
-export function availableOverrides(isHost: boolean, isHider: boolean): OverrideOption[] {
+/**
+ * What this phone may do: the host everything, other hiders the hider-only fixes, and anyone
+ * on a team can ask for an undo (both teams must agree).
+ */
+export function availableOverrides(isHost: boolean, isHider: boolean, onTeam = isHider): OverrideOption[] {
   if (isHost) return [...OVERRIDES]
-  return isHider ? OVERRIDES.filter((o) => o.private) : []
+  return OVERRIDES.filter((o) => (isHider && o.private) || (onTeam && o.kind === 'undo'))
 }
 
 /** A seeker host's hider-only fix goes to the hiders as a request instead. */
-export const needsHiderApproval = (o: Pick<OverrideOption, 'private'>, isHider: boolean, params: Record<string, unknown> = {}) =>
-  !isHider && (o.private || params.team === 'hiders')
+export const needsHiderApproval = (o: Pick<OverrideOption, 'private' | 'kind'>, isHider: boolean, params: Record<string, unknown> = {}) =>
+  o.kind !== 'undo' && !isHider && (o.private || params.team === 'hiders')

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '../sync/types'
-import { deriveOverrides, effectiveEvents, openRequests, undoneOverrides } from './state'
+import { deriveOverrides, effectiveEvents, openRequests, undoneOverrides, undoVotesFor } from './state'
 import { availableOverrides, needsHiderApproval, OVERRIDES } from './catalogue'
 import { derivePlay, shownEnd } from '../play/state'
 import { deriveCards, lockedUntil, openProofs } from '../cards/state'
@@ -173,10 +173,22 @@ describe('catalogue', () => {
     expect(OVERRIDES.map((o) => o.kind).sort()).toEqual(kinds)
   })
 
-  it('a non-host hider only sees hider-only fixes; seekers who are not host see none', () => {
-    expect(availableOverrides(false, true).every((o) => o.private)).toBe(true)
-    expect(availableOverrides(false, false)).toEqual([])
-    expect(availableOverrides(true, false)).toHaveLength(OVERRIDES.length)
+  it('a non-host hider sees hider-only fixes and undo; other seekers only undo; no team, nothing', () => {
+    expect(availableOverrides(false, true, true).every((o) => o.private || o.kind === 'undo')).toBe(true)
+    expect(availableOverrides(false, false, true).map((o) => o.kind)).toEqual(['undo'])
+    expect(availableOverrides(false, false, false)).toEqual([])
+    expect(availableOverrides(true, false, true)).toHaveLength(OVERRIDES.length)
+  })
+
+  it('an undo request waits for a yes from each team', () => {
+    seq = 0
+    const events = [ev('override_requested', { request_id: 'u1', kind: 'undo', team: 'seekers', reason: 'r', summary: 'Undo: x', params: { override_id: 'o1' } })]
+    expect(undoVotesFor(deriveOverrides(events), 'seekers')).toEqual([])
+    expect(undoVotesFor(deriveOverrides(events), 'hiders').map((r) => r.id)).toEqual(['u1'])
+    events.push(ev('override_confirmed', { request_id: 'u1', team: 'hiders' }))
+    const r = deriveOverrides(events).requests[0]
+    expect(r.confirmed).toEqual({ hiders: true, seekers: true })
+    expect(undoVotesFor(deriveOverrides(events), 'hiders')).toEqual([])
   })
 
   it('a seeker host needs a hider for hider-only fixes and for moving someone onto the hiders', () => {
@@ -186,6 +198,7 @@ describe('catalogue', () => {
     expect(needsHiderApproval(bar, true)).toBe(false)
     expect(needsHiderApproval(move, false, { team: 'hiders' })).toBe(true)
     expect(needsHiderApproval(move, false, { team: 'seekers' })).toBe(false)
+    expect(needsHiderApproval(OVERRIDES.find((o) => o.kind === 'undo')!, false)).toBe(false)
   })
 
   it('every option explains itself in one line', () => {
