@@ -422,7 +422,6 @@ function HiderView({
             canAct={canAct}
             ctx={{ city: lobby.city, pendingQuestion: !!play.pending, barChosen: !!bar }}
           />
-          {questionsBlockedBy(cards).length > 0 && <BlockedBanner effects={questionsBlockedBy(cards)} team="hiders" />}
           <EffectsPanel sync={sync} cards={cards} team="hiders" canAct={canAct} now={now} config={lobby.config} nameOf={nameOf} />
         </>
       )}
