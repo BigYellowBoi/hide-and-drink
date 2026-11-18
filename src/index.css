@@ -1549,20 +1549,27 @@ button.answer.on {
 /* Ask (seekers) */
 .type-tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  /* Wide enough for the longest type name ("Thermometer") on one line. */
+  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
   gap: 8px;
 }
 
 button.type-tile {
   display: grid;
   gap: 2px;
+  min-width: 0;
   min-height: 64px;
-  padding: 8px;
+  padding: 8px 6px;
   border-radius: 14px;
   background: var(--surface-2);
   border-color: var(--surface-2);
   color: var(--text);
   font-weight: 600;
+}
+
+/* A name that still doesn't fit wraps rather than clipping. */
+button.type-tile strong {
+  overflow-wrap: anywhere;
 }
 
 button.type-tile .small {
