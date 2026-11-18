@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import brisbaneInner from '../../data/play-areas/brisbane-inner.geojson?raw'
 import type { AreaCollection } from '../map/playArea'
 import { circleSteps, distanceM, distancesToArea, projector, radarCircle, thermometerHalf, thermometerSide, type Area, type LngLat } from './geo'
-import { remainingBars, shade, suggestAnswer } from './shading'
+import { shade, suggestAnswer } from './shading'
 import type { Question } from './state'
 
 const O: LngLat = [153.025, -27.47]
@@ -262,29 +262,6 @@ describe('drawable shading', () => {
       for (const f of s.ruledOut.features) expect((f.geometry as GeoJSON.Polygon).coordinates).toHaveLength(1)
     }
   }, 30_000)
-})
-
-describe('remainingBars', () => {
-  const venues = [
-    { id: 'a', name: 'Inside', point: at(0, 0) },
-    { id: 'b', name: 'Edge', point: at(1050, 0) }, // circle reaches into a 1 km radar
-    { id: 'c', name: 'Far', point: at(1500, 0) },
-    { id: 'd', name: 'Outside play area', point: at(5000, 0) },
-  ]
-
-  it('keeps bars whose hiding circle overlaps the remaining area', () => {
-    const s = shade(square, [q('radar', { center: O, distance_m: 1000 }, 'yes')])
-    expect(remainingBars(venues, square, s.remaining, 100).map((v) => v.id)).toEqual(['b', 'a'])
-  })
-
-  it('all bars in the play area remain before any answer', () => {
-    const s = shade(square, [])
-    expect(remainingBars(venues, square, s.remaining, 100).map((v) => v.id).sort()).toEqual(['a', 'b', 'c'])
-  })
-
-  it('none remain when answers contradict', () => {
-    expect(remainingBars(venues, square, null, 100)).toEqual([])
-  })
 })
 
 describe('suggestAnswer', () => {

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from shapely.geometry import shape
 
-from pipeline.fetch import get_json
+from pipeline.fetch import cached_reply, get_json, request_key, store_reply
 from pipeline.geo import Projector, clip, tidy
 
 PAGE = 1000
@@ -18,13 +18,16 @@ _STATE_SUFFIX = re.compile(r"\s*\((?:[^()]* - )?(?:NSW|Vic\.|Qld|SA|WA|Tas\.|NT|
 
 
 def fetch(dataset: dict, area, cache: Path, *, offline: bool = False) -> tuple[dict, dict]:
-    """All boundary polygons intersecting the area's bounding box, as GeoJSON (cached)."""
-    meta_file = cache.with_name(cache.name + ".meta.json")
-    if cache.exists() and (offline or meta_file.exists()):
-        return json.loads(cache.read_text()), json.loads(meta_file.read_text())
-    if offline:
-        raise FileNotFoundError(f"{cache} not cached; run without --offline")
+    """All boundary polygons intersecting the area's bounding box, as GeoJSON (cached).
+
+    Boundaries rarely change, so the cache never ages, but it is refetched when the area grows.
+    """
     minx, miny, maxx, maxy = area.bounds
+    key = request_key({"url": dataset["url"], "fields": [dataset["code_field"], dataset["name_field"]],
+                       "bbox": [round(v, 6) for v in (minx, miny, maxx, maxy)]})
+    hit = cached_reply(cache, key, offline=offline, max_age_h=None)
+    if hit:
+        return hit
     features, offset = [], 0
     while True:
         page = get_json(dataset["url"] + "/query", {
@@ -49,10 +52,7 @@ def fetch(dataset: dict, area, cache: Path, *, offline: bool = False) -> tuple[d
         offset += len(batch)
     fc = {"type": "FeatureCollection", "features": features}
     meta = {"url": dataset["url"], "retrieved_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
-    cache.parent.mkdir(parents=True, exist_ok=True)
-    cache.write_text(json.dumps(fc))
-    meta_file.write_text(json.dumps(meta, indent=2))
-    return fc, meta
+    return fc, store_reply(cache, key, fc, meta)
 
 
 def _prop(props: dict, field: str):

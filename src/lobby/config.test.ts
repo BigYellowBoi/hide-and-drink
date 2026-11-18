@@ -6,7 +6,7 @@ describe('config fields', () => {
     const groups = configGroups(defaultConfig)
     const paths = groups.flatMap((g) => g.fields.map((f) => f.path.join('.')))
     expect(paths).toContain('hiding_zone.bar_radius_m')
-    expect(paths).toContain('hiding_zone.station_zone.radius_m')
+    expect(paths).toContain('hiding_zone.freeze_when_seeker_within_m')
     expect(paths).toContain('hiding_period_s')
     expect(paths.some((p) => p.endsWith('todo') || p === 'schema_version')).toBe(false)
   })

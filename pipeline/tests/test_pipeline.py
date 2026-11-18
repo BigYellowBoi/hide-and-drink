@@ -10,7 +10,7 @@ from shapely.geometry import LineString, Point, Polygon, shape
 from shapely.prepared import prep
 
 from pipeline import abs as abs_src
-from pipeline import gtfs, osm, to_sql
+from pipeline import fetch, gtfs, osm, to_sql
 from pipeline.config import DATA, load_city
 from pipeline.geo import Projector, clip, extent
 
@@ -103,6 +103,33 @@ def test_manual_venues_and_excludes():
         osm.apply_venue_edits([], {"add": [{"id": "bad", "name": "x", "lon": 0, "lat": 0}]}, SQUARE, None)
 
 
+def test_include_keeps_untagged_venues_and_clashes_fail():
+    els = [{"id": "node/7", "kind": "node", "tags": {"amenity": "restaurant", "name": "Dry but licensed"},
+            "geom": Point(153.02, -27.47)},
+           {"id": "node/8", "kind": "node", "tags": {"amenity": "restaurant", "name": "Dry"},
+            "geom": Point(153.03, -27.47)}]
+    feats = osm.build_point_layer(VENUES, els, SQUARE, prep(SQUARE), PROJ, frozenset({"osm:node/7"}))
+    assert [f["id"] for f in feats] == ["osm:node/7"]
+    with pytest.raises(ValueError):
+        osm.apply_venue_edits([], {"include": ["osm:node/7"], "exclude": [{"id": "osm:node/7"}]}, SQUARE, None)
+
+
+def test_unmatched_edits_are_reported():
+    feats = [{"id": "osm:node/1"}]
+    edits = {"include": ["osm:node/1", {"id": "osm:node/2", "note": "x"}], "exclude": ["osm:node/3"]}
+    assert osm.unmatched_edits(feats, edits) == {"include": ["osm:node/2"], "exclude": ["osm:node/3"]}
+
+
+def test_overpass_query_fetches_included_ids():
+    q = osm.overpass_query([VENUES], SQUARE, frozenset({"osm:node/5", "osm:node/12", "osm:way/9"}))
+    assert "node(id:5,12);" in q and "way(id:9);" in q
+
+
+def test_brisbane_venue_edits_drop_old_blind_tiger():
+    edits = load_city("brisbane").venue_edits
+    assert "osm:node/4821933306" in osm.edit_ids(edits["exclude"])
+
+
 # --- GTFS -------------------------------------------------------------------------
 
 def test_base_name_strips_mode_suffixes():
@@ -189,6 +216,23 @@ def test_extent_is_buffered_play_area():
     inner = shape(city.play_areas["brisbane-inner"]["features"][0]["geometry"])
     assert area.contains(inner)
     assert 1900 < PROJ.distance_m(inner.exterior, Point(area.exterior.coords[0])) < 2100
+
+
+def test_extent_includes_coverage_circles():
+    city = load_city("brisbane")
+    area = extent(city.play_areas, PROJ, 2000, city.config["coverage"])
+    assert area.contains(Point(152.9526, -27.4452))  # Blind Tiger, The Gap
+    assert not extent(city.play_areas, PROJ, 2000).contains(Point(152.9526, -27.4452))
+
+
+def test_cache_is_not_reused_for_another_request(tmp_path):
+    path = tmp_path / "reply.json"
+    fetch.store_reply(path, fetch.request_key({"bbox": [1, 2, 3, 4]}), {"ok": 1}, {"url": "u"})
+    body, meta = fetch.cached_reply(path, fetch.request_key({"bbox": [1, 2, 3, 4]}), offline=False, max_age_h=24)
+    assert body == {"ok": 1} and meta == {"url": "u"}
+    assert fetch.cached_reply(path, fetch.request_key({"bbox": [0, 2, 3, 4]}), offline=False, max_age_h=24) is None
+    with pytest.raises(FileNotFoundError):
+        fetch.cached_reply(path, fetch.request_key({"bbox": [0, 2, 3, 4]}), offline=True, max_age_h=24)
 
 
 def test_clip_cuts_lines_and_drops_points_outside():

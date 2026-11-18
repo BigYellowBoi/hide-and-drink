@@ -23,7 +23,7 @@ def build(city: City, *, osm_source: str = "auto", offline: bool = False, log=pr
     cfg = city.config
     cache = CACHE / city.id
     projector = Projector(cfg["projected_crs"])
-    area = extent(city.play_areas, projector, cfg["buffer_m"])
+    area = extent(city.play_areas, projector, cfg["buffer_m"], cfg.get("coverage"))
     prepared = prep(area)
     simplify_m = cfg.get("simplify_m", 0)
     features: list[dict] = []
@@ -50,7 +50,7 @@ def build(city: City, *, osm_source: str = "auto", offline: bool = False, log=pr
         elements, meta = _osm_elements(city, osm_layers, area, cache, osm_source, offline, log)
         sources.append({"name": cfg["osm"]["name"], "licence": cfg["osm"]["licence"], **meta})
         features += osm.build_layers(osm_layers, elements, area, prepared, projector, simplify_m,
-                                     city.venue_edits)
+                                     city.venue_edits, log)
 
     # ABS boundaries
     for layer in city.layers_from("abs"):
@@ -80,6 +80,7 @@ def build(city: City, *, osm_source: str = "auto", offline: bool = False, log=pr
             "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "play_areas": cfg["play_areas"],
             "buffer_m": cfg["buffer_m"],
+            **({"coverage": cfg["coverage"]} if cfg.get("coverage") else {}),
             "extent": mapping(area),
             "layers": [
                 {"id": layer["id"], "label": layer["label"], "geometry": layer["geometry"],
@@ -102,10 +103,11 @@ def build(city: City, *, osm_source: str = "auto", offline: bool = False, log=pr
 
 def _osm_elements(city, layers, area, cache, source, offline, log):
     cfg = city.config["osm"]
+    include = osm.edit_ids(city.venue_edits.get("include"))
     if source in ("auto", "overpass") and cfg.get("overpass_urls"):
         try:
             log("osm: querying Overpass")
-            body, meta = post_json(cfg["overpass_urls"], {"data": osm.overpass_query(layers, area)},
+            body, meta = post_json(cfg["overpass_urls"], {"data": osm.overpass_query(layers, area, include)},
                                    cache / "overpass.json", offline=offline)
             return osm.from_overpass(body), {**meta, "via": "overpass"}
         except (RuntimeError, FileNotFoundError) as e:
@@ -114,7 +116,7 @@ def _osm_elements(city, layers, area, cache, source, offline, log):
             log(f"osm: Overpass unavailable, falling back to extract ({str(e).splitlines()[-1].strip()})")
     meta = download(cfg["pbf_url"], cache / "osm.pbf", offline=offline, max_age_h=24 * 7)
     log("osm: reading extract")
-    return osm.from_pbf(cache / "osm.pbf", layers, area), {**meta, "via": "pbf"}
+    return osm.from_pbf(cache / "osm.pbf", layers, area, include), {**meta, "via": "pbf"}
 
 
 

@@ -1,6 +1,12 @@
 {
   "schema_version": 1,
-  "comment": "Hand edits applied on top of OSM when building the Brisbane pack. `add`: licensed restaurants or other venues OSM misses ({id, name, lon, lat, kind}); ids start with 'manual:'. `exclude`: feature ids to drop (e.g. 'osm:node/123'). Per-game curation happens in the lobby.",
+  "comment": "Hand edits applied on top of OSM when building the Brisbane pack. `add`: licensed restaurants or other venues OSM misses ({id, name, lon, lat, kind}); ids start with 'manual:'. `include`: OSM ids kept as venues even when their tags don't say they serve alcohol. `exclude`: OSM ids to drop (closed, moved, not really a bar). Include/exclude entries are an id string or {id, note}. The build warns about ids it no longer finds. Per-game curation happens in the lobby.",
   "add": [],
-  "exclude": []
+  "include": [],
+  "exclude": [
+    {
+      "id": "osm:node/4821933306",
+      "note": "Blind Tiger Bar, 1b/204 Oxford St, Bulimba: the 2016 address. Blind Tiger is now at 34/1000 Waterworks Rd, The Gap (osm:node/409529625)."
+    }
+  ]
 }

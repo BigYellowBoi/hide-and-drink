@@ -3,16 +3,7 @@
   "game_size": "small",
   "hiding_zone": {
     "bar_radius_m": 100,
-    "freeze_when_seeker_within_m": 100,
-    "station_zone": {
-      "enabled": null,
-      "radius_m": 805,
-      "layer": "stations",
-      "modes": [
-        "rail"
-      ],
-      "todo": "Confirm if still a rule"
-    }
+    "freeze_when_seeker_within_m": 100
   },
   "answer_deadline_s": {
     "default": 300,

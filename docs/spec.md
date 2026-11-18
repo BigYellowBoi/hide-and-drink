@@ -29,7 +29,7 @@ Source of truth for building the app. The shared roadmap doc is a read-only over
 - No reply to a reasonable request within **5 min** = one shot for that team, unless the request naturally takes longer.
 - Drinks taken for costs/curses are photographed and sent to the other team.
 - Drinks can be redistributed within a team (no app logic).
-- OPEN: last game's map also used a 0.5 mi (805 m) hiding radius around railway stations. Confirm whether this still applies.
+- The hiding spot is always a bar. Stations are only for getting around: no station zones (that is the original game's rule, not ours).
 
 ## 3. How rules map to the app
 
@@ -41,7 +41,6 @@ Source of truth for building the app. The shared roadmap doc is a read-only over
 | Veto | Veto button on curses with `can_veto: true`. Server counts vetoes per run; lock = base + step x vetoes_used (from config), starting when any earlier lock ends. Opens a drink proof for the seekers. |
 | 5 min reply | Default answer deadline 300 s, overridable per question type. Missed deadline logs a penalty shot event. |
 | Photo proof | Each drink the app knows about (cast cost, drink cards, veto, missed deadline) asks the drinking team for a photo, shown to both teams in the log. A curse's cast cost is drunk by the seekers (card `params.cost_team` overrides); other cards' costs by the hider. |
-| Station zone (open) | If enabled, bar picker only offers bars inside a station zone. |
 
 ## 4. Sync and concurrency
 
@@ -89,11 +88,11 @@ Utilities: `params.utility` = `dice` (with `params.dice` count) or `wheel` (`par
 | Layer | Brisbane | Sydney |
 | --- | --- | --- |
 | Transit | TransLink SEQ GTFS (direct zip) | TfNSW Timetables Complete GTFS (free API key) |
-| Venues | OSM: amenity=bar/pub/biergarten/nightclub, craft=brewery/winery, plus licensed restaurants added by hand | same |
+| Venues | OSM: amenity=bar/pub/biergarten/nightclub, craft=brewery/winery, plus licensed restaurants added by hand; hand include/exclude lists by OSM id (`data/venues/<city>.json`) | same |
 | Matching/Tentacles | OSM categories; ABS suburbs/localities and LGAs | same |
 | Play area | Drawn in lobby or `data/play-areas/*.geojson` | same |
 
-Pipeline (`pipeline/`): download, clip to play area, merge stations, tag venues, export a city pack, load into PostGIS. Host curates venues in the lobby.
+Pipeline (`pipeline/`): download, clip to the play areas plus the city's `coverage` circles (so hosts can draw new areas anywhere in them), merge stations, tag venues, export a city pack, load into PostGIS. Host curates venues in the lobby. `save_play_area` refuses areas reaching past the pack (`play_area_outside_map_data`).
 
 Reuse: taibeled/JetLagHideAndSeek (MIT) for question geometry and OSM queries; keep its licence notice in any ported files. Its share links (`?hzc=`) are base64url zlib-compressed JSON (GeoJSON + settings), so they're importable.
 
@@ -120,7 +119,6 @@ Latency harness (fail deploy if p95 > 1 s), leak test (seeker client never recei
 
 ## 11. Open questions
 
-- Is the 0.5 mi railway-station zone still a rule?
 - Rounds and scoring: official small-game values? (Hiding period default set to 1 hour.)
 - Copies per curse (assumed 1 each).
 - Curse of Nathan: no text yet.

@@ -4,6 +4,13 @@
   "label": "Brisbane",
   "play_areas": ["brisbane-inner"],
   "buffer_m": 2000,
+  "coverage": [
+    {
+      "name": "Brisbane within 10 km of the CBD",
+      "centre": [153.0251, -27.4689],
+      "radius_m": 10000
+    }
+  ],
   "projected_crs": "EPSG:7856",
   "simplify_m": 2,
   "gtfs": {

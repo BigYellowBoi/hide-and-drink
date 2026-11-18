@@ -5,7 +5,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(16);
+select plan(17);
 
 insert into auth.users (id) values
   ('11111111-1111-1111-1111-111111111111'),
@@ -48,6 +48,13 @@ select throws_ok(
        (select last_seq from seq), 'Tiny',
        '{"type":"Polygon","coordinates":[[[153.02,-27.47],[153.021,-27.47],[153.021,-27.469],[153.02,-27.47]]]}') $$,
   'P0001', 'play_area_too_small', 'a tiny area is refused'
+);
+-- The Gold Coast: no Brisbane map data there.
+select throws_ok(
+  $$ select public.save_play_area(current_setting('test.game_id')::uuid, 'dddddddd-0000-0000-0000-000000000019',
+       (select last_seq from seq), 'Gold Coast',
+       '{"type":"Polygon","coordinates":[[[153.40,-28.00],[153.43,-28.00],[153.43,-27.97],[153.40,-27.97],[153.40,-28.00]]]}') $$,
+  'P0001', 'play_area_outside_map_data', 'an area past the city pack is refused'
 );
 select throws_ok(
   $$ select public.save_play_area(current_setting('test.game_id')::uuid, 'dddddddd-0000-0000-0000-000000000013',

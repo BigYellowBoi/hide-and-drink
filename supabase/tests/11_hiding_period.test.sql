@@ -5,7 +5,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(38);
+select plan(37);
 
 insert into auth.users (id) values
   ('11111111-1111-1111-1111-111111111111'),
@@ -34,8 +34,7 @@ set local role authenticated;
 select set_config('test.game_id',
   public.create_game('Host', 'dddddddd-0000-0000-0000-000000000001', 'brisbane',
     '{"hiding_period_s":3600,"seeker_location_interval_s":20,
-      "hiding_zone":{"bar_radius_m":100,"freeze_when_seeker_within_m":100,
-                     "station_zone":{"enabled":null,"radius_m":805,"layer":"stations","modes":["rail"]}}}'::jsonb) ->> 'game_id', true);
+      "hiding_zone":{"bar_radius_m":100,"freeze_when_seeker_within_m":100}}'::jsonb) ->> 'game_id', true);
 select set_config('test.code', (select code from public.games where id = current_setting('test.game_id')::uuid), true);
 
 select pg_temp.as_user('22222222-2222-2222-2222-222222222222');
@@ -99,25 +98,20 @@ select throws_ok(
   'P0001', 'stale_state', 'choosing a bar needs an up-to-date view'
 );
 
--- Station zone on with a tiny radius: (almost) nothing qualifies, and the server enforces it.
+-- Stations play no part in hiding: an old station_zone config is ignored.
 reset role;
 update public.games
    set config = jsonb_set(config, '{hiding_zone,station_zone}', '{"enabled":true,"radius_m":1,"layer":"stations","modes":["rail"]}')
  where id = current_setting('test.game_id')::uuid;
 set local role authenticated;
-select ok(
-  cardinality(public.hiding_bars(current_setting('test.game_id')::uuid))
-    < cardinality(string_to_array(current_setting('test.bars'), ',')),
-  'station zone narrows the bar list'
-);
-select throws_ok(
-  $$ select public.choose_bar(current_setting('test.game_id')::uuid, current_setting('test.bar'),
-       'dddddddd-0000-0000-0000-000000000014', pg_temp.last_seq()) $$,
-  'P0001', 'venue_not_allowed', 'bar outside the station zone is refused'
+select is(
+  cardinality(public.hiding_bars(current_setting('test.game_id')::uuid)),
+  cardinality(string_to_array(current_setting('test.bars'), ',')),
+  'a leftover station zone does not narrow the bar list'
 );
 reset role;
 update public.games
-   set config = jsonb_set(config, '{hiding_zone,station_zone,enabled}', 'null')
+   set config = config #- '{hiding_zone,station_zone}'
  where id = current_setting('test.game_id')::uuid;
 set local role authenticated;
 

@@ -12,6 +12,7 @@ const MESSAGES: Record<string, string> = {
   invalid_play_area_name: 'Give the play area a name (up to 80 characters).',
   play_area_too_small: 'That area is too small (under 0.1 km²).',
   play_area_too_large: 'That area is too large (over 2000 km²).',
+  play_area_outside_map_data: 'Part of that area is outside the map data, so it would have no stations or bars there. Keep it within the city.',
   play_area_too_detailed: 'That shape has too many corners (5000 max). Simplify it.',
   play_area_name_taken: 'A play area with that name already exists. Pick another name.',
   play_area_protected: 'Built-in maps can\'t be deleted.',

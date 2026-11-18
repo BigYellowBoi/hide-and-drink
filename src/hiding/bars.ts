@@ -13,7 +13,7 @@ export interface BarOption {
   distanceM: number | null
 }
 
-/** Venue ids the server accepts for choose_bar in this game (play area, station zone). */
+/** Venue ids the server accepts for choose_bar in this game (inside the play area). */
 export async function loadHidingBars(client: SupabaseClient, gameId: string): Promise<string[]> {
   const { data, error } = await client.rpc('hiding_bars', { p_game_id: gameId })
   if (error) throw new Error(error.message)

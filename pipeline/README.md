@@ -12,7 +12,8 @@ python3 -m pytest pipeline/tests       # unit tests (no network)
 ```
 
 Downloads are cached in `pipeline/.cache/` (git-ignored, refreshed after 24 h; the OSM extract after
-7 days). `--offline` rebuilds from the cache only. `--osm overpass|pbf` forces an OSM source; the
+7 days; ABS boundaries kept until the area changes). Overpass and ABS replies are keyed on their query
+and area, so changing the play areas, coverage or layers always refetches. `--offline` rebuilds from the cache only. `--osm overpass|pbf` forces an OSM source; the
 default tries Overpass and falls back to the city's `.osm.pbf` extract.
 
 ## What goes in
@@ -21,9 +22,9 @@ Everything is data; the code only knows the source types.
 
 | File | What it controls |
 | --- | --- |
-| `data/cities/<city>.json` | Play areas to cover, buffer, CRS, simplification, source URLs and licences |
+| `data/cities/<city>.json` | Play areas to cover, buffer, `coverage` circles (`{centre, radius_m}`: extra ground hosts can draw new areas in), CRS, simplification, source URLs and licences |
 | `data/map-layers.json` | Layers: OSM tag rules, GTFS modes, ABS datasets. A layer id equals the `source` string used by question options in `data/questions.json` |
-| `data/venues/<city>.json` | Hand edits on top of OSM: licensed restaurants to `add`, feature ids to `exclude` |
+| `data/venues/<city>.json` | Hand edits on top of OSM: venues OSM lacks to `add`, OSM ids to `include` whatever their tags, OSM ids to `exclude` (closed, moved). Entries are an id or `{id, note}`; the build warns about ids it no longer finds |
 | `data/play-areas/*.geojson` | Play areas; the pack covers their union grown by `buffer_m` |
 
 Sources for Brisbane:

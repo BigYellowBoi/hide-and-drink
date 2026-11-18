@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import shapely
 from pyproj import Transformer
-from shapely.geometry import shape
+from shapely.geometry import Point, shape
 from shapely.ops import unary_union
 
 PRECISION = 1e-6  # ~0.1 m in degrees
@@ -37,9 +37,20 @@ def play_area_union(play_areas: dict):
     return unary_union(geoms)
 
 
-def extent(play_areas: dict, projector: Projector, buffer_m: float):
-    """Union of the play areas grown by buffer_m: everything in the pack lies inside it."""
-    return shapely.set_precision(projector.buffer(play_area_union(play_areas), buffer_m), PRECISION)
+def coverage_union(coverage: list[dict], projector: Projector):
+    """Circles from the city config's `coverage` ({centre: [lon, lat], radius_m}), or None."""
+    circles = [projector.buffer(Point(*c["centre"]), c["radius_m"]) for c in coverage]
+    return unary_union(circles) if circles else None
+
+
+def extent(play_areas: dict, projector: Projector, buffer_m: float, coverage: list[dict] | None = None):
+    """Play areas grown by buffer_m, plus the city's coverage circles: everything in the pack lies
+    inside it. Coverage lets hosts draw new areas anywhere in it and still get stations and venues."""
+    area = projector.buffer(play_area_union(play_areas), buffer_m)
+    extra = coverage_union(coverage or [], projector)
+    if extra is not None:
+        area = unary_union([area, extra])
+    return shapely.set_precision(area, PRECISION)
 
 
 def clip(geom, area, prepared=None):

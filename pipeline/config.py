@@ -29,7 +29,7 @@ def load_city(city_id: str, data_dir: Path = DATA) -> City:
     play_areas = {}
     for name in cfg["play_areas"]:
         play_areas[name] = json.loads((data_dir / "play-areas" / f"{name}.geojson").read_text())
-    edits = {"add": [], "exclude": []}
+    edits = {"add": [], "include": [], "exclude": []}
     if cfg.get("venues_file"):
         edits = json.loads((data_dir / cfg["venues_file"]).read_text())
     return City(city_id, cfg, layers, play_areas, edits)
