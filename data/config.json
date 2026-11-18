@@ -35,5 +35,6 @@
   "hiding_period_s": 3600,
   "hand_limit": 6,
   "rounds": null,
+  "dev_mode": false,
   "todo": "Rounds and scoring from the official small-game rules"
 }

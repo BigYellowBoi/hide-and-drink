@@ -6,6 +6,8 @@ export interface Fix {
   accuracyM: number | null
   /** Device time of the fix, ms. */
   at: number
+  /** Dev/playtest mode: placed by long-pressing the map, not from GPS. */
+  fake?: boolean
 }
 
 export type GeoError = 'denied' | 'unavailable' | 'unsupported'

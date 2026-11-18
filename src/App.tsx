@@ -14,6 +14,7 @@ import { Lobby } from './components/Lobby'
 import { Round, TopbarClock } from './components/Round'
 import { StaleBanner } from './components/StaleBanner'
 import { presenceOf } from './sync/presence'
+import { isDevMode } from './hiding/devPosition'
 
 const transport = supabase ? supabaseTransport(supabase) : null
 const asset = (f: string) => `${import.meta.env.BASE_URL}${f}`
@@ -53,6 +54,13 @@ function GameScreen({ gameId, transport, onLeave }: { gameId: string; transport:
       </header>
 
       <StaleBanner status={game.status} staleSince={game.staleSince} />
+
+      {isDevMode(lobby.config) && (
+        <div className="dev-banner" role="status">
+          <strong>Playtest mode</strong>
+          <span>GPS is off: long-press the map to set your position.</span>
+        </div>
+      )}
 
       {/* Locked: nothing on the game screen can be tapped until this phone is caught up. */}
       <div className={`game-body${locked ? ` locked lock-${game.status}` : ''}`} inert={locked}>

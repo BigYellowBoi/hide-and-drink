@@ -2212,3 +2212,37 @@ button.pcard {
 .log-proof .log-dot {
   background: var(--alert);
 }
+
+/* Dev/playtest mode (config dev_mode): always visible so nobody mistakes it for a real game. */
+.dev-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+  margin: 8px 0 0;
+  padding: 8px 16px;
+  border: 2px dashed var(--alert);
+  border-radius: var(--r-card);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.dev-banner strong {
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--alert);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dev-note {
+  color: var(--alert);
+  font-weight: 600;
+}
+
+/* Long press sets the playtest position: no text selection or iOS callout on the map. */
+.game-map-canvas {
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}

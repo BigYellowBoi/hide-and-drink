@@ -66,7 +66,13 @@ interface Props {
   hideVenues?: boolean
   /** Called with [lng, lat] on every tap (e.g. to place a question tool by hand). */
   onTap?: (lngLat: [number, number]) => void
+  /** Called with [lng, lat] on a long press (touch hold or right click), e.g. to set a playtest position. */
+  onLongPress?: (lngLat: [number, number]) => void
 }
+
+const LONG_PRESS_MS = 500
+/** A hold that drifts further than this (px) is a pan, not a press. */
+const LONG_PRESS_SLOP_PX = 10
 
 // MapLibre finds its worker next to its own module, which bundling breaks: point it at the
 // worker file Vite emits instead.
@@ -92,7 +98,7 @@ function describeFeature(layer: string, props: Record<string, unknown>): string 
 }
 
 /** MapLibre map of the city pack: streets, water, transit lines, stations, venues and the play area. */
-export function GameMap({ city, playArea, onReady, className, tapNames = true, overlay, onBarTap, focus, hideVenues = false, onTap }: Props) {
+export function GameMap({ city, playArea, onReady, className, tapNames = true, overlay, onBarTap, focus, hideVenues = false, onTap, onLongPress }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   /** The play area the view was last fitted to (JSON). */
@@ -103,6 +109,7 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
   const onReadyRef = useRef(onReady)
   const onBarTapRef = useRef(onBarTap)
   const onTapRef = useRef(onTap)
+  const onLongPressRef = useRef(onLongPress)
   const dotsRef = useRef<readonly MapDot[]>([])
   const popupRef = useRef<Popup | null>(null)
   const tagsRef = useRef(new Map<string, Marker>())
@@ -110,7 +117,8 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
     onReadyRef.current = onReady
     onBarTapRef.current = onBarTap
     onTapRef.current = onTap
-  }, [onReady, onBarTap, onTap])
+    onLongPressRef.current = onLongPress
+  }, [onReady, onBarTap, onTap, onLongPress])
 
   useEffect(() => {
     if (!supabase) return
@@ -142,9 +150,57 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right')
     mapRef.current = map
 
-    map.on('click', (e) => onTapRef.current?.([e.lngLat.lng, e.lngLat.lat]))
+    // Long press: a timer started on a one-finger touch or mouse down, cancelled by a pan, a
+    // second finger or letting go. Right click (contextmenu) counts too. The click that
+    // follows a long press is swallowed so it doesn't also count as a tap.
+    let pressTimer: ReturnType<typeof setTimeout> | null = null
+    let pressStart: { x: number; y: number } | null = null
+    let pressedAt = 0
+    const cancelPress = () => {
+      if (pressTimer) clearTimeout(pressTimer)
+      pressTimer = null
+      pressStart = null
+    }
+    const firePress = (lng: number, lat: number) => {
+      pressedAt = Date.now()
+      onLongPressRef.current?.([lng, lat])
+    }
+    const startPress = (point: { x: number; y: number }, lngLat: { lng: number; lat: number }) => {
+      cancelPress()
+      if (!onLongPressRef.current) return
+      pressStart = { x: point.x, y: point.y }
+      pressTimer = setTimeout(() => {
+        pressTimer = null
+        firePress(lngLat.lng, lngLat.lat)
+      }, LONG_PRESS_MS)
+    }
+    const movePress = (point: { x: number; y: number }) => {
+      if (pressStart && Math.hypot(point.x - pressStart.x, point.y - pressStart.y) > LONG_PRESS_SLOP_PX) cancelPress()
+    }
+    map.on('touchstart', (e) => (e.points.length === 1 ? startPress(e.point, e.lngLat) : cancelPress()))
+    map.on('touchmove', (e) => (e.points.length === 1 ? movePress(e.point) : cancelPress()))
+    map.on('touchend', cancelPress)
+    map.on('touchcancel', cancelPress)
+    map.on('mousedown', (e) => (e.originalEvent.button === 0 ? startPress(e.point, e.lngLat) : cancelPress()))
+    map.on('mousemove', (e) => movePress(e.point))
+    map.on('mouseup', cancelPress)
+    map.on('dragstart', cancelPress)
+    map.on('zoomstart', cancelPress)
+    map.on('contextmenu', (e) => {
+      // Some browsers raise contextmenu on a touch hold too: don't fire twice.
+      if (!onLongPressRef.current || Date.now() - pressedAt < 1000) return
+      e.preventDefault()
+      cancelPress()
+      firePress(e.lngLat.lng, e.lngLat.lat)
+    })
+    const afterPress = () => Date.now() - pressedAt < 1000
+
+    map.on('click', (e) => {
+      if (!afterPress()) onTapRef.current?.([e.lngLat.lng, e.lngLat.lat])
+    })
     if (tapNames) {
       map.on('click', (e) => {
+        if (afterPress()) return
         const hit = map.queryRenderedFeatures(
           [
             [e.point.x - 10, e.point.y - 10],
@@ -176,6 +232,7 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
     })
     const tags = tagsRef.current
     return () => {
+      cancelPress()
       popupRef.current?.remove()
       for (const m of tags.values()) m.remove()
       tags.clear()

@@ -19,6 +19,8 @@ interface Props {
   zone: HidingZoneConfig
   canAct: boolean
   fix: Fix | null
+  /** Dev/playtest mode: long-press the map to set this phone's position. */
+  onLongPress?: (lngLat: [number, number]) => void
   /** Countdown text for the header, e.g. "42:10 left". */
   timeNote: string
   late: boolean
@@ -29,7 +31,7 @@ interface Props {
 const NO_DOTS: readonly MapDot[] = []
 
 /** Hider: pick a bar from the valid ones (nearest first), preview its circle, slide to lock in. */
-export function BarPicker({ sync, city, started, zone, canAct, fix, timeNote, late, seekers = NO_DOTS }: Props) {
+export function BarPicker({ sync, city, started, zone, canAct, fix, onLongPress, timeNote, late, seekers = NO_DOTS }: Props) {
   const [pack, setPack] = useState<CityPack | null>(null)
   const [validIds, setValidIds] = useState<string[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -107,6 +109,7 @@ export function BarPicker({ sync, city, started, zone, canAct, fix, timeNote, la
             onBarTap={setSelected}
             focus={chosen ? { lng: chosen.lng, lat: chosen.lat } : null}
             hideVenues
+            onLongPress={onLongPress}
           />
         </Suspense>
       </section>
