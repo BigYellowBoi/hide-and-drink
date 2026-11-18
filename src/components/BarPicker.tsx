@@ -347,7 +347,9 @@ export function BarPicker({
         )}
       </section>
 
-      <div className="picker-confirm">
+      {/* Once a bar is selected the slider floats above the tabs, so nobody scrolls to find it. */}
+      {chosen && <div className="picker-confirm-spacer" aria-hidden="true" />}
+      <div className={`picker-confirm${chosen ? ' picker-confirm-floating' : ''}`}>
         {error && <p className="bad">{error}</p>}
         <SlideToConfirm
           label={chosen ? `Lock in ${chosen.name}` : 'Choose a bar first'}

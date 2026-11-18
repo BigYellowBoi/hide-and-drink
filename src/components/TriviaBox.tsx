@@ -47,12 +47,19 @@ export function TriviaBox({ sync, effect: e, team, canAct, nameOf }: Props) {
 
   return (
     <span className="trivia">
+      {!qs && t.lastFailed && (
+        <span className="flag small" role="status">
+          {t.lastFailed.right === 0 ? 'None right' : `Only ${t.lastFailed.right} of ${t.lastFailed.total} right`} last time
+          {team === 'hiders' ? ': write new questions.' : ': waiting for new questions from the hider.'}
+        </span>
+      )}
       {!qs ? (
         team === 'hiders' ? (
           <TriviaWrite count={t.count} topic={t.topic} disabled={disabled} onSend={(list) => act('set_trivia', { p_questions: list })} />
         ) : (
           <span className="muted small">
-            Waiting for the hider to send {t.count} questions{t.need < t.count ? ` (get ${t.need} right)` : ''}.
+            Waiting for the hider to send {t.lastFailed ? 'new ' : ''}
+            {t.count} questions{t.need < t.count ? ` (get ${t.need} right)` : ''}.
           </span>
         )
       ) : (

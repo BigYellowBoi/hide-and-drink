@@ -111,7 +111,17 @@ export const COMMON_FIELDS: ParamField[] = [
       { value: 'photo', label: 'Photo' },
       { value: 'video', label: 'Video' },
     ],
-    hint: 'Photo: the app asks for it (seekers before a curse clears; each drink the card hands out). Video: shown in person',
+    hint: 'The app asks the seekers for it before a curse clears (photo also for each drink the card hands out)',
+  },
+  {
+    key: 'hider_proof',
+    label: 'Hiders send first',
+    kind: 'select',
+    options: [
+      { value: 'photo', label: 'Photo' },
+      { value: 'video', label: 'Video' },
+    ],
+    hint: "The hiders send this when they cast it (e.g. a Street View screenshot); the seekers can't clear it before it arrives",
   },
 ]
 

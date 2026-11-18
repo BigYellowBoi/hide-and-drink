@@ -212,22 +212,16 @@ export function DrinkProofs({ sync, cards, team, canAct }: { sync: GameSync; car
 }
 
 function DrinkProofCard({ sync, proof, canAct }: { sync: GameSync; proof: DrinkProof; canAct: boolean }) {
-  const { input, photo, busy, err, take, send } = useProofPhoto(sync, proof.id)
+  const { box, busy, err, photo, send } = useProofPhoto(sync, proof.id, 'photo', !canAct)
   return (
     <section className="card drink-proof" role="alert">
       <p className="eyebrow">Photo proof</p>
       <h2>{proof.cost === 'shot' ? 'Take a shot' : 'Have a drink'}</h2>
       <p className="muted small">{proof.label}. Photograph it: the other team sees the photo.</p>
-      {input}
-      {photo && <img className="photo-preview" src={photo.url} alt="Your drink" />}
-      <div className="confirm-row">
-        <button className="secondary" disabled={!!busy || !canAct} onClick={take}>
-          {photo ? 'Retake' : 'Take photo'}
-        </button>
-        <button disabled={!photo || !!busy || !canAct} onClick={() => void send()}>
-          {busy ?? 'Send'}
-        </button>
-      </div>
+      {box}
+      <button className="wide" disabled={!photo || !!busy || !canAct} onClick={() => void send()}>
+        {busy ?? 'Send'}
+      </button>
       {err && <p className="bad">{err}</p>}
     </section>
   )

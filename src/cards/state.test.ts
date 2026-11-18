@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '../sync/types'
 import {
   banKey,
+  hiderProofKind,
+  keepDiscardLabel,
+  proofToastText,
+  setupFor,
   bannedSet,
   cardDetails,
   cardFacts,
@@ -424,7 +428,7 @@ describe('trivia curses', () => {
   it('waits for the hider to write the questions, without blocking questions', () => {
     const s = deriveCards(start())
     const e = s.effects[0]
-    expect(e.trivia).toEqual({ count: 3, need: 3, topic: 'Harry Potter', questions: null, forced: false })
+    expect(e.trivia).toEqual({ count: 3, need: 3, topic: 'Harry Potter', questions: null, forced: false, lastFailed: null })
     expect(triviaTodo(e, 'hiders')).toBe('write')
     expect(triviaTodo(e, 'seekers')).toBeNull()
     expect(questionsBlockedBy(s)).toEqual([])
@@ -497,7 +501,7 @@ describe('playtest 2: Moll 1 of 3, seeker-confirmed curses, drink cards', () => 
     ]
     const s = deriveCards(events)
     const e = s.effects[0]
-    expect(e.trivia).toMatchObject({ need: 1, questions: null })
+    expect(e.trivia).toMatchObject({ need: 1, questions: null, lastFailed: { right: 0, total: 3 } })
     expect(e.status).toBe('active')
     expect(triviaTodo(e, 'hiders')).toBe('write')
     expect(s.log.at(-1)?.text).toBe('MOLL: Q1 "x", Q2 "y", Q3 "z" wrong; not enough right: the hider sends new questions')
@@ -558,5 +562,60 @@ describe('curses blocking transport', () => {
     expect(questionsBlockedBy(s)).toEqual([])
     s = deriveCards([...events, ev('effect_cleared', { effect_id: 'e1' }), ev('effect_cleared', { effect_id: 'e2' })])
     expect(otherBlocks(s)).toEqual([])
+  })
+})
+
+describe('playtest 2 follow-ups', () => {
+  it('names what goes when the hand is full', () => {
+    expect(keepDiscardLabel([], ['Curse of Express Route'], [])).toBe('Discard Curse of Express Route, keep your hand')
+    expect(keepDiscardLabel(['Veto'], [], ['Curse of Quan'])).toBe('Keep Veto, discard Curse of Quan')
+    expect(keepDiscardLabel([], ['Veto'], ['Curse of Quan'])).toBe('Discard Veto, Curse of Quan')
+  })
+
+  it('a curse with hider_proof waits for the hiders, and a rejection keeps their photo', () => {
+    const tourist = card('unguided_tourist', 'until_cleared', { blocks_questions: true, proof: 'photo', hider_proof: 'photo' })
+    const events = [
+      ev('game_started', { round: 1, deck: [tourist] }),
+      ev('card_played', { round: 1, instance_id: 'i1', card: tourist, effect_id: 'e1' }),
+      ev('proof_due', { round: 1, proof_id: 'p1', team: 'hiders', kind: 'setup', label: 'Tourist', effect_id: 'e1' }),
+      ev('proof_due', { round: 1, proof_id: 'p2', team: 'seekers', label: 'Tourist', effect_id: 'e1' }),
+    ]
+    let s = deriveCards(events)
+    expect(setupFor(s, 'e1')).toMatchObject({ id: 'p1', team: 'hiders', kind: 'setup', path: null })
+    expect(evidenceFor(s, 'e1')?.id).toBe('p2')
+    expect(openProofs(s, 'hiders')).toEqual([])
+    const done = [
+      ...events,
+      ev('drink_proved', { proof_id: 'p1', team: 'hiders', path: 'g/p1/a.png', by: 'h1', kind: 'setup' }),
+      ev('drink_proved', { proof_id: 'p2', team: 'seekers', path: 'g/p2/b.jpg', by: 's1' }),
+      ev('effect_clear_requested', { effect_id: 'e1' }),
+      ev('effect_clear_rejected', { effect_id: 'e1' }),
+    ]
+    s = deriveCards(done)
+    expect(setupFor(s, 'e1')).toMatchObject({ path: 'g/p1/a.png', by: 'h1' })
+    expect(setupFor(s, 'e1')?.doneAt).not.toBeNull()
+    expect(evidenceFor(s, 'e1')).toMatchObject({ path: null, doneAt: null })
+    expect(hiderProofKind(parseCard(tourist)!)).toBe('photo')
+  })
+
+  it('toast text for drinks, proofs and host fixes', () => {
+    const base = {
+      id: 'p',
+      seq: 1,
+      team: 'seekers' as const,
+      kind: 'drink' as const,
+      cost: 'drink' as const,
+      label: 'Veto',
+      path: 'x.jpg',
+      effectId: null,
+      instanceId: null,
+      resolution: null,
+      doneAt: 1,
+      by: 's1',
+    }
+    const name = (id: string | null) => (id === 's1' ? 'Sam' : '?')
+    expect(proofToastText(base, 'hiders', name).title).toBe('The seekers drank: Veto')
+    expect(proofToastText(base, 'seekers', name).title).toBe('Your team drank: Veto')
+    expect(proofToastText({ ...base, path: null, resolution: 'waived' }, 'hiders', name).body).toMatch(/host fix/)
   })
 })

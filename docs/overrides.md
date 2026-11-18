@@ -68,6 +68,7 @@ This is the audit of `supabase/migrations/` (up to `20261217090000_playtest2_fix
 | `answer_overdue` (+ `drink_due` shot) | `_settle_timers` when an answer deadline passes | `cancel_penalty`; `timer` answer (before it passes); `add_penalty` for one it missed |
 | `drink_due` (cast cost, `params.drinks`, veto, missed deadline) | `play_card`, `veto_curse`, `_settle_timers` | `cancel_drink`, `waive_proof`, `add_penalty` |
 | `proof_due` (curse evidence photo) | `play_card` for `params.proof` = photo curses | `waive_proof`, `clear_effect` |
+| `proof_due` with `kind` setup (hiders' first photo/video) | `play_card`/`check_curse` for curses with `params.hider_proof` | `waive_proof`, `clear_effect` |
 | `freeze_changed` | `_update_freeze` on every seeker position and bar change | `freeze` (forced value wins until set back to automatic) |
 | `bar_chosen` `late` flag | `choose_bar` after the hiding period | `set_bar` (relocks with `late` false) |
 | `question_answered` `late` flag | `answer_question` after the deadline | `set_answer` (edit), `cancel_penalty` |
