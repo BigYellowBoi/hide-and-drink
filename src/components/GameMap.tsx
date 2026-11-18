@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 import { loadCityPack, type CityPack } from '../map/cityPack'
 import { circlePolygon, distanceM, formatDistance } from '../map/geo'
 import { boundsOf, outsideMask, type AreaCollection } from '../map/playArea'
+import { resetGestures } from '../map/gestures'
 import { hatchImage, MAP_COLORS, mapStyle, TAPPABLE_LAYERS } from '../map/style'
 
 /** Game things drawn over the city: a zone circle, candidate bars and people. */
@@ -195,6 +196,19 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
     })
     const afterPress = () => Date.now() - pressedAt < 1000
 
+    // Touches lost while the app was hidden or the screen inert would leave the pan handler
+    // stuck: reset gestures whenever either changes.
+    const reset = () => {
+      cancelPress()
+      resetGestures(map)
+    }
+    const onVisibility = () => reset()
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('pageshow', reset)
+    window.addEventListener('blur', reset)
+    const inertWatch = new MutationObserver(reset)
+    inertWatch.observe(document.body, { attributes: true, attributeFilter: ['inert'], subtree: true })
+
     map.on('click', (e) => {
       if (!afterPress()) onTapRef.current?.([e.lngLat.lng, e.lngLat.lat])
     })
@@ -233,6 +247,10 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
     const tags = tagsRef.current
     return () => {
       cancelPress()
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('pageshow', reset)
+      window.removeEventListener('blur', reset)
+      inertWatch.disconnect()
       popupRef.current?.remove()
       for (const m of tags.values()) m.remove()
       tags.clear()
