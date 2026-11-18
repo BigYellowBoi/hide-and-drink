@@ -13,6 +13,7 @@ import {
   type Effect,
 } from '../cards/state'
 import { formatClock } from '../hiding/state'
+import { timerTone } from '../lib/timers'
 import { describeError } from '../lobby/messages'
 import type { GameSync } from '../sync/engine'
 import type { Team } from '../sync/types'
@@ -189,13 +190,11 @@ export function EffectBar({ endsAt, totalS, now, label }: { endsAt: number; tota
   const left = Math.max(0, endsAt - now)
   const frac = totalS > 0 ? Math.min(1, left / (totalS * 1000)) : 0
   return (
-    <span className="effect-bar">
+    <span className={`effect-bar effect-bar-${timerTone(left)}`} role="timer" aria-label={`${label} ${formatClock(left)}`}>
       <span className="effect-bar-track">
         <span className="effect-bar-fill" style={{ width: `${frac * 100}%` }} />
       </span>
-      <span className="effect-bar-time">
-        {label} {formatClock(left)}
-      </span>
+      <span className="effect-bar-time">{left > 0 ? `${label} ${formatClock(left)}` : "Time's up"}</span>
     </span>
   )
 }

@@ -13,6 +13,7 @@ import { supabase } from '../lib/supabase'
 import { ANSWERS, answerText, candidatesOf, km, NULL_ANSWER, optionText, questionLabel, questionText, type Question } from '../play/state'
 import { LockIcon, PrivateLabel } from './PrivateLabel'
 import { DeadlineRing } from './DeadlineRing'
+import { useTimerAlert } from '../lib/useTimerAlert'
 import type { MapDot } from './GameMap'
 import { LazyGameMap } from './lazyMap'
 
@@ -72,6 +73,8 @@ export function AnswerSheet({
   const fileRef = useRef<HTMLInputElement>(null)
   const suggestion = useMemo(() => suggestAnswer(q, zone, layer), [q, zone, layer])
   const late = now > q.deadlineAt
+  // Buzz the hider's phone a minute before the deadline and when it passes.
+  useTimerAlert(`answer:${q.id}`, q.deadlineAt - now)
   const kind = q.type === 'bonus' ? String(q.params.answer_kind ?? 'text') : q.type
   const nullLabel = typeof q.params.null_answer === 'string' ? q.params.null_answer : null
 

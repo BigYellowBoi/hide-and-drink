@@ -40,11 +40,15 @@ import { BarPicker } from './BarPicker'
 import { HiderCountContext } from './hiderCount'
 import { PrivateLabel } from './PrivateLabel'
 import { DeadlineRing } from './DeadlineRing'
+import { timerTone } from '../lib/timers'
+import { useTimerAlert } from '../lib/useTimerAlert'
 import { BlockedBanner, ConfirmClear, EffectStrip, EffectsPanel, TriviaPrompt } from './EffectsPanel'
 import { HandPanel } from './HandPanel'
 import type { MapDot } from './GameMap'
 import { LazyGameMap } from './lazyMap'
 import { Timeline } from './Timeline'
+import { PushToggle } from './PushToggle'
+import type { SyncTransport } from '../sync/transport'
 import { MapsLink } from './MapsLink'
 import { ManualShadeSheet } from './ManualShadeSheet'
 import { PresenceDot } from './PresenceDot'
@@ -75,6 +79,8 @@ interface Props {
   events: readonly GameEvent[]
   positions: readonly SeekerPosition[]
   presence: (userId: string) => Presence
+  /** For the alerts toggle in the timeline tab. */
+  transport?: SyncTransport
 }
 
 /** What every view of the round shares: question state, shading, the tool to draw. */
@@ -106,7 +112,7 @@ interface Shared {
  * A running round. Bottom tabs, map first. Anything that needs action (the hider's answer
  * sheet, a freeze) sits on top until handled.
  */
-export function Round({ sync, lobby, userId, canAct, events, positions, presence }: Props) {
+export function Round({ sync, lobby, userId, canAct, events, positions, presence, transport }: Props) {
   const started = lobby.started
   const now = useServerNow(sync)
   const zone = useMemo(() => hidingZone(lobby.config), [lobby.config])
@@ -226,6 +232,11 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
             }}
             onShade={(q) => setShadeId(q.id)}
           />
+          {transport && (
+            <section className="card">
+              <PushToggle transport={transport} />
+            </section>
+          )}
           <section className="card">
             <p className="muted">
               Round {started.round} · {started.playAreaName ?? 'Play area'}
@@ -290,8 +301,14 @@ type Clock = ReturnType<typeof roundClock>
 export function TopbarClock({ sync, started, bonusS = 0 }: { sync: GameSync; started: StartedRound; bonusS?: number }) {
   const now = useServerNow(sync)
   const clock = roundClock(started.startedAt, started.hidingPeriodS, now)
+  const hidingLeft = clock.phase === 'hiding' ? clock.ms : started.startedAt + started.hidingPeriodS * 1000 - now
+  // Buzz a minute before seeking starts and when it does (every phone, both teams).
+  useTimerAlert(`hiding:${started.round}`, hidingLeft)
+  const tone = clock.phase === 'hiding' ? timerTone(clock.ms) : 'ok'
+  // Flash "Seeking" for the first few seconds after the hiding period ends.
+  const justStarted = clock.phase === 'seeking' && clock.ms < 5000
   return (
-    <span className="topbar-clock">
+    <span className={`topbar-clock topbar-${tone}${justStarted ? ' topbar-flash' : ''}`} role="timer">
       <span className="topbar-label">{clock.phase === 'hiding' ? 'Hiding' : 'Seeking'}</span>
       <span className="topbar-time">
         {formatClock(clock.ms, { up: clock.phase === 'seeking' })}
