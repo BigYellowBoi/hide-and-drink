@@ -81,7 +81,9 @@ describe('shade', () => {
   it('radar yes keeps the circle, no cuts it out', () => {
     const yes = shade(square, [q('radar', { center: O, distance_m: 1000 }, 'yes')])
     expect(km2(yes.remaining)).toBeCloseTo(Math.PI, 1)
-    expect(km2(yes.ruledOut.features[0])).toBeCloseTo(16 - Math.PI, 1)
+    // The hatch comes in hole-free pieces (the square around the circle is split in two).
+    expect(yes.ruledOut.features.reduce((t, f) => t + km2(f), 0)).toBeCloseTo(16 - Math.PI, 1)
+    expect(yes.ruledOut.features.every((f) => (f.geometry as GeoJSON.Polygon).coordinates.length === 1)).toBe(true)
 
     const no = shade(square, [q('radar', { center: O, distance_m: 1000 }, 'no')])
     expect(km2(no.remaining)).toBeCloseTo(16 - Math.PI, 1)
@@ -191,6 +193,75 @@ describe('shading geometry', () => {
       expectInside(L, lArea, qs)
     }
   })
+})
+
+describe('drawable shading', () => {
+  // Concave 8-gon like a real play area (km), where thermometer lines meet its edges.
+  const V = [[-3.5, -2.2], [-2.2, 1.6], [-0.6, 1.6], [1.6, 3.2], [3.0, 3.0], [3.2, 0.8], [2.6, -0.5], [2.2, -2]].map(
+    ([x, y]) => at(x * 1000, y * 1000),
+  )
+  const area8: AreaCollection = {
+    type: 'FeatureCollection',
+    features: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[...V, V[0]]] } }],
+  }
+
+  /** Rings MapLibre can fill: no spike (edge folding straight back), no edges crossing. */
+  function badRings(f: GeoJSON.Feature): number {
+    const g = f.geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon
+    let bad = 0
+    for (const rings of g.type === 'Polygon' ? [g.coordinates] : g.coordinates) {
+      for (const r of rings) {
+        const xy = r.map((c) => p.toXY(c))
+        const n = xy.length - 1
+        const orient = (a: number[], b: number[], c: number[]) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+        for (let i = 0; i < n; i++) {
+          const [a, b, c] = [xy[(i + n - 1) % n], xy[i], xy[(i + 1) % n]]
+          const [ux, uy, vx, vy] = [b[0] - a[0], b[1] - a[1], c[0] - b[0], c[1] - b[1]]
+          if (ux * vx + uy * vy < 0 && Math.abs(ux * vy - uy * vx) < 1e-3 * Math.hypot(ux, uy) * Math.hypot(vx, vy)) bad++
+          for (let j = i + 2; j < n; j++) {
+            if (i === 0 && j === n - 1) continue
+            const [p1, p2, p3, p4] = [xy[i], xy[i + 1], xy[j], xy[j + 1]]
+            // Proper crossings only: more than 1 cm either side (edges overlapping along the
+            // play-area edge, a valid bridge, differ only by float noise).
+            const side = (a: number[], b: number[], c: number[]) => orient(a, b, c) / Math.hypot(b[0] - a[0], b[1] - a[1])
+            const [d1, d2, d3, d4] = [side(p1, p2, p3), side(p1, p2, p4), side(p3, p4, p1), side(p3, p4, p2)]
+            if (d1 * d2 < 0 && d3 * d4 < 0 && Math.min(...[d1, d2, d3, d4].map(Math.abs)) > 0.01) bad++
+          }
+        }
+      }
+    }
+    return bad
+  }
+
+  it('two thermometers meeting the edge: the hatch has no spike that fills the remaining area', () => {
+    // From a fuzz run; reproduces the playtest screenshot (hatched triangle inside the wedge).
+    const s = shade(area8, [
+      { ...q('thermometer', { start: [153.05315273002924, -27.45479189418988], end: [153.00479092548125, -27.446725373351118] }, 'colder'), id: 'a' },
+      { ...q('thermometer', { start: [153.04496860272772, -27.47434712088208], end: [153.0175665636708, -27.44763429644939] }, 'hotter'), id: 'b' },
+    ])
+    for (const f of s.ruledOut.features) {
+      expect(badRings(f)).toBe(0)
+      expect((f.geometry as GeoJSON.Polygon).coordinates).toHaveLength(1)
+    }
+    expect(badRings(s.remaining!)).toBe(0)
+  })
+
+  it('random answers: every hatch piece and remaining outline is drawable, and the hatch has no holes', () => {
+    let seed = 5
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+    const pt = (): LngLat => at(-4000 + 8000 * rnd(), -3000 + 7000 * rnd())
+    for (let i = 0; i < 150; i++) {
+      const qs = Array.from({ length: 1 + Math.floor(rnd() * 3) }, (_, k) => ({
+        ...(rnd() < 0.4
+          ? q('radar', { center: pt(), distance_m: 200 + rnd() * 4000 }, rnd() < 0.5 ? 'yes' : 'no')
+          : q('thermometer', { start: pt(), end: pt() }, rnd() < 0.5 ? 'hotter' : 'colder')),
+        id: `${i}-${k}`,
+      }))
+      const s = shade(area8, qs)
+      for (const f of [...s.ruledOut.features, ...(s.remaining ? [s.remaining] : [])]) expect(badRings(f)).toBe(0)
+      for (const f of s.ruledOut.features) expect((f.geometry as GeoJSON.Polygon).coordinates).toHaveLength(1)
+    }
+  }, 30_000)
 })
 
 describe('remainingBars', () => {
