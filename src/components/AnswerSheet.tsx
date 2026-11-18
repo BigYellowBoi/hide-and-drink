@@ -3,7 +3,7 @@ import type { FeatureCollection } from 'geojson'
 import type { GameSync } from '../sync/engine'
 import type { AreaCollection } from '../map/playArea'
 import { describeError } from '../lobby/messages'
-import { questionTool } from '../play/overlays'
+import { candidateDistances, hiderTool, kmLabel, questionTool } from '../play/overlays'
 import { isLngLat } from '../play/geo'
 import { suggestAnswer, type HiderZone } from '../play/shading'
 import type { LayerLookup } from '../play/features'
@@ -77,11 +77,21 @@ export function AnswerSheet({
   useTimerAlert(`answer:${q.id}`, shownEnd(q.deadlineAt, q.pausedLeftMs, now) - now)
   const kind = q.type === 'bonus' ? String(q.params.answer_kind ?? 'text') : q.type
   const nullLabel = typeof q.params.null_answer === 'string' ? q.params.null_answer : null
+  /** Where the hider is, for their side of the tools: the bar, else GPS. */
+  const hiderAt = zone.bar?.point ?? zone.gps?.point ?? null
+  const fromHider = useMemo(() => candidateDistances(q, hiderAt), [q, hiderAt])
 
   // Every way to answer this question, as [answer, label] buttons (typed answers aside).
   const buttons: [string, string][] = [
     ...(ANSWERS[q.type] ?? (kind === 'yes_no' ? ['yes', 'no'] : [])).map((a): [string, string] => [a, answerText(q, a)]),
-    ...(q.type === 'tentacles' ? candidatesOf(q).map((c): [string, string] => [c.feature_id, c.name]) : []),
+    ...(q.type === 'tentacles'
+      ? [...candidatesOf(q)]
+          .sort((a, b) => (fromHider.get(a.feature_id) ?? 0) - (fromHider.get(b.feature_id) ?? 0))
+          .map((c): [string, string] => {
+            const d = fromHider.get(c.feature_id)
+            return [c.feature_id, d === undefined ? c.name : `${c.name} · ${kmLabel(d)} from you`]
+          })
+      : []),
     ...(nullLabel ? [[NULL_ANSWER, nullLabel] as [string, string]] : []),
   ]
   const typed = kind === 'text' || kind === 'number'
@@ -112,7 +122,10 @@ export function AnswerSheet({
 
   const overlay = useMemo(
     () => ({
-      tool: questionTool(q, layer),
+      tool: (() => {
+        const t = questionTool(q, layer)
+        return { ...t, features: [...t.features, ...hiderTool(q, hiderAt, layer)] }
+      })(),
       ruled,
       zone: zone.bar ? { lng: zone.bar.point[0], lat: zone.bar.point[1], radiusM: zone.bar.radiusM, team: 'hiders' as const } : null,
       dots: [
@@ -120,7 +133,7 @@ export function AnswerSheet({
         ...(zone.gps ? [{ id: 'me', lng: zone.gps.point[0], lat: zone.gps.point[1], team: 'hiders' as const, me: true }] : []),
       ],
     }),
-    [q, layer, ruled, zone, seekers],
+    [q, layer, ruled, zone, seekers, hiderAt],
   )
 
   const send = async () => {
@@ -186,8 +199,8 @@ export function AnswerSheet({
       </div>
 
       {(isLngLat(q.params.center) || isLngLat(q.params.start)) && (
-        <Suspense fallback={<div className="game-map mini-map" />}>
-          <LazyGameMap city={city} playArea={playArea} className="mini-map" overlay={overlay} tapNames={false} venues={venues} />
+        <Suspense fallback={<div className="game-map mini-map answer-map" />}>
+          <LazyGameMap city={city} playArea={playArea} className="mini-map answer-map" overlay={overlay} tapNames={false} venues={venues} />
         </Suspense>
       )}
 

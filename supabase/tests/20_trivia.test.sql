@@ -7,6 +7,14 @@ set search_path = public, extensions;
 
 select plan(33);
 
+-- Written before 20261217090000_playtest2_fixes.sql: same option asked more than once, and
+-- the cards as they were (no seeker_confirm curses, Moll needs all three). Those are
+-- tested in 27_playtest2.test.sql.
+update public.question_types set options = (select jsonb_agg(o || '{"reusable": true}'::jsonb order by i)
+                                              from jsonb_array_elements(options) with ordinality t(o, i));
+update public.question_types set extra = extra - 'randomize_vetoes';
+update public.cards set params = params - 'seeker_confirm' - 'need_right';
+
 insert into auth.users (id) values
   ('11111111-1111-1111-1111-111111111111'),
   ('22222222-2222-2222-2222-222222222222'),

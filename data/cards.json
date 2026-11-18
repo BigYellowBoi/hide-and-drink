@@ -389,7 +389,8 @@
       "text": "If seekers are in your chosen hiding bar when this is played, they are locked there for 10 minutes and draw a card. You must tell them they are at your bar.",
       "params": {
         "duration_s": 600,
-        "condition": "seekers_in_hider_bar"
+        "condition": "seekers_in_hider_bar",
+        "seeker_confirm": "Are you in the hiders' bar right now?"
       },
       "active": true,
       "cast_cost": "free",
@@ -451,7 +452,8 @@
       "text": "Seekers have 3 minutes to exit a bar. Any drinks ordered must be finished before they can leave. If they don't leave in time, they are locked in the bar for 10 minutes.",
       "params": {
         "duration_s": 180,
-        "followup_s": 600
+        "followup_s": 600,
+        "seeker_confirm": "Are you in a bar right now?"
       },
       "active": true,
       "cast_cost": "drink",
@@ -511,12 +513,13 @@
       "category": "curse",
       "behaviour": "trivia",
       "copies": 1,
-      "text": "Seekers must correctly answer 3 Harry Potter trivia questions before using transport. No Googling.",
+      "text": "Seekers must get 1 of 3 Harry Potter trivia questions right before using transport. If all three are wrong, the hider sends three new ones. No Googling.",
       "params": {
         "blocks_questions": false,
         "blocks": "transport",
         "count": 3,
-        "topic": "Harry Potter"
+        "topic": "Harry Potter",
+        "need_right": 1
       },
       "active": true,
       "cast_cost": "drink",

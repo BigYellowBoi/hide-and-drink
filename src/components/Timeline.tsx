@@ -109,6 +109,8 @@ function curseStatus(p: PlayedCard, cards: CardsState, now: number): string {
       return e.blocksQuestions ? "In force: seekers can't ask questions until they do it" : 'In force until the seekers do it'
     case 'awaiting_confirm':
       return 'Seekers say they did it: waiting for the hider to confirm'
+    case 'awaiting_seekers':
+      return 'Waiting for the seekers to say if it applies'
     case 'over':
       return e.status === 'cleared' ? 'Done' : 'Over'
   }

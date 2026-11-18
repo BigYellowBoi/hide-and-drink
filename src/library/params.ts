@@ -22,7 +22,7 @@ export const BEHAVIOURS: { id: string; label: string; hint: string }[] = [
   { id: 'text', label: 'Text', hint: 'Do what the card says. Nothing to track.' },
   { id: 'timed', label: 'Timed', hint: 'Runs for a set time, shown to both teams.' },
   { id: 'until_cleared', label: 'Until cleared', hint: 'Lasts until the seekers do it and the hider confirms.' },
-  { id: 'trivia', label: 'Trivia', hint: 'The hider writes questions, the seekers answer until all are right.' },
+  { id: 'trivia', label: 'Trivia', hint: 'The hider writes questions, the seekers answer until enough are right.' },
   { id: 'time_bonus', label: 'Time bonus', hint: 'Never played: adds time while held at the end of the round.' },
   { id: 'next_question_modifier', label: 'Next question', hint: 'Multiplies the next answer\'s draw and keep.' },
   { id: 'powerup', label: 'Powerup', hint: 'Veto, randomize, duplicate, move or discard/draw.' },
@@ -38,11 +38,16 @@ const BY_BEHAVIOUR: Record<string, ParamField[]> = {
   timed: [
     { key: 'duration_s', label: 'Duration', kind: 'minutes', required: true },
     { key: 'followup_s', label: 'Then a lock of', kind: 'minutes', hint: 'Optional follow-on timer if the task is missed' },
+    { key: 'seeker_confirm', label: 'Ask the seekers first', kind: 'text', hint: "Only starts if they say yes, e.g. Are you in the hiders' bar?" },
   ],
-  until_cleared: [{ key: 'blocks_questions', label: 'Blocks questions until done', kind: 'bool' }],
+  until_cleared: [
+    { key: 'blocks_questions', label: 'Blocks questions until done', kind: 'bool' },
+    { key: 'seeker_confirm', label: 'Ask the seekers first', kind: 'text', hint: "Only starts if they say yes, e.g. Are you in the hiders' bar?" },
+  ],
   trivia: [
     { key: 'count', label: 'Questions', kind: 'int', hint: 'Default 3' },
     { key: 'topic', label: 'Topic', kind: 'text', hint: 'e.g. Harry Potter' },
+    { key: 'need_right', label: 'Right answers needed', kind: 'int', hint: 'Default all. Fewer: a set that falls short is replaced by a new one' },
     { key: 'blocks_questions', label: 'Blocks questions until done', kind: 'bool' },
   ],
   time_bonus: [{ key: 'minutes', label: 'Minutes added', kind: 'number', required: true }],

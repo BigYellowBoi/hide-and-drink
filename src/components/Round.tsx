@@ -22,6 +22,7 @@ import { shadingBounds, type LayerLookup } from '../play/features'
 import { useCityLayers } from '../play/useCityLayers'
 import { useSettleTimers } from '../play/useSettleTimers'
 import {
+  banKey,
   bannedSet,
   cardOf,
   deriveCards,
@@ -46,7 +47,8 @@ import { PrivateLabel } from './PrivateLabel'
 import { DeadlineRing } from './DeadlineRing'
 import { timerTone } from '../lib/timers'
 import { useTimerAlert } from '../lib/useTimerAlert'
-import { BlockedBanner, ConfirmClear, EffectStrip, EffectsPanel, TriviaPrompt } from './EffectsPanel'
+import { BlockedBanner, ConfirmClear, CurseCheckPrompt, EffectStrip, EffectsPanel, OtherBlockedBanners, TriviaPrompt } from './EffectsPanel'
+import { DrinkNotice } from './DrinkNotice'
 import { HandPanel } from './HandPanel'
 import type { MapDot } from './GameMap'
 import { LazyGameMap } from './lazyMap'
@@ -85,7 +87,12 @@ interface Props {
   presence: (userId: string) => Presence
   /** For the alerts toggle in the timeline tab. */
   transport?: SyncTransport
+  /** The Fix something sheet (its button sits by Leave game): open (true), or carrying out a seeker host's request. */
+  fix: FixState
+  setFix: (f: FixState) => void
 }
+
+export type FixState = false | true | OverrideRequest
 
 /** What every view of the round shares: question state, shading, the tool to draw. */
 interface Shared {
@@ -99,7 +106,7 @@ interface Shared {
   goMap: () => void
   goHand: () => void
   goEffects: () => void
-  /** The host can mark a trivia curse all correct by hand. */
+  /** The host (Fix something requests). */
   isHost: boolean
   /** The open question's tool (radar circle, thermometer line). */
   tool: FeatureCollection | undefined
@@ -116,7 +123,7 @@ interface Shared {
  * A running round. Bottom tabs, map first. Anything that needs action (the hider's answer
  * sheet, a freeze) sits on top until handled.
  */
-export function Round({ sync, lobby, userId, canAct, events, positions, presence, transport }: Props) {
+export function Round({ sync, lobby, userId, canAct, events, positions, presence, transport, fix, setFix }: Props) {
   const started = lobby.started
   const now = useServerNow(sync)
   const zone = useMemo(() => hidingZone(lobby.config), [lobby.config])
@@ -124,8 +131,6 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
   const cards = useMemo(() => deriveCards(events), [events])
   const log = useMemo(() => [...play.log, ...cards.log].sort((a, b) => a.seq - b.seq), [play.log, cards.log])
   const overrides = useMemo(() => deriveOverrides(events), [events])
-  /** The Fix something sheet: open (true), or carrying out a seeker host's request. */
-  const [fix, setFix] = useState<false | true | OverrideRequest>(false)
   const [voteErr, setVoteErr] = useState<{ id: string; msg: string } | null>(null)
   const [tab, setTab] = useState<Tab>('map')
   /** A past question shown on the map from the timeline (its tool, candidates and distances). */
@@ -197,7 +202,6 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
 
   const requests = openRequests(overrides).filter((r) => r.kind !== 'undo')
   const undos = openRequests(overrides).filter((r) => r.kind === 'undo')
-  const canFix = shared.isHost || team !== null
   const vote = (id: string, kind: 'confirm' | 'decline') => {
     setVoteErr(null)
     sync
@@ -246,13 +250,7 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
           </div>
         )
       })}
-      {canFix && (
-        <div className="fix-bar">
-          <button className="small secondary" disabled={!canAct} onClick={() => setFix(true)}>
-            Fix something
-          </button>
-        </div>
-      )}
+      {team && <DrinkNotice gameId={sync.gameId} cards={cards} team={team} now={now} />}
       {fix && (
         <FixSomething
           sync={sync}
@@ -290,7 +288,7 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
       )}
 
       {tab === 'effects' && team && (
-        <EffectsPanel sync={sync} cards={cards} team={team} canAct={canAct} now={now} config={lobby.config} nameOf={nameOf} isHost={shared.isHost} />
+        <EffectsPanel sync={sync} cards={cards} team={team} canAct={canAct} now={now} config={lobby.config} nameOf={nameOf} />
       )}
 
       {tab === 'log' && (
@@ -426,7 +424,6 @@ function HiderView({
   seekerDots,
   goMap,
   goHand,
-  isHost,
   tool,
   tab,
   now,
@@ -541,7 +538,6 @@ function HiderView({
             now={now}
             config={lobby.config}
             nameOf={nameOf}
-            isHost={isHost}
           />
         </>
       )}
@@ -680,12 +676,18 @@ function SeekerView({
   const pending = play.pending
   const blocked = questionsBlockedBy(cards)
   const banned = useMemo(() => bannedSet(cards), [cards])
+  // Each question once per run (the server refuses question_used); host-voided ones don't count.
+  const used = useMemo(
+    () => new Set(play.questions.filter((q) => q.round === started.round && q.closedBy !== 'void').map((q) => banKey(q.type, q.optionId))),
+    [play.questions, started.round],
+  )
   const locked = lockedUntil(cards, now)
 
   return (
     <>
       <DrinkProofs sync={sync} cards={cards} team="seekers" canAct={canAct} />
       {blocked.length > 0 && tab !== 'effects' && <BlockedBanner effects={blocked} team="seekers" />}
+      {tab !== 'effects' && <OtherBlockedBanners cards={cards} team="seekers" />}
       {tab !== 'effects' && <LockBanner cards={cards} team="seekers" now={now} />}
       {cards.moving && tab !== 'effects' && (
         <div className="blocked-banner" role="status">
@@ -706,6 +708,7 @@ function SeekerView({
         </section>
       )}
 
+      {tab !== 'effects' && <CurseCheckPrompt sync={sync} cards={cards} canAct={canAct} />}
       {tab !== 'effects' && <TriviaPrompt effects={triviaWaiting(cards, 'seekers')} team="seekers" onOpen={goEffects} />}
       {tab === 'map' && <EffectStrip cards={cards} now={now} />}
       {tab === 'map' && (
@@ -761,6 +764,8 @@ function SeekerView({
           city={lobby.city}
           playArea={started.playArea}
           ruled={ruled}
+          remaining={remaining}
+          used={used}
           canAct={canAct}
           seekingAt={clock.phase === 'hiding' ? now + clock.ms : null}
           pending={!!pending}

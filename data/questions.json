@@ -101,6 +101,7 @@
       "type": "thermometer",
       "prompt": "I travelled ___, am I hotter or colder?",
       "colour": "#F2C744",
+      "randomize_vetoes": true,
       "reward": {
         "draw": 2,
         "pick": 1
@@ -153,7 +154,8 @@
         },
         {
           "id": "custom",
-          "distance_m": null
+          "distance_m": null,
+          "reusable": true
         }
       ]
     },

@@ -9,16 +9,16 @@ interface Props {
   effect: Effect
   team: Team
   canAct: boolean
-  isHost: boolean
   nameOf: (userId: string | null) => string
 }
 
 /**
  * A trivia curse (behaviour 'trivia'), inside its card: the hider writes the questions, the
- * seekers send all their answers at once, the hider marks them all at once. Both teams see everything. The host can mark
- * them all right by hand.
+ * seekers send all their answers at once, the hider marks them all at once. Both teams see everything.
+ * With need_right below the count (Moll: 1 of 3), a set that falls short is thrown out and the
+ * hider writes a new one. A stuck curse is cleared with Fix something.
  */
-export function TriviaBox({ sync, effect: e, team, canAct, isHost, nameOf }: Props) {
+export function TriviaBox({ sync, effect: e, team, canAct, nameOf }: Props) {
   const t = e.trivia
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -51,12 +51,14 @@ export function TriviaBox({ sync, effect: e, team, canAct, isHost, nameOf }: Pro
         team === 'hiders' ? (
           <TriviaWrite count={t.count} topic={t.topic} disabled={disabled} onSend={(list) => act('set_trivia', { p_questions: list })} />
         ) : (
-          <span className="muted small">Waiting for the hider to send {t.count} questions.</span>
+          <span className="muted small">
+            Waiting for the hider to send {t.count} questions{t.need < t.count ? ` (get ${t.need} right)` : ''}.
+          </span>
         )
       ) : (
         <>
           <span className="muted small">
-            {done} of {qs.length} right
+            {done} of {qs.length} right{t.need < qs.length ? ` (${t.need} needed)` : ''}
             {active && stage === 'answering' && team === 'hiders' && ' · waiting for the seekers to answer'}
             {active && stage === 'marking' && team === 'seekers' && ' · waiting for the hider to mark'}
           </span>
@@ -92,7 +94,6 @@ export function TriviaBox({ sync, effect: e, team, canAct, isHost, nameOf }: Pro
           )}
         </>
       )}
-      {isHost && e.status === 'active' && <HostClear disabled={disabled} onClear={() => act('force_clear_trivia', {})} />}
       {err && <span className="bad small">{err}</span>}
     </span>
   )
@@ -242,24 +243,5 @@ function TriviaMarks({
         Send marks
       </button>
     </>
-  )
-}
-
-/** Host only, either team: mark everything right and clear the curse. Asks once. */
-function HostClear({ disabled, onClear }: { disabled: boolean; onClear: () => Promise<boolean> }) {
-  const [sure, setSure] = useState(false)
-  return sure ? (
-    <span className="confirm-row">
-      <button className="secondary small" disabled={disabled} onClick={() => setSure(false)}>
-        Cancel
-      </button>
-      <button className="small" disabled={disabled} onClick={() => void onClear()}>
-        Clear curse
-      </button>
-    </span>
-  ) : (
-    <button className="secondary small" disabled={disabled} onClick={() => setSure(true)}>
-      Host: mark all correct
-    </button>
   )
 }

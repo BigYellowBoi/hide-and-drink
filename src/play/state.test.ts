@@ -109,6 +109,12 @@ describe('powerups on questions', () => {
     expect(s.log.at(-1)?.text).toBe('Randomized into Radar 3 km')
   })
 
+  it('randomize on a thermometer closes it as a veto', () => {
+    const s = derivePlay([started, asked, ev('card_played', { card: randCard, question_id: 'q1', as_veto: true })])
+    expect(s.pending).toBeNull()
+    expect(outcomeText(s.questions[0])).toBe('Vetoed')
+  })
+
   it('answers from before a move are not shaded', () => {
     const answered = ev('question_answered', { question_id: 'q1', answer: 'yes' })
     expect(shadable(derivePlay([started, asked, answered]))).toHaveLength(1)

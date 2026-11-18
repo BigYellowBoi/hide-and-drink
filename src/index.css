@@ -1851,6 +1851,11 @@ button.option-chip.on {
   margin-top: 16px;
 }
 
+/* The hider's incoming question: enough map to read both tools. */
+.mini-map.answer-map {
+  height: min(45vh, 380px);
+}
+
 a.link {
   color: var(--hider);
   font-weight: 600;
@@ -3172,4 +3177,52 @@ button.preset-delete.danger {
 
 .tl-undone {
   text-decoration: line-through;
+}
+
+/* Ask: question types as cards (colour band with the name, reward underneath). */
+button.pcard.type-card {
+  border-radius: 14px;
+}
+
+button.pcard.type-card .pcard-band {
+  padding: 6px 10px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.type-card-body {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px 10px;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+button.pcard.type-card:disabled,
+button.pcard.type-card.type-card-spent {
+  opacity: 0.5;
+}
+
+/* Join code under the main clock, so anyone who drops out can rejoin. */
+.topbar-centre {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+
+.topbar-code {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+.footer-actions.footer-split {
+  justify-content: space-between;
+}
+
+/* Drinks for both teams: pinned on top until dismissed. */
+.drink-notice {
+  box-shadow: inset 0 0 0 2px var(--alert);
 }

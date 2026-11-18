@@ -12,7 +12,7 @@ import { ConnectionStatus } from './components/ConnectionStatus'
 import { Home } from './components/Home'
 import { Settings } from './components/Settings'
 import { Lobby } from './components/Lobby'
-import { Round, TopbarClock } from './components/Round'
+import { Round, TopbarClock, type FixState } from './components/Round'
 import { StaleBanner } from './components/StaleBanner'
 import { presenceOf } from './sync/presence'
 import { isDevMode } from './hiding/devPosition'
@@ -39,6 +39,7 @@ function GameScreen({
   const events = useMemo(() => effectiveEvents(game.events), [game.events])
   const lobby = useMemo(() => deriveLobby(events), [events])
   const [confirmLeave, setConfirmLeave] = useState(false)
+  const [fix, setFix] = useState<FixState>(false)
   const [rejoin, setRejoin] = useState<{ busy: boolean; err: string | null }>({ busy: false, err: null })
 
   // Remember this game's code: if the phone ever loses its player session, it can rejoin.
@@ -72,6 +73,8 @@ function GameScreen({
   const locked = !game.canAct && game.status !== 'idle' && game.status !== 'error'
   const myTeam = lobby.players.find((p) => p.userId === game.userId)?.team ?? null
   // Hider-only events: on seekers' phones the hand is always empty.
+  // Fix something: in a running game, for the host and anyone on a team.
+  const canFix = lobby.status !== 'lobby' && !!lobby.started && (myTeam !== null || (!!game.userId && game.userId === lobby.hostId))
   const bonusS = useMemo(() => handBonusS(deriveCards(events)), [events])
 
   return (
@@ -79,11 +82,15 @@ function GameScreen({
       {/* Top bar: team chip left, screen label centre, status dot right (docs/design.md). */}
       <header className="topbar">
         <span className={`chip chip-${myTeam ?? 'none'}`}>{myTeam ? TEAM_CHIP[myTeam] : 'No team'}</span>
-        {lobby.started && game.sync ? (
-          <TopbarClock sync={game.sync} started={lobby.started} bonusS={myTeam === 'hiders' ? bonusS : 0} />
-        ) : (
-          <span className="topbar-label">{lobby.code ? 'Lobby' : ''}</span>
-        )}
+        <span className="topbar-centre">
+          {lobby.started && game.sync ? (
+            <TopbarClock sync={game.sync} started={lobby.started} bonusS={myTeam === 'hiders' ? bonusS : 0} />
+          ) : (
+            <span className="topbar-label">{lobby.code ? 'Lobby' : ''}</span>
+          )}
+          {/* Always on show, so anyone who drops out can rejoin with it. */}
+          {lobby.code && <span className="topbar-code">Code {lobby.code}</span>}
+        </span>
         <ConnectionStatus status={game.status} canAct={game.canAct} />
       </header>
 
@@ -125,11 +132,13 @@ function GameScreen({
             positions={game.positions}
             presence={presence}
             transport={transport}
+            fix={fix}
+            setFix={setFix}
           />
         )}
       </div>
 
-      <div className="row footer-actions">
+      <div className={`row footer-actions${canFix ? ' footer-split' : ''}`}>
         <button
           className={`secondary${confirmLeave ? ' danger' : ''}`}
           onClick={() => (confirmLeave ? void leave() : setConfirmLeave(true))}
@@ -137,6 +146,11 @@ function GameScreen({
         >
           {confirmLeave ? 'Tap again to leave' : 'Leave game'}
         </button>
+        {canFix && (
+          <button className="secondary" disabled={!game.canAct} onClick={() => setFix(true)}>
+            Fix something
+          </button>
+        )}
       </div>
 
       <details className="debug">

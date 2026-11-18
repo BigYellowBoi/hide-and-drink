@@ -9,7 +9,7 @@ import { distanceM, isLngLat, type LngLat } from '../play/geo'
 import { measuringTool, nearestTool, radarTool, tentacleCandidates, tentaclesTool, thermometerTool } from '../play/overlays'
 import type { LayerLookup } from '../play/features'
 import { MapsLink } from './MapsLink'
-import { loadQuestionTypes, optionLabel, textOn, typeColour, type QuestionType } from '../play/questionTypes'
+import { loadQuestionTypes, optionLabel, textOn, typeColour, type QuestionOption, type QuestionType } from '../play/questionTypes'
 import { isSupportedType, km, MAP_TYPES, questionText, typeName } from '../play/state'
 import type { Fix, GeoError } from '../hiding/useGeolocation'
 import { formatClock } from '../hiding/state'
@@ -22,6 +22,10 @@ interface Props {
   city: string
   playArea: AreaCollection | null
   ruled: FeatureCollection
+  /** Where the hider can still be (white outline), as on the map tab. */
+  remaining?: FeatureCollection
+  /** Questions already asked this run, as banKey(type, option id): each is asked once. */
+  used?: ReadonlySet<string>
   canAct: boolean
   /** Server ms when questions open; null if unknown. */
   seekingAt: number | null
@@ -53,6 +57,8 @@ export function AskPanel({
   city,
   playArea,
   ruled,
+  remaining,
+  used = NONE,
   canAct,
   seekingAt,
   pending,
@@ -95,6 +101,7 @@ export function AskPanel({
     writeLocal(startKey(gameId), p ? JSON.stringify(p) : null)
   }
 
+  const isUsed = (t: string, o: QuestionOption) => o.reusable !== true && used.has(banKey(t, o.id))
   const qt = types?.find((t) => t.type === type) ?? null
   const option = qt?.options.find((o) => o.id === optionId) ?? null
   const gpsPoint: LngLat | null = fix ? [fix.lng, fix.lat] : null
@@ -127,15 +134,16 @@ export function AskPanel({
       fixLng !== undefined && fixLat !== undefined
         ? [{ id: 'me', lng: fixLng, lat: fixLat, team: 'seekers' as const, me: true }]
         : []
-    return { ruled, tool, dots }
+    return { ruled, remaining, tool, dots }
     // `distance` comes from the loaded option list, which is never mutated.
     // oxlint-disable-next-line react/preserve-manual-memoization
-  }, [type, tapped, fixLng, fixLat, distance, start, ruled, option, layer])
+  }, [type, tapped, fixLng, fixLat, distance, start, ruled, remaining, option, layer])
 
   let blocker: string | null = null
   if (!qt || !isSupportedType(type)) blocker = 'Pick a question type.'
   else if (!option) blocker = 'Pick an option.'
   else if (banned.has(banKey(type, option.id))) blocker = 'That question is banned for the rest of the run.'
+  else if (isUsed(type, option)) blocker = 'Already asked this run: each question is asked once.'
   else if ((type === 'radar' || type === 'thermometer') && (!distance || distance < 10)) blocker = 'Type a distance.'
   else if ((MAP_TYPES.includes(type) || type === 'thermometer') && !here)
     blocker = onLongPress
@@ -176,22 +184,27 @@ export function AskPanel({
       <div className="type-tiles" role="radiogroup" aria-label="Question type">
         {(types ?? []).map((t) => {
           const ok = isSupportedType(t.type)
-          const colour = typeColour(types, t.type)
+          const colour = typeColour(types, t.type) ?? '#A9B4BF'
+          const left = t.options.filter((o) => !isUsed(t.type, o) && !banned.has(banKey(t.type, o.id))).length
           return (
             <button
               key={t.type}
               role="radio"
               aria-checked={type === t.type}
-              className={`type-tile${type === t.type ? ' on' : ''}`}
-              style={colour ? { background: colour, color: textOn(colour), borderColor: colour } : undefined}
+              className={`pcard type-card${type === t.type ? ' pcard-on' : ''}${ok && left === 0 ? ' type-card-spent' : ''}`}
               disabled={!ok}
               onClick={() => {
                 setType(t.type)
                 setOptionId(null)
               }}
             >
-              <strong>{typeName(t.type)}</strong>
-              <span className="small">{ok ? `Draw ${t.reward_draw}, keep ${t.reward_pick}` : 'Soon'}</span>
+              <span className="pcard-band" style={{ background: colour, color: textOn(colour) }}>
+                {typeName(t.type)}
+              </span>
+              <span className="type-card-body">
+                <span>{ok ? `Draw ${t.reward_draw}, keep ${t.reward_pick}` : 'Soon'}</span>
+                {ok && <span className="muted">{left ? `${left} of ${t.options.length} left` : 'All asked'}</span>}
+              </span>
             </button>
           )
         })}
@@ -208,14 +221,15 @@ export function AskPanel({
           <div className="chips" role="radiogroup" aria-label="Option">
             {qt.options.map((o) => {
               const isBanned = banned.has(banKey(type, o.id))
+              const asked = isUsed(type, o)
               return (
                 <button
                   key={o.id}
                   role="radio"
                   aria-checked={optionId === o.id}
-                  className={`option-chip${optionId === o.id ? ' on' : ''}${isBanned ? ' banned' : ''}`}
-                  disabled={isBanned}
-                  title={isBanned ? 'Banned for the rest of the run' : undefined}
+                  className={`option-chip${optionId === o.id ? ' on' : ''}${isBanned || asked ? ' banned' : ''}`}
+                  disabled={isBanned || asked}
+                  title={isBanned ? 'Banned for the rest of the run' : asked ? 'Already asked this run' : undefined}
                   onClick={() => setOptionId(o.id)}
                 >
                   {optionLabel(o)}

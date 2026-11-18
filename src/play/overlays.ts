@@ -33,7 +33,7 @@ export function radarTool(center: LngLat, distanceM: number): FeatureCollection 
 
 /** Start and end, the path between them and the dividing line (3 km each way). */
 export function thermometerTool(start: LngLat, end: LngLat | null): FeatureCollection {
-  if (!end) return fc([point(start)])
+  if (!end) return fc([point(start, { label: 'Start' })])
   const mid: LngLat = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2]
   const p = projector(mid)
   const [sx, sy] = p.toXY(start)
@@ -41,7 +41,12 @@ export function thermometerTool(start: LngLat, end: LngLat | null): FeatureColle
   const len = Math.hypot(ex - sx, ey - sy) || 1
   const [nx, ny] = [-(ey - sy) / len, (ex - sx) / len]
   const S = 3000
-  return fc([line(start, end), line(p.toLngLat([nx * S, ny * S]), p.toLngLat([-nx * S, -ny * S])), point(start), point(end)])
+  return fc([
+    line(start, end),
+    line(p.toLngLat([nx * S, ny * S]), p.toLngLat([-nx * S, -ny * S])),
+    point(start, { label: 'Start' }),
+    point(end, { label: 'End' }),
+  ])
 }
 
 /** Measuring: the target, a circle through the seekers (closer = inside it) and the line between, in km. */
@@ -147,3 +152,34 @@ export function questionTool(q: Question, layer?: LayerLookup | null): FeatureCo
 
 /** Whether a question has anything to show on the map. */
 export const hasTool = (q: Question) => questionTool(q).features.length > 0
+
+/**
+ * The hider's side of a question, drawn on the answer sheet's map next to the seekers' tool:
+ * tentacles get the same circle around the hider, matching a line from the hider to their own
+ * nearest feature with its distance.
+ */
+export function hiderTool(q: Question, hider: LngLat | null, layer?: LayerLookup | null): Feature[] {
+  if (!hider) return []
+  const p = q.params
+  if (q.type === 'tentacles' && typeof p.radius_m === 'number') {
+    const sorted = candidatesOf(q)
+      .map((c) => ({ c, d: distanceM(hider, c.point) }))
+      .sort((a, b) => a.d - b.d)
+    return [
+      radarCircle(hider, p.radius_m),
+      ...(sorted[0] ? [line(hider, sorted[0].c.point, { role: 'nearest-line', label: kmLabel(sorted[0].d) })] : []),
+    ]
+  }
+  if (q.type === 'matching' && layer && typeof p.layer === 'string') {
+    return nearestTool(hider, layer(p.layer)).features.filter((f) => {
+      const role = (f.properties as Props | null)?.role
+      return role === 'nearest-line' || role === 'nearest' || role === 'nearest-feature'
+    })
+  }
+  return []
+}
+
+/** Straight-line distance from the hider to each tentacles candidate, by feature id. */
+export function candidateDistances(q: Question, hider: LngLat | null): Map<string, number> {
+  return new Map(hider ? candidatesOf(q).map((c) => [c.feature_id, distanceM(hider, c.point)]) : [])
+}

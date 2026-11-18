@@ -6,6 +6,7 @@ import {
   effectTimer,
   evidenceFor,
   liveEffects,
+  otherBlocks,
   questionsBlockedBy,
   triviaTodo,
   type CardsState,
@@ -32,8 +33,6 @@ interface Props {
   /** Game config (veto lock lengths). */
   config: Record<string, unknown>
   nameOf: (userId: string | null) => string
-  /** The host can mark a trivia curse all correct by hand. */
-  isHost?: boolean
 }
 
 const minutes = (s: number | null) => (s ? `${Math.round(s / 60)} min` : '')
@@ -47,6 +46,7 @@ export function EffectsPanel(props: Props) {
   return (
     <>
       {blocked.length > 0 && <BlockedBanner effects={blocked} team={team} />}
+      <OtherBlockedBanners cards={cards} team={team} />
       <LockBanner cards={cards} team={team} now={now} />
       {cards.moving && (
         <div className="blocked-banner" role="status">
@@ -91,10 +91,10 @@ export function EffectsPanel(props: Props) {
   )
 }
 
-export function BlockedBanner({ effects, team }: { effects: readonly Effect[]; team: Team }) {
+export function BlockedBanner({ effects, team, what = 'questions' }: { effects: readonly Effect[]; team: Team; what?: string }) {
   return (
     <div className="blocked-banner" role="status">
-      <strong>Questions blocked</strong>
+      <strong>{what.charAt(0).toUpperCase() + what.slice(1)} blocked</strong>
       <p>
         {team === 'seekers' ? 'Until you complete ' : 'Seekers must complete '}
         {effects.map((e) => e.card.name).join(' and ')}.
@@ -103,7 +103,18 @@ export function BlockedBanner({ effects, team }: { effects: readonly Effect[]; t
   )
 }
 
-function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf, isHost = false }: Props & { effect: Effect }) {
+/** One yellow banner per thing curses block besides questions (params.blocks, e.g. transport). */
+export function OtherBlockedBanners({ cards, team }: { cards: CardsState; team: Team }) {
+  return (
+    <>
+      {otherBlocks(cards).map(([what, effects]) => (
+        <BlockedBanner key={what} what={what} effects={effects} team={team} />
+      ))}
+    </>
+  )
+}
+
+function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf }: Props & { effect: Effect }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const phase = effectPhase(e, now)
@@ -125,6 +136,12 @@ function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf,
 
   return (
     <CardFace card={e.card}>
+      {phase === 'awaiting_seekers' &&
+        (team === 'seekers' ? (
+          <CurseCheck sync={sync} effect={e} canAct={canAct} />
+        ) : (
+          <span className="muted small">Waiting for the seekers to say if it applies: “{e.seekerConfirm}”</span>
+        ))}
       {timer && <EffectBar endsAt={timer[0]} totalS={timer[1]} now={now} label={phase === 'followup' ? 'Locked' : 'Left'} />}
       {phase === 'followup_available' && (
         <span className="effect-actions">
@@ -148,7 +165,7 @@ function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf,
             Waiting for the seekers to do it{evidence ? ' and send a photo' : ''}.
           </span>
         ))}
-      {e.behaviour === 'trivia' && <TriviaBox sync={sync} effect={e} team={team} canAct={canAct} isHost={isHost} nameOf={nameOf} />}
+      {e.behaviour === 'trivia' && <TriviaBox sync={sync} effect={e} team={team} canAct={canAct} nameOf={nameOf} />}
       {evidence?.path && phase === 'awaiting_confirm' && <PhotoThumb path={evidence.path} bucket={DRINK_BUCKET} alt="Proof photo" />}
       {phase === 'awaiting_confirm' && (
         <span className="muted small">{team === 'seekers' ? 'Waiting for the hider to confirm.' : 'Seekers say they did it. Confirm above.'}</span>
@@ -218,6 +235,8 @@ export function EffectStrip({ cards, now }: { cards: CardsState; now: number }) 
                   ? e.trivia.questions
                     ? `Trivia: ${e.trivia.questions.filter((q) => q.correct).length} of ${e.trivia.questions.length} right`
                     : 'Trivia: waiting for the questions'
+                  : effectPhase(e, now) === 'awaiting_seekers'
+                  ? 'Waiting for the seekers to confirm'
                   : effectPhase(e, now) === 'followup_available'
                   ? "Time's up. Missed it? See Effects"
                   : effectPhase(e, now) === 'awaiting_confirm'
@@ -256,6 +275,59 @@ export function TriviaPrompt({ effects, team, onOpen }: { effects: readonly Effe
         Open
       </button>
     </section>
+  )
+}
+
+/**
+ * Seekers: a curse with params.seeker_confirm (e.g. Prison, only if they're in the hiders'
+ * bar) waits for them to say whether it applies. Yes starts it, no drops it.
+ */
+export function CurseCheck({ sync, effect: e, canAct }: { sync: GameSync; effect: Effect; canAct: boolean }) {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const answer = async (applies: boolean) => {
+    setBusy(true)
+    setErr(null)
+    try {
+      await sync.action('check_curse', { p_effect_id: e.id, p_applies: applies })
+    } catch (x) {
+      setErr(describeError(x))
+      setBusy(false)
+    }
+  }
+  return (
+    <span className="effect-actions">
+      <span className="small">
+        <strong>{e.seekerConfirm}</strong> Be honest: the hiders see your answer.
+      </span>
+      <span className="confirm-row">
+        <button className="secondary small" disabled={busy || !canAct} onClick={() => void answer(false)}>
+          No, doesn't apply
+        </button>
+        <button className="small" disabled={busy || !canAct} onClick={() => void answer(true)}>
+          Yes, it applies
+        </button>
+      </span>
+      {err && <span className="bad small">{err}</span>}
+    </span>
+  )
+}
+
+/** Seekers: curses waiting for them to say whether they apply, pinned on top of the other tabs. */
+export function CurseCheckPrompt({ sync, cards, canAct }: { sync: GameSync; cards: CardsState; canAct: boolean }) {
+  const waiting = cards.effects.filter((e) => e.status === 'awaiting_seekers')
+  if (!waiting.length) return null
+  return (
+    <>
+      {waiting.map((e) => (
+        <section key={e.id} className="card confirm-clear" role="alert">
+          <p className="eyebrow">Curse: does it apply?</p>
+          <h2>{e.card.name}</h2>
+          {e.card.text && <p className="muted small">{e.card.text}</p>}
+          <CurseCheck sync={sync} effect={e} canAct={canAct} />
+        </section>
+      ))}
+    </>
   )
 }
 
