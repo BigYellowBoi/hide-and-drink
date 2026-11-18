@@ -40,6 +40,8 @@ import { BarPicker } from './BarPicker'
 import { HiderCountContext } from './hiderCount'
 import { PrivateLabel } from './PrivateLabel'
 import { DeadlineRing } from './DeadlineRing'
+import { timerTone } from '../lib/timers'
+import { useTimerAlert } from '../lib/useTimerAlert'
 import { BlockedBanner, ConfirmClear, EffectStrip, EffectsPanel, TriviaPrompt } from './EffectsPanel'
 import { HandPanel } from './HandPanel'
 import type { MapDot } from './GameMap'
@@ -290,8 +292,14 @@ type Clock = ReturnType<typeof roundClock>
 export function TopbarClock({ sync, started, bonusS = 0 }: { sync: GameSync; started: StartedRound; bonusS?: number }) {
   const now = useServerNow(sync)
   const clock = roundClock(started.startedAt, started.hidingPeriodS, now)
+  const hidingLeft = clock.phase === 'hiding' ? clock.ms : started.startedAt + started.hidingPeriodS * 1000 - now
+  // Buzz a minute before seeking starts and when it does (every phone, both teams).
+  useTimerAlert(`hiding:${started.round}`, hidingLeft)
+  const tone = clock.phase === 'hiding' ? timerTone(clock.ms) : 'ok'
+  // Flash "Seeking" for the first few seconds after the hiding period ends.
+  const justStarted = clock.phase === 'seeking' && clock.ms < 5000
   return (
-    <span className="topbar-clock">
+    <span className={`topbar-clock topbar-${tone}${justStarted ? ' topbar-flash' : ''}`} role="timer">
       <span className="topbar-label">{clock.phase === 'hiding' ? 'Hiding' : 'Seeking'}</span>
       <span className="topbar-time">
         {formatClock(clock.ms, { up: clock.phase === 'seeking' })}

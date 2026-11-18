@@ -730,6 +730,128 @@ details.card > summary h2 {
   margin-top: 16px;
 }
 
+/* Game settings (src/lobby/config.ts schema) */
+.setting-summary {
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.setting-group-count {
+  color: var(--alert);
+  letter-spacing: 0.04em;
+}
+
+.setting {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.setting:last-child {
+  border-bottom: none;
+}
+
+.setting-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.setting-label {
+  flex: 1 1 auto;
+  font-weight: 600;
+}
+
+.setting-badge {
+  color: var(--alert);
+  box-shadow: inset 0 0 0 1.5px var(--alert);
+}
+
+.setting-readonly {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.setting-desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.setting-info {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--r-input);
+  background: var(--surface-2);
+  font-size: 15px;
+}
+
+.setting-number {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.setting-slider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.setting-slider input[type='range'] {
+  flex: 1 1 auto;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  accent-color: var(--text);
+}
+
+.setting-value {
+  min-width: 72px;
+  text-align: right;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.setting .stepper {
+  margin-top: 8px;
+}
+
+.setting .stepper-count {
+  min-width: 72px;
+}
+
+.setting-switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  margin-top: 4px;
+}
+
+.setting-switch input {
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  accent-color: var(--ok);
+}
+
+.setting-reset {
+  margin-top: 8px;
+}
+
+.setting-error .setting-label {
+  color: var(--seeker-on-dark);
+}
+
+.setting-msg {
+  margin: 8px 0 0;
+  font-size: 15px;
+}
+
 .checklist {
   margin: 0;
   padding: 0;
@@ -1468,7 +1590,7 @@ button.bar-row-selected {
 .ring-fill {
   stroke: var(--text);
   stroke-linecap: round;
-  transition: stroke-dashoffset 0.5s linear;
+  transition: stroke-dashoffset 1s linear;
 }
 
 .ring-soon .ring-fill {
@@ -1488,6 +1610,64 @@ button.bar-row-selected {
 
 .ring-late .ring-digits {
   color: var(--alert);
+}
+
+.ring-late-digits {
+  display: grid;
+  justify-items: center;
+  line-height: 1.05;
+  font-size: 13px;
+}
+
+.ring-final .ring-fill {
+  stroke: var(--alert);
+}
+
+.ring-final .ring-digits,
+.topbar-final .topbar-time,
+.effect-bar-final .effect-bar-time {
+  color: var(--alert);
+  animation: timer-pulse 1s ease-in-out infinite;
+}
+
+.topbar-soon .topbar-time,
+.effect-bar-soon .effect-bar-time {
+  color: var(--alert);
+}
+
+.effect-bar-soon .effect-bar-fill,
+.effect-bar-final .effect-bar-fill {
+  background: var(--alert);
+}
+
+.effect-bar-late .effect-bar-time {
+  color: var(--text-muted);
+}
+
+.effect-bar-fill {
+  transition: width 1s linear;
+}
+
+.topbar-flash .topbar-label,
+.topbar-flash .topbar-time {
+  color: var(--ok);
+  animation: timer-pulse 1s ease-in-out 3;
+}
+
+@keyframes timer-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring-final .ring-digits,
+  .topbar-final .topbar-time,
+  .effect-bar-final .effect-bar-time,
+  .topbar-flash .topbar-label,
+  .topbar-flash .topbar-time {
+    animation: none;
+  }
 }
 
 /* Answer sheet (hider) and the seekers' waiting card */
