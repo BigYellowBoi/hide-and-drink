@@ -14,6 +14,8 @@ export interface StartedRound {
   /** Server time, ms since epoch. */
   startedAt: number
   hidingPeriodS: number
+  /** The hiding period is paused (host override): time left, ms. */
+  hidingPausedLeftMs?: number | null
   playAreaName: string | null
   /** Polygon snapshotted at start (null if the event had none). */
   playArea: AreaCollection | null
@@ -161,6 +163,27 @@ function applyCoreEvent(state: LobbyState, e: GameEvent): LobbyState {
       if (!started || Number.isNaN(at)) return { ...state, status: 'seeking' }
       const hidingPeriodS = Math.max(0, Math.min(started.hidingPeriodS, Math.round((at - started.startedAt) / 1000)))
       return { ...state, status: 'seeking', started: { ...started, hidingPeriodS } }
+    }
+    case 'host_changed': {
+      const hostId = str(p.user_id)
+      if (!hostId) return state
+      return { ...state, hostId, players: state.players.map((x) => ({ ...x, isHost: x.userId === hostId })) }
+    }
+    case 'hand_limit_changed':
+      return typeof p.hand_limit === 'number' ? { ...state, config: { ...state.config, hand_limit: p.hand_limit } } : state
+    case 'timer_changed': {
+      if (p.timer !== 'hiding' || !state.started) return state
+      const paused = typeof p.paused_left_s === 'number' && p.ends_at == null
+      const period = typeof p.hiding_period_s === 'number' ? p.hiding_period_s : state.started.hidingPeriodS
+      return {
+        ...state,
+        status: p.status === 'hiding' || p.status === 'seeking' ? p.status : state.status,
+        started: {
+          ...state.started,
+          hidingPeriodS: paused ? state.started.hidingPeriodS : period,
+          hidingPausedLeftMs: paused ? (p.paused_left_s as number) * 1000 : null,
+        },
+      }
     }
     default:
       return state

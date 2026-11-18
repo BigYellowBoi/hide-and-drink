@@ -1,4 +1,4 @@
--- Playtest tools and cast cost payer (20261213090000_playtest_tools_curse_cost.sql).
+-- Playtest tools and cast cost payer (20261214090000_playtest_tools_curse_cost.sql).
 -- Players: H = host (seeker), A = hider, S = seeker.
 
 begin;

@@ -159,9 +159,9 @@ export function LockBanner({ cards, team, now }: { cards: CardsState; team: Team
       <strong>{team === 'seekers' ? 'Locked at a bar' : 'Seekers locked at a bar'}</strong>
       <p>
         Veto of {v.name}.{' '}
-        {started ? `${formatClock(until - now)} left.` : `Next lock starts in ${formatClock(v.lockStartsAt - now)}.`}
+        {started ? `${formatClock(until - now)} left${v.pausedLeftMs !== null ? ' (paused by the host)' : ''}.` : `Next lock starts in ${formatClock(v.lockStartsAt - now)}.`}
       </p>
-      {started && <EffectBar endsAt={v.lockEndsAt} totalS={v.lockS} now={now} label="Left" />}
+      {started && <EffectBar endsAt={v.pausedLeftMs !== null ? now + v.pausedLeftMs : v.lockEndsAt} totalS={v.lockS} now={now} label="Left" />}
     </div>
   )
 }

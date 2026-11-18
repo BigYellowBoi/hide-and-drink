@@ -156,7 +156,7 @@ function CurseCard({
             <li key={l.seq} className={`log-${l.kind}`}>
               <span className="log-dot" style={l.colour ? { background: l.colour } : undefined} aria-hidden="true" />
               <span>
-                {l.text} <span className="muted small">+{formatClock(Math.max(0, l.at - roundStart), { up: true })}</span>
+                <FixText l={l} /> <span className="muted small">+{formatClock(Math.max(0, l.at - roundStart), { up: true })}</span>
                 {l.photo && <PhotoThumb path={l.photo} bucket={l.photoBucket} alt="Proof photo" />}
                 {l.private && <Private />}
               </span>
@@ -168,13 +168,25 @@ function CurseCard({
   )
 }
 
+/** An entry's text; host fixes (overrides) are tagged, with the reason and whether it was undone. */
+function FixText({ l }: { l: LogEntry }) {
+  if (l.kind !== 'override') return <>{l.text}</>
+  return (
+    <>
+      <span className="tl-fix">Host fix</span> <span className={l.undone ? 'tl-undone' : undefined}>{l.text}</span>
+      {l.reason && <span className="muted"> · “{l.reason}”</span>}
+      {l.undone && <span className="muted"> (undone)</span>}
+    </>
+  )
+}
+
 function Row({ entry: l, roundStart }: { entry: LogEntry; roundStart: number }) {
   return (
     <li className={`tl-row log-${l.kind}`}>
       <span className="log-dot" style={l.colour ? { background: l.colour } : undefined} aria-hidden="true" />
       <Time at={l.at} roundStart={roundStart} />
       <span>
-        {l.text}
+        <FixText l={l} />
         {l.photo && <PhotoThumb path={l.photo} bucket={l.photoBucket} alt={l.photoBucket ? 'Proof photo' : 'Answer photo'} />}
         {l.private && <Private />}
       </span>
@@ -233,7 +245,7 @@ function QuestionCard({ q, entries, photo, colour, roundStart, asker, canShade, 
             <li key={l.seq} className={`log-${l.kind}`}>
               <span className="log-dot" style={l.colour ? { background: l.colour } : undefined} aria-hidden="true" />
               <span>
-                {l.text}
+                <FixText l={l} />
                 {l.photo && <PhotoThumb path={l.photo} bucket={l.photoBucket} alt="Proof photo" />}
                 {l.private && <Private />}
               </span>

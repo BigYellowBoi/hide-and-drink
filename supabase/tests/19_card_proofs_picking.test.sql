@@ -95,7 +95,7 @@ select is(pg_temp.picks(':hiders'), 2, 'picks go to the hiders topic');
 select is(pg_temp.picks(':seekers') + pg_temp.picks(''), 0, 'and never to the seekers or the shared topic');
 select is(
   (select array[payload ->> 'user_id', payload ->> 'venue_id', (payload ->> 'name' is not null)::text]
-     from realtime.messages where event = 'picking' order by id limit 1),
+     from realtime.messages where event = 'picking' and payload ->> 'venue_id' is not null),
   array['44444444-4444-4444-4444-444444444444', split_part(current_setting('test.bars'), ',', 2), 'true'],
   'a pick names the hider, the bar and its name');
 select is(pg_temp.seq()::text, current_setting('test.seq_before_picks'), 'picks are not events');

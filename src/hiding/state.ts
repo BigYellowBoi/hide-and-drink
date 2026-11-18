@@ -49,6 +49,8 @@ export function deriveHiding(events: readonly GameEvent[], round: number): Hidin
       }
     } else if (e.type === 'card_played' && isObj(e.payload.card) && isObj(e.payload.card.params) && e.payload.card.params.action === 'move') {
       state = { ...state, moving: true }
+    } else if (e.type === 'move_cancelled') {
+      state = { ...state, moving: false }
     } else if (e.type === 'freeze_changed' && typeof e.payload.frozen === 'boolean') {
       state = { ...state, frozen: e.payload.frozen }
     }
@@ -84,6 +86,18 @@ export interface RoundClock {
   phase: RoundPhase
   /** Hiding: time left. Seeking: time since the hiding period ended. Never negative. */
   ms: number
+}
+
+/**
+ * The hiding period to show now: while paused by the host, it keeps ending "time left" from
+ * now, so every clock freezes at the time left.
+ */
+export function hidingPeriodAt(
+  started: { startedAt: number; hidingPeriodS: number; hidingPausedLeftMs?: number | null },
+  serverNow: number,
+): number {
+  const left = started.hidingPausedLeftMs
+  return left != null ? (serverNow + left - started.startedAt) / 1000 : started.hidingPeriodS
 }
 
 /** Where the round is on server time. */

@@ -68,6 +68,8 @@ export interface Effect {
   followupS: number | null
   followupEndsAt: number | null
   blocksQuestions: boolean
+  /** A countdown paused by the host: time left, ms (its end is Infinity meanwhile). */
+  pausedLeftMs: number | null
   status: EffectStatus
   /** Trivia curses only. */
   trivia: Trivia | null
@@ -98,6 +100,8 @@ export interface Veto {
   lockS: number
   lockStartsAt: number
   lockEndsAt: number
+  /** Paused by the host: time left, ms (lockEndsAt is Infinity meanwhile). */
+  pausedLeftMs: number | null
   penalty: string
 }
 
@@ -129,6 +133,8 @@ export interface DrinkProof {
   effectId: string | null
   /** The played card it is for (cast cost, card drinks, curse evidence), when known. */
   instanceId: string | null
+  /** Closed by the host without a photo: not owed, or drunk without proof. */
+  resolution: 'cancelled' | 'waived' | null
 }
 
 export interface CardsState {
@@ -324,6 +330,7 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
               followupS: num(p.followup_s),
               followupEndsAt: null,
               blocksQuestions: p.blocks_questions === true,
+              pausedLeftMs: null,
               status: 'active',
               trivia:
                 card.behaviour === 'trivia'
@@ -363,6 +370,7 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
         lockS,
         lockStartsAt: time(p.lock_starts_at, e.created_at),
         lockEndsAt: time(p.lock_ends_at, e.created_at),
+        pausedLeftMs: null,
         penalty: str(p.penalty) ?? 'each seeker drinks',
       }
       const next = updateEffect(
@@ -404,6 +412,7 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
         path: null,
         effectId: null,
         instanceId: str(p.instance_id),
+        resolution: null,
       }
       const who = team === 'hiders' ? 'Hiders' : 'Seekers'
       return log(
@@ -417,7 +426,7 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
       if (!id || !effectId) return state
       const team = p.team === 'hiders' ? 'hiders' : 'seekers'
       const instanceId = state.effects.find((x) => x.id === effectId)?.instanceId ?? null
-      const proof: DrinkProof = { id, seq: e.seq, team, kind: 'evidence', cost: 'drink', label: str(p.label) ?? 'Curse', path: null, effectId, instanceId }
+      const proof: DrinkProof = { id, seq: e.seq, team, kind: 'evidence', cost: 'drink', label: str(p.label) ?? 'Curse', path: null, effectId, instanceId, resolution: null }
       return { ...state, proofs: [...state.proofs, proof] }
     }
     case 'drink_proved': {
@@ -512,6 +521,80 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
       const effect = next.effects.find((x) => x.id === id)
       const len = effect?.followupS ? ` (${minutes(effect.followupS)})` : ''
       return log({ kind: 'penalty', text: `${effect?.card.name ?? 'Curse'}: missed, follow-on timer started${len}`, ...effectLink(next, id) }, next)
+    }
+    // ---------------------------------------------------------------- host overrides
+    case 'drink_resolved': {
+      const id = str(p.proof_id)
+      const resolution: 'cancelled' | 'waived' = p.resolution === 'cancelled' ? 'cancelled' : 'waived'
+      const proof = state.proofs.find((x) => x.id === id)
+      const next = { ...state, proofs: state.proofs.map((x) => (x.id === id ? { ...x, resolution } : x)) }
+      if (!proof || proof.kind === 'evidence') return next
+      const who = proof.team === 'hiders' ? 'Hiders' : 'Seekers'
+      return log({ kind: 'override', text: `${who}: ${proof.label} ${resolution === 'cancelled' ? 'cancelled' : 'done, no photo needed'}` }, next)
+    }
+    case 'card_given': {
+      const card = parseCard(p.card)
+      const instanceId = str(p.instance_id)
+      if (!card || !instanceId) return state
+      return {
+        ...state,
+        deck: state.deck[card.id] ? state.deck : { ...state.deck, [card.id]: card },
+        hand: [...state.hand, { instanceId, cardId: card.id }],
+      }
+    }
+    case 'card_removed': {
+      const id = str(p.instance_id)
+      return { ...state, hand: state.hand.filter((c) => c.instanceId !== id) }
+    }
+    case 'deck_reshuffled':
+      return { ...state, pileLeft: num(p.pile_left) ?? state.pileLeft }
+    case 'hand_limit_changed':
+      return { ...state, handLimit: num(p.hand_limit) ?? state.handLimit }
+    case 'effect_changed':
+      return updateEffect(state, str(p.effect_id), (x) =>
+        typeof p.blocks_questions === 'boolean' ? { ...x, blocksQuestions: p.blocks_questions } : x,
+      )
+    case 'effect_reinstated': {
+      const next = updateEffect(state, str(p.effect_id), (x) => ({
+        ...x,
+        status: 'active',
+        endsAt: x.behaviour === 'timed' ? time(p.ends_at, e.created_at) : x.endsAt,
+        durationS: num(p.duration_s) ?? x.durationS,
+        followupEndsAt: null,
+        pausedLeftMs: null,
+      }))
+      return log({ kind: 'override', text: `${effectName(next, str(p.effect_id))} is back in force` }, next)
+    }
+    case 'veto_cancelled': {
+      const instanceId = str(p.instance_id)
+      if (!instanceId) return state
+      const bans = (Array.isArray(p.bans) ? p.bans : []).flatMap((b): Ban[] =>
+        isObject(b) && str(b.type) && str(b.option_id)
+          ? [{ type: str(b.type)!, optionId: str(b.option_id)!, label: str(b.label) ?? str(b.option_id)!, instanceId }]
+          : [],
+      )
+      return updateEffect(
+        { ...state, vetoes: state.vetoes.filter((v) => v.instanceId !== instanceId), bans: [...state.bans, ...bans] },
+        str(p.effect_id),
+        (x) => ({ ...x, status: 'active' }),
+      )
+    }
+    case 'ban_lifted':
+      return { ...state, bans: state.bans.filter((b) => !(b.type === p.type && b.optionId === p.option_id)) }
+    case 'move_cancelled':
+      return log({ kind: 'override', text: 'Move cancelled: the hider stays at their bar' }, { ...state, moving: false })
+    case 'timer_changed': {
+      const ends = str(p.ends_at)
+      const left = num(p.paused_left_s)
+      const endsAt = ends ? time(ends, e.created_at) : Number.POSITIVE_INFINITY
+      const pausedLeftMs = ends === null && left !== null ? left * 1000 : null
+      const id = str(p.id)
+      if (p.timer === 'effect') return updateEffect(state, id, (x) => ({ ...x, endsAt, pausedLeftMs }))
+      if (p.timer === 'followup') return updateEffect(state, id, (x) => ({ ...x, followupEndsAt: endsAt, pausedLeftMs }))
+      if (p.timer === 'veto_lock') {
+        return { ...state, vetoes: state.vetoes.map((v) => (v.instanceId === id ? { ...v, lockEndsAt: endsAt, pausedLeftMs } : v)) }
+      }
+      return state
     }
     default:
       return state
@@ -616,8 +699,9 @@ export const questionsBlockedBy = (s: CardsState): Effect[] =>
 /** The countdown an effect shows now: [ends at, total seconds], or null. */
 export function effectTimer(e: Effect, now: number): [number, number] | null {
   const phase = effectPhase(e, now)
-  if (phase === 'running' && e.endsAt !== null) return [e.endsAt, e.durationS ?? 0]
-  if (phase === 'followup' && e.followupEndsAt !== null) return [e.followupEndsAt, e.followupS ?? 0]
+  const shown = (end: number) => (e.pausedLeftMs !== null ? now + e.pausedLeftMs : end)
+  if (phase === 'running' && e.endsAt !== null) return [shown(e.endsAt), e.durationS ?? 0]
+  if (phase === 'followup' && e.followupEndsAt !== null) return [shown(e.followupEndsAt), e.followupS ?? 0]
   return null
 }
 
@@ -707,7 +791,7 @@ export function vetoLock(s: CardsState, now: number): Veto | null {
 
 /** When the seekers' chained veto locks end (server ms), or null when not locked. */
 export const lockedUntil = (s: CardsState, now: number) => {
-  const end = Math.max(0, ...s.vetoes.map((v) => v.lockEndsAt))
+  const end = Math.max(0, ...s.vetoes.map((v) => (v.pausedLeftMs !== null ? now + v.pausedLeftMs : v.lockEndsAt)))
   return end > now ? end : null
 }
 
@@ -739,7 +823,7 @@ export function cardUtility(c: CardDef): { kind: 'dice'; dice: number } | { kind
 
 /** Open drink proofs a team still owes (curse evidence is sent from the curse itself). */
 export const openProofs = (s: CardsState, team: 'hiders' | 'seekers') =>
-  s.proofs.filter((p) => p.kind === 'drink' && p.team === team && !p.path)
+  s.proofs.filter((p) => p.kind === 'drink' && p.team === team && !p.path && !p.resolution)
 
 /** The photo proof a curse's effect needs before the seekers can say they did it, or null. */
 export const evidenceFor = (s: CardsState, effectId: string): DrinkProof | null =>
