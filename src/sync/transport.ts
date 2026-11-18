@@ -42,8 +42,11 @@ export interface SyncTransport {
   call(fn: string, args: Record<string, unknown>): Promise<ActionResult>
 }
 
-/** Ephemeral broadcasts that are not in the event log. 'position': a seeker's GPS (both team topics). */
-export const SIGNAL_EVENTS = ['position'] as const
+/**
+ * Ephemeral broadcasts that are not in the event log. 'position': a seeker's GPS (both team
+ * topics). 'picking': the bar a hider is looking at in the picker (hiders' topic only).
+ */
+export const SIGNAL_EVENTS = ['position', 'picking'] as const
 
 export const gameTopic = (gameId: string) => `game:${gameId}`
 export const teamTopic = (gameId: string, team: Team) => `game:${gameId}:${team}`

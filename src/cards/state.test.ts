@@ -3,7 +3,10 @@ import type { GameEvent } from '../sync/types'
 import {
   banKey,
   bannedSet,
+  cardDetails,
   cardFacts,
+  evidenceFor,
+  parseCard,
   cardUtility,
   castBlocker,
   castChoice,
@@ -366,5 +369,43 @@ describe('powerups, bans, vetoes, utilities and drink proofs', () => {
     const done = deriveCards([s0, due, ev('drink_proved', { proof_id: 'p1', team: 'seekers', path: 'g/p1/x.jpg' })])
     expect(openProofs(done, 'seekers')).toEqual([])
     expect(done.log.at(-1)).toMatchObject({ kind: 'proof', photo: 'g/p1/x.jpg', photoBucket: 'drink-photos' })
+  })
+
+  it('curse evidence is sent from the curse, and a "not yet" reopens it', () => {
+    const played = ev('card_played', { round: 1, instance_id: 'i1', card: deck[0], effect_id: 'e1', blocks_questions: true })
+    const due = ev('proof_due', { proof_id: 'p2', team: 'seekers', label: 'CUISINE', effect_id: 'e1' })
+    const s = deriveCards([s0, played, due])
+    expect(openProofs(s, 'seekers')).toEqual([])
+    expect(evidenceFor(s, 'e1')).toMatchObject({ id: 'p2', kind: 'evidence', path: null })
+    const sent = [s0, played, due, ev('drink_proved', { proof_id: 'p2', team: 'seekers', path: 'g/p2/a.jpg' })]
+    expect(evidenceFor(deriveCards(sent), 'e1')?.path).toBe('g/p2/a.jpg')
+    expect(deriveCards(sent).log.at(-1)?.text).toBe('Seekers sent proof: CUISINE')
+    const asked = [...sent, ev('effect_clear_requested', { effect_id: 'e1' }), ev('effect_clear_rejected', { effect_id: 'e1' })]
+    expect(evidenceFor(deriveCards(asked), 'e1')?.path).toBeNull()
+  })
+})
+
+describe('keeping a draw', () => {
+  it('a card kept and discarded in the same keep never reaches the hand', () => {
+    const s = deriveCards([started, drawn, ev('cards_kept', { round: 1, draw_id: 'd1', kept: [], discarded: ['i1', 'i2'] }, 'hiders')])
+    expect(s.hand).toEqual([])
+    expect(s.draws).toEqual([])
+  })
+})
+
+describe('cardDetails', () => {
+  it('lists cast cost, veto status, drinks, proof and rules', () => {
+    const curse = parseCard(card('cuisine', 'until_cleared', { blocks_questions: true, proof: 'photo' }))!
+    const rows = Object.fromEntries(cardDetails(curse).map((r) => [r.label, r.value]))
+    expect(rows['Cast cost']).toBe('Drink, paid by the seekers')
+    expect(rows.Veto).toMatch(/can veto/)
+    expect(rows.Proof).toMatch(/before they can say they did it/)
+    expect(rows.Rules).toBe('Blocks questions')
+    const cheers = parseCard(card('cheers', 'text', { drinks: ['hiders', 'seekers'], proof: 'photo' }, { category: 'drink', cast_cost: null, can_veto: null }))!
+    const c = Object.fromEntries(cardDetails(cheers).map((r) => [r.label, r.value]))
+    expect(c['Cast cost']).toBe('Free')
+    expect(c.Veto).toBeUndefined()
+    expect(c.Drinks).toBe('Hiders and seekers drink when it\'s played')
+    expect(c.Proof).toBe('Photo of each drink')
   })
 })

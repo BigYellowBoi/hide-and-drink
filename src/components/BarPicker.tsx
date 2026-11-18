@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { supabase } from '../lib/supabase'
 import { describeError } from '../lobby/messages'
 import type { StartedRound } from '../lobby/state'
@@ -8,9 +8,11 @@ import type { Fix } from '../hiding/useGeolocation'
 import { loadCityPack, type CityPack } from '../map/cityPack'
 import { packWithVenues, type VenueEdits } from '../venues/state'
 import { formatDistance } from '../map/geo'
+import { useServerNow } from '../hiding/useServerNow'
 import type { GameSync } from '../sync/engine'
 import type { MapDot } from './GameMap'
 import { LazyGameMap } from './lazyMap'
+import { PrivateLabel } from './PrivateLabel'
 import { SlideToConfirm } from './SlideToConfirm'
 
 interface Props {
@@ -29,12 +31,64 @@ interface Props {
   seekers?: readonly MapDot[]
   /** The game's venue edits (lobby adds and hides, and bars added here). */
   venues: VenueEdits
+  /** This phone's user and the other hiders, for "[name] is picking…". */
+  userId?: string | null
+  hiderNames?: ReadonlyMap<string, string>
+  /** Picking a new bar after the Move powerup. */
+  moving?: boolean
+}
+
+/** A teammate's pick counts as live for this long after its last report (they re-send every PICK_HEARTBEAT_MS). */
+const PICK_TTL_MS = 45_000
+const PICK_HEARTBEAT_MS = 15_000
+const NO_NAMES: ReadonlyMap<string, string> = new Map()
+
+/**
+ * Hider teams: send this phone's selection to teammates (on change, then every 15 s while the
+ * picker is open; none on close) and return the teammates' live picks. Hiders' topic only.
+ */
+function useTeamPicks(sync: GameSync, round: number, selected: string | null, canAct: boolean, userId: string | null) {
+  const snap = useSyncExternalStore(sync.subscribe, sync.getSnapshot)
+  const now = useServerNow(sync, 5000)
+  const sel = useRef(selected)
+  useEffect(() => {
+    sel.current = selected
+    if (!canAct) return
+    const t = setTimeout(() => void sync.reportPicking(selected).catch(() => {}), 300)
+    return () => clearTimeout(t)
+  }, [sync, selected, canAct])
+  useEffect(() => {
+    if (!canAct) return
+    const t = setInterval(() => void sync.reportPicking(sel.current).catch(() => {}), PICK_HEARTBEAT_MS)
+    return () => clearInterval(t)
+  }, [sync, canAct])
+  // Closing the picker (locked in, or another tab) clears this phone's pick for the others.
+  useEffect(() => () => void sync.reportPicking(null).catch(() => {}), [sync])
+  return useMemo(
+    () => snap.picks.filter((p) => p.userId !== userId && p.round === round && now - p.at < PICK_TTL_MS),
+    [snap.picks, userId, round, now],
+  )
 }
 
 const NO_DOTS: readonly MapDot[] = []
 
 /** Hider: pick a bar from the valid ones (nearest first), preview its circle, slide to lock in. */
-export function BarPicker({ sync, city, started, zone, canAct, fix, onLongPress, timeNote, late, seekers = NO_DOTS, venues }: Props) {
+export function BarPicker({
+  sync,
+  city,
+  started,
+  zone,
+  canAct,
+  fix,
+  onLongPress,
+  timeNote,
+  late,
+  seekers = NO_DOTS,
+  venues,
+  userId = null,
+  hiderNames = NO_NAMES,
+  moving = false,
+}: Props) {
   const [basePack, setPack] = useState<CityPack | null>(null)
   const pack = useMemo(() => (basePack ? packWithVenues(basePack, venues) : null), [basePack, venues])
   /** "Not listed?" form: the pin (defaults to this phone's position) and the bar's name. */
@@ -67,6 +121,16 @@ export function BarPicker({ sync, city, started, zone, canAct, fix, onLongPress,
   const all = useMemo(() => (pack && validIds ? barOptions(pack, validIds, from) : []), [pack, validIds, from])
   const shown = useMemo(() => (pack && validIds ? barOptions(pack, validIds, from, search) : []), [pack, validIds, from, search])
   const chosen = all.find((b) => b.id === selected) ?? null
+  const teamPicks = useTeamPicks(sync, started.round, selected, canAct, userId)
+  const picking = useMemo(
+    () =>
+      teamPicks.map((p) => ({
+        ...p,
+        who: hiderNames.get(p.userId) ?? 'A teammate',
+        bar: p.venueId ? (all.find((b) => b.id === p.venueId) ?? null) : null,
+      })),
+    [teamPicks, hiderNames, all],
+  )
   const isAdding = adding !== null
   const dropped = adding?.pin ?? null
   const pin = useMemo<[number, number] | null>(
@@ -87,9 +151,12 @@ export function BarPicker({ sync, city, started, zone, canAct, fix, onLongPress,
         ...seekers,
         ...(fix ? [{ id: 'me', lng: fix.lng, lat: fix.lat, team: 'hiders' as const, me: true }] : []),
         ...(pin ? [{ id: 'pin', lng: pin[0], lat: pin[1], team: 'hiders' as const, name: 'New bar' }] : []),
+        ...picking.flatMap((p) =>
+          p.bar ? [{ id: `pick:${p.userId}`, lng: p.bar.lng, lat: p.bar.lat, team: 'hiders' as const, name: `${p.who}'s pick` }] : [],
+        ),
       ],
     }),
-    [all, selected, chosen, zone.barRadiusM, fix, seekers, pin],
+    [all, selected, chosen, zone.barRadiusM, fix, seekers, pin, picking],
   )
 
   const addBar = async () => {
@@ -131,15 +198,40 @@ export function BarPicker({ sync, city, started, zone, canAct, fix, onLongPress,
   return (
     <>
       <section className="card picker-head">
-        <p className="eyebrow">
-          <LockIcon /> Only you see this
-        </p>
-        <h2>Pick your bar</h2>
+        <PrivateLabel />
+        <h2>{moving ? 'Pick your new bar' : 'Pick your bar'}</h2>
         <p className={late ? 'picker-late' : 'muted'}>
           {late ? 'Hiding period is over. Lock in a bar now.' : timeNote}
           {' · '}
           Hide inside or within {formatDistance(zone.barRadiusM)} of it.
         </p>
+        {picking.length > 0 && (
+          <ul className="team-picks" aria-live="polite">
+            {picking.map((p) => (
+              <li key={p.userId}>
+                <span>
+                  <strong>{p.who} is picking…</strong>
+                  {p.bar ? (
+                    <>
+                      {' '}
+                      <span className="muted">{p.bar.name}</span>
+                    </>
+                  ) : p.name ? (
+                    <span className="muted"> {p.name}</span>
+                  ) : (
+                    <span className="muted"> nothing selected yet</span>
+                  )}
+                </span>
+                {p.bar && p.bar.id !== selected && (
+                  <button className="small secondary" onClick={() => setSelected(p.bar!.id)}>
+                    View
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {picking.length > 0 && <p className="muted small-note">First to lock in picks the bar for the team.</p>}
       </section>
 
       <section className="card map-card">
@@ -228,6 +320,14 @@ export function BarPicker({ sync, city, started, zone, canAct, fix, onLongPress,
                     <span className="bar-meta">
                       {b.kind?.replace(/_/g, ' ')}
                       {b.distanceM !== null && ` · ${formatDistance(b.distanceM)}`}
+                      {picking
+                        .filter((p) => p.venueId === b.id)
+                        .map((p) => (
+                          <span key={p.userId} className="pick-tag">
+                            {' '}
+                            · {p.who}'s pick
+                          </span>
+                        ))}
                     </span>
                   </button>
                 </li>
@@ -247,14 +347,5 @@ export function BarPicker({ sync, city, started, zone, canAct, fix, onLongPress,
         />
       </div>
     </>
-  )
-}
-
-export function LockIcon() {
-  return (
-    <svg className="lock-icon" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
-      <rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor" />
-      <path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" strokeWidth="2.2" />
-    </svg>
   )
 }

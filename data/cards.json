@@ -192,7 +192,8 @@
         "drinks": [
           "hiders",
           "seekers"
-        ]
+        ],
+        "proof": "photo"
       },
       "active": true
     },
@@ -219,7 +220,8 @@
       "copies": 1,
       "text": "Find a restaurant within your zone that serves food from a specific foreign country. The seekers must visit a restaurant serving food from a country that is a greater distance away before asking their next question.",
       "params": {
-        "blocks_questions": true
+        "blocks_questions": true,
+        "proof": "photo"
       },
       "active": true,
       "cast_cost": "free",
@@ -280,7 +282,8 @@
       "copies": 1,
       "text": "The seekers must ask their next question from under a bridge.",
       "params": {
-        "blocks_questions": true
+        "blocks_questions": true,
+        "proof": "photo"
       },
       "active": true,
       "cast_cost": "drink",
@@ -399,7 +402,8 @@
       "copies": 1,
       "text": "Seekers cannot ask any more questions until successfully winning the pokies.",
       "params": {
-        "blocks_questions": true
+        "blocks_questions": true,
+        "proof": "photo"
       },
       "active": true,
       "cast_cost": "drink",
@@ -414,7 +418,8 @@
       "text": "Seekers can't use any transport until beating the hiders at Clash Royale.",
       "params": {
         "blocks_questions": false,
-        "blocks": "transport"
+        "blocks": "transport",
+        "proof": "photo"
       },
       "active": true,
       "cast_cost": "drink",
@@ -429,7 +434,8 @@
       "text": "Hiders get one chance to chug a schooner / pint and time it. Seekers can't use transport until they are able to chug a schooner / pint quicker.",
       "params": {
         "blocks_questions": false,
-        "blocks": "transport"
+        "blocks": "transport",
+        "proof": "video"
       },
       "active": true,
       "cast_cost": "drink",
@@ -476,7 +482,8 @@
       "params": {
         "blocks_questions": true,
         "utility": "dice",
-        "dice": 1
+        "dice": 1,
+        "proof": "photo"
       },
       "active": true,
       "cast_cost": "shot",
@@ -490,7 +497,8 @@
       "copies": 1,
       "text": "Seekers must lose a game of pool before asking their next question.",
       "params": {
-        "blocks_questions": true
+        "blocks_questions": true,
+        "proof": "photo"
       },
       "active": true,
       "cast_cost": "shot",
@@ -519,7 +527,8 @@
       "copies": 1,
       "text": "Seekers must ask their next question from inside a Chinese restaurant, or from Chinatown in the Valley.",
       "params": {
-        "blocks_questions": true
+        "blocks_questions": true,
+        "proof": "photo"
       },
       "active": true,
       "cast_cost": "drink",
@@ -533,7 +542,8 @@
       "copies": 1,
       "text": "Seekers must ask their next question from inside a KFC, or after eating something watermelon flavoured.",
       "params": {
-        "blocks_questions": true
+        "blocks_questions": true,
+        "proof": "photo"
       },
       "active": true,
       "cast_cost": "shot",

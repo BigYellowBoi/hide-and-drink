@@ -18,7 +18,7 @@ import { loadQuestionTypes, optionLabel, type QuestionType } from '../play/quest
 import { isSupportedType, typeName } from '../play/state'
 import { describeError } from '../lobby/messages'
 import type { GameSync } from '../sync/engine'
-import { LockIcon } from './BarPicker'
+import { PrivateLabel } from './PrivateLabel'
 import { CardFace } from './CardFace'
 import { SlideToConfirm } from './SlideToConfirm'
 
@@ -93,9 +93,7 @@ function Hand({ sync, cards, canAct, ctx }: Props & { ctx: CastContext }) {
 
   return (
     <section className="card">
-      <p className="eyebrow">
-        <LockIcon /> Only you see this
-      </p>
+      <PrivateLabel />
       <h2>
         Hand{' '}
         <span className="muted small">
@@ -159,23 +157,36 @@ function Hand({ sync, cards, canAct, ctx }: Props & { ctx: CastContext }) {
             <p className="muted small">This kind of card isn't in the app yet. Play it by hand for now.</p>
           )}
           {err && <p className="bad">{err}</p>}
-          {hand.length > 1 && (
-            <div className="hand-strip" role="list">
-              {hand.map((c) => (
-                <div role="listitem" key={c.instanceId}>
-                  <CardFace
-                    card={cardOf(cards, c.cardId)}
-                    size="small"
-                    selected={c.instanceId === current.instanceId}
-                    onClick={() => select(c.instanceId)}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
         </>
       )}
+      {hand.length > 0 && (
+        <HandGrid cards={cards} selected={current?.instanceId ?? null} onSelect={select} />
+      )}
     </section>
+  )
+}
+
+/** Columns for a hand of this size: one row up to 4, then two rows (6 cards: 3 × 2). */
+const handColumns = (slots: number) => (slots <= 4 ? Math.max(1, slots) : Math.min(5, Math.ceil(slots / 2)))
+
+/** The hand as a grid with one slot per card the hand can hold, so it all fits on screen. */
+function HandGrid({ cards, selected, onSelect }: { cards: CardsState; selected: string | null; onSelect: (id: string) => void }) {
+  const slots = Math.max(cards.handLimit, cards.hand.length)
+  return (
+    <div className="hand-grid" role="list" aria-label="Your hand" style={{ ['--cols' as string]: handColumns(slots) }}>
+      {Array.from({ length: slots }, (_, i) => {
+        const c = cards.hand[i]
+        return (
+          <div role="listitem" key={c?.instanceId ?? `empty-${i}`} className="hand-slot">
+            {c ? (
+              <CardFace card={cardOf(cards, c.cardId)} size="small" selected={c.instanceId === selected} onClick={() => onSelect(c.instanceId)} />
+            ) : (
+              <span className="hand-slot-empty">Empty</span>
+            )}
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
@@ -286,6 +297,12 @@ function DrawChooser({ sync, cards, draw, canAct }: Props & { draw: PendingDraw 
   const [err, setErr] = useState<string | null>(null)
   const overflow = Math.max(0, cards.hand.length + draw.pick - cards.handLimit)
   const ready = keep.length === draw.pick && discard.length === overflow
+  // To make room the hider can throw away a card from the hand or one just kept from this draw.
+  const kept = draw.cards.filter((c) => keep.includes(c.instanceId))
+  const setKept = (next: string[]) => {
+    setKeep(next)
+    setDiscard((d) => d.filter((id) => next.includes(id) || cards.hand.some((h) => h.instanceId === id)))
+  }
 
   const send = async () => {
     setBusy(true)
@@ -300,9 +317,7 @@ function DrawChooser({ sync, cards, draw, canAct }: Props & { draw: PendingDraw 
 
   return (
     <section className="card draw-card" aria-live="polite">
-      <p className="eyebrow">
-        <LockIcon /> Only you see this
-      </p>
+      <PrivateLabel />
       <h2>
         Keep {draw.pick} of {draw.cards.length}
       </h2>
@@ -313,21 +328,23 @@ function DrawChooser({ sync, cards, draw, canAct }: Props & { draw: PendingDraw 
             card={cardOf(cards, c.cardId)}
             size="small"
             selected={keep.includes(c.instanceId)}
-            onClick={() => setKeep((k) => toggle(k, c.instanceId, draw.pick))}
+            onClick={() => setKept(toggle(keep, c.instanceId, draw.pick))}
           />
         ))}
       </div>
       {overflow > 0 && (
         <>
           <p className="flag">
-            Hand limit is {cards.handLimit}. Pick {overflow} card{overflow > 1 ? 's' : ''} from your hand to discard.
+            Hand limit is {cards.handLimit}. Pick {overflow} card{overflow > 1 ? 's' : ''} to discard: from your hand, or the new
+            card{draw.pick > 1 ? 's' : ''} you keep.
           </p>
           <div className="draw-grid">
-            {cards.hand.map((c) => (
+            {[...kept, ...cards.hand].map((c) => (
               <CardFace
                 key={c.instanceId}
                 card={cardOf(cards, c.cardId)}
                 size="small"
+                tag={kept.includes(c) ? 'New' : undefined}
                 selected={discard.includes(c.instanceId)}
                 onClick={() => setDiscard((d) => toggle(d, c.instanceId, overflow))}
               />
@@ -336,7 +353,13 @@ function DrawChooser({ sync, cards, draw, canAct }: Props & { draw: PendingDraw 
         </>
       )}
       <button className="wide" disabled={!ready || busy || !canAct} onClick={() => void send()}>
-        {busy ? 'Keeping…' : ready ? `Keep ${draw.pick === 1 ? 'this card' : 'these cards'}` : `Pick ${draw.pick - keep.length} more`}
+        {busy
+          ? 'Keeping…'
+          : ready
+            ? `Keep ${draw.pick === 1 ? 'this card' : 'these cards'}`
+            : keep.length < draw.pick
+              ? `Pick ${draw.pick - keep.length} more`
+              : `Pick ${overflow - discard.length} to discard`}
       </button>
       <p className="muted small">The rest go to the discard pile.</p>
       {err && <p className="bad">{err}</p>}

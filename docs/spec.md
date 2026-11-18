@@ -74,7 +74,7 @@ Behaviours (the only card logic in code):
 
 Seed deck: `data/cards.json` (81 cards: 12 powerups, 42 time bonuses, 5 drink cards, 22 curses). Curse values are the small-game values, the left-most of the `[small, medium, large]` options on the cards. Cards with `copies: 0` (Nathan, Brothel) are in the library but not the default deck.
 
-Utilities: `params.utility` = `dice` (with `params.dice` count) or `wheel` (`params.wheel_options` to spin in the app, else `params.wheel_url` opens). Proof: `params.proof` = `photo` or `video`. Drinks: `params.drinks` lists the teams that drink when the card is played (photo proof each); `params.cost` is a cost for cards with no `cast_cost`.
+Utilities: `params.utility` = `dice` (with `params.dice` count) or `wheel` (`params.wheel_options` to spin in the app, else `params.wheel_url` opens). Proof: `params.proof` = `photo` or `video`. With `photo`, a curse the seekers clear (until_cleared, or timed with a follow-on) needs a photo before they can say they did it (the hider sees it when confirming; "not yet" asks for a new one), and the card's `params.drinks` need a photo each. `video` is shown in person. Drinks: `params.drinks` lists the teams that drink when the card is played; `params.cost` is a cost for cards with no `cast_cost`.
 
 ## 6. Questions
 

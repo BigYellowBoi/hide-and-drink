@@ -20,6 +20,7 @@ import {
 import { describeError } from '../lobby/messages'
 import type { SyncTransport } from '../sync/transport'
 import { CardEditor } from './CardEditor'
+import { CardInfoButton } from './CardFace'
 import { Stepper } from './Stepper'
 
 const RETIRED = '__retired'
@@ -208,7 +209,8 @@ export function CardLibrary({ transport, library, loadError, canAct, onClose, de
           <ul className="lib-list">
             {list.map((c) => {
               const n = isDeck ? copiesIn(shownDeck, c) : c.copies
-              const facts = cardFacts(toCardDef(c, library.categories))
+              const def = toCardDef(c, library.categories)
+              const facts = cardFacts(def)
               return (
                 <li key={c.id} className={`lib-row${n === 0 || !c.active ? ' lib-off' : ''}`}>
                   <button className="lib-main" onClick={() => setEditing(c)} aria-label={`Edit ${c.name}`}>
@@ -224,6 +226,7 @@ export function CardLibrary({ transport, library, loadError, canAct, onClose, de
                         .join(' · ')}
                     </span>
                   </button>
+                  <CardInfoButton card={def} />
                   {isDeck &&
                     (deckBuilder.editable ? (
                       <Stepper

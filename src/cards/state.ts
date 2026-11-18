@@ -89,14 +89,20 @@ export interface Roll {
   by: string | null
 }
 
-/** A drink the app asked to see a photo of. Open until the drinking team sends one. */
+/**
+ * A photo the app asked for. Open until the team sends one. kind 'drink': a drink (cast cost,
+ * a card's params.drinks, veto, missed deadline). kind 'evidence': a curse's params.proof
+ * photo, sent before the seekers can say they did it (effectId).
+ */
 export interface DrinkProof {
   id: string
   seq: number
   team: 'hiders' | 'seekers'
+  kind: 'drink' | 'evidence'
   cost: 'drink' | 'shot'
   label: string
   path: string | null
+  effectId: string | null
 }
 
 export interface CardsState {
@@ -342,9 +348,26 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
       const id = str(p.proof_id)
       const team = p.team === 'hiders' || p.team === 'seekers' ? p.team : null
       if (!id || !team) return state
-      const proof: DrinkProof = { id, seq: e.seq, team, cost: p.cost === 'shot' ? 'shot' : 'drink', label: str(p.label) ?? 'Drink', path: null }
+      const proof: DrinkProof = {
+        id,
+        seq: e.seq,
+        team,
+        kind: 'drink',
+        cost: p.cost === 'shot' ? 'shot' : 'drink',
+        label: str(p.label) ?? 'Drink',
+        path: null,
+        effectId: null,
+      }
       const who = team === 'hiders' ? 'Hiders' : 'Seekers'
       return log({ kind: 'penalty', text: `${who}: ${proof.cost} (${proof.label}). Photo proof needed` }, { ...state, proofs: [...state.proofs, proof] })
+    }
+    case 'proof_due': {
+      const id = str(p.proof_id)
+      const effectId = str(p.effect_id)
+      if (!id || !effectId) return state
+      const team = p.team === 'hiders' ? 'hiders' : 'seekers'
+      const proof: DrinkProof = { id, seq: e.seq, team, kind: 'evidence', cost: 'drink', label: str(p.label) ?? 'Curse', path: null, effectId }
+      return { ...state, proofs: [...state.proofs, proof] }
     }
     case 'drink_proved': {
       const id = str(p.proof_id)
@@ -353,7 +376,8 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
       if (!id || !path) return state
       const next = { ...state, proofs: state.proofs.map((x) => (x.id === id ? { ...x, path } : x)) }
       const who = p.team === 'hiders' ? 'Hiders' : 'Seekers'
-      return log({ kind: 'proof', text: `${who} drank: ${proof?.label ?? 'drink'}`, photo: path, photoBucket: DRINK_BUCKET }, next)
+      const text = proof?.kind === 'evidence' ? `${who} sent proof: ${proof.label}` : `${who} drank: ${proof?.label ?? 'drink'}`
+      return log({ kind: 'proof', text, photo: path, photoBucket: DRINK_BUCKET }, next)
     }
     case 'effect_clear_requested': {
       const id = str(p.effect_id)
@@ -363,7 +387,12 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
     }
     case 'effect_clear_rejected': {
       const id = str(p.effect_id)
-      const next = updateEffect(state, id, (x) => ({ ...x, status: 'active' }))
+      // The server reopens the curse's photo proof: the next try needs a new photo.
+      const next = updateEffect(
+        { ...state, proofs: state.proofs.map((x) => (x.effectId !== null && x.effectId === id ? { ...x, path: null } : x)) },
+        id,
+        (x) => ({ ...x, status: 'active' }),
+      )
       const name = next.effects.find((x) => x.id === id)?.card.name ?? 'Curse'
       return log({ kind: 'penalty', text: `Hider says ${name} is not done yet` }, next)
     }
@@ -560,8 +589,13 @@ export function cardUtility(c: CardDef): { kind: 'dice'; dice: number } | { kind
   return null
 }
 
-/** Open drink proofs a team still owes. */
-export const openProofs = (s: CardsState, team: 'hiders' | 'seekers') => s.proofs.filter((p) => p.team === team && !p.path)
+/** Open drink proofs a team still owes (curse evidence is sent from the curse itself). */
+export const openProofs = (s: CardsState, team: 'hiders' | 'seekers') =>
+  s.proofs.filter((p) => p.kind === 'drink' && p.team === team && !p.path)
+
+/** The photo proof a curse's effect needs before the seekers can say they did it, or null. */
+export const evidenceFor = (s: CardsState, effectId: string): DrinkProof | null =>
+  s.proofs.find((p) => p.kind === 'evidence' && p.effectId === effectId) ?? null
 
 /**
  * Time bonus the hider would get if the round ended now: time_bonus cards count only while
@@ -591,7 +625,8 @@ export function cardFacts(c: CardDef): string[] {
   const u = cardUtility(c)
   if (u?.kind === 'dice') out.push(`Roll ${u.dice} ${u.dice > 1 ? 'dice' : 'die'}`)
   if (u?.kind === 'wheel') out.push('Spin the wheel')
-  if (c.params.proof === 'photo' || c.params.proof === 'video') out.push(`${c.params.proof === 'photo' ? 'Photo' : 'Video'} proof`)
+  const proof = proofKind(c)
+  if (proof) out.push(`${proof === 'photo' ? 'Photo' : 'Video'} proof`)
   if (c.canVeto === false && c.category === 'curse') out.push("Can't veto")
   return out
 }
@@ -612,4 +647,59 @@ export function costPayer(c: CardDef): 'hiders' | 'seekers' {
   const t = c.params.cost_team
   if (t === 'hiders' || t === 'seekers') return t
   return c.category === 'curse' ? 'seekers' : 'hiders'
+}
+
+/** params.proof: 'photo' (the app collects it) or 'video' (shown in person). */
+export function proofKind(c: CardDef): 'photo' | 'video' | null {
+  return c.params.proof === 'photo' || c.params.proof === 'video' ? c.params.proof : null
+}
+
+const BEHAVIOUR_LABEL: Record<string, string> = {
+  text: 'Shown to everyone',
+  timed: 'Timed',
+  until_cleared: 'Until the seekers do it',
+  time_bonus: 'Time bonus',
+  next_question_modifier: 'Changes the next reward',
+  question_ban: 'Bans questions',
+  powerup: 'Powerup',
+}
+
+const teamName = (t: 'hiders' | 'seekers') => (t === 'hiders' ? 'hiders' : 'seekers')
+const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
+
+/** Everything the card info sheet shows besides the name and text: label/value rows. */
+export function cardDetails(c: CardDef): { label: string; value: string }[] {
+  const rows: { label: string; value: string }[] = []
+  rows.push({ label: 'Type', value: `${c.categoryName || 'Card'} · ${BEHAVIOUR_LABEL[c.behaviour] ?? c.behaviour}` })
+  const cost = castCost(c)
+  rows.push({
+    label: 'Cast cost',
+    value: cost ? `${COST_LABEL[cost]}, paid by the ${teamName(costPayer(c))}` : 'Free',
+  })
+  if (c.canVeto !== null || c.category === 'curse') {
+    rows.push({
+      label: 'Veto',
+      value: c.canVeto === true ? 'Seekers can veto it (bar lock and a drink)' : "Can't be vetoed",
+    })
+  }
+  const drinks = strings(c.params.drinks).filter((t): t is 'hiders' | 'seekers' => t === 'hiders' || t === 'seekers')
+  if (drinks.length) rows.push({ label: 'Drinks', value: `${cap(drinks.map(teamName).join(' and '))} drink when it's played` })
+  const proof = proofKind(c)
+  if (proof === 'photo') {
+    rows.push({
+      label: 'Proof',
+      value:
+        c.behaviour === 'until_cleared' || (c.behaviour === 'timed' && num(c.params.followup_s))
+          ? 'Photo: the seekers send one before they can say they did it'
+          : drinks.length
+            ? 'Photo of each drink'
+            : 'Photo',
+    })
+  } else if (proof === 'video') {
+    rows.push({ label: 'Proof', value: 'Video: show it to the other team' })
+  }
+  const facts = cardFacts(c).filter((f) => !/ proof$/.test(f) && f !== "Can't veto")
+  if (facts.length) rows.push({ label: 'Rules', value: facts.join(' · ') })
+  if (c.behaviour === 'until_cleared' && typeof c.params.blocks === 'string') rows.push({ label: 'Blocks', value: cap(c.params.blocks) })
+  return rows
 }

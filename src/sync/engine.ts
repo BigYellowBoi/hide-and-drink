@@ -2,7 +2,7 @@ import { ActionError, callWithRetry } from './actions'
 import { ServerClock } from './clock'
 import { EventSequencer } from './sequencer'
 import { gameTopic, teamTopic, type ActionResult, type ChannelState, type SyncTransport } from './transport'
-import { audienceFor, isGameEvent, parsePosition, type GameEvent, type SeekerPosition, type Team } from './types'
+import { audienceFor, isGameEvent, parsePick, parsePosition, type GameEvent, type HiderPick, type SeekerPosition, type Team } from './types'
 
 /**
  * connecting: joining topics. syncing: fetching missed events. live: up to date.
@@ -26,6 +26,8 @@ export interface SyncSnapshot {
   staleSince: number | null
   /** Latest position per seeker, for both teams (ephemeral, never in the event log). */
   positions: readonly SeekerPosition[]
+  /** Hiders only: what each teammate has selected in the bar picker (ephemeral). */
+  picks: readonly HiderPick[]
 }
 
 export { ActionError }
@@ -81,6 +83,7 @@ export class GameSync {
   private error: string | null = null
   private present: readonly string[] = []
   private positions = new Map<string, SeekerPosition>()
+  private picks = new Map<string, HiderPick>()
   private staleSince: number | null = null
   private wasLive = false
 
@@ -260,6 +263,14 @@ export class GameSync {
     })
   }
 
+  /** Hiders: tell teammates which bar this phone has selected in the picker (null: none). Not an action. */
+  async reportPicking(venueId: string | null): Promise<ActionResult> {
+    if (!this.snapshot.canAct || this.team !== 'hiders') {
+      return { ok: false, code: 'not_live', message: 'Not connected.', retryable: false }
+    }
+    return this.transport.call('report_picking', { p_game_id: this.gameId, p_venue_id: venueId })
+  }
+
   /**
    * Fetch every event after the last applied one. Single-flight: a request made while a
    * fetch is running triggers one more pass. quiet: a background check that doesn't
@@ -318,6 +329,7 @@ export class GameSync {
         // Visibility changed: start over with the new team's view of the log.
         this.team = member.team
         this.positions.clear()
+        this.picks.clear()
         this.sequencer.reset(audienceFor(this.team))
         this.rebuilding = []
         this.stale = true
@@ -360,7 +372,15 @@ export class GameSync {
   }
 
   private onSignal(event: string, raw: unknown): void {
-    if (this.stopped || event !== 'position' || !this.team) return
+    if (this.stopped || !this.team || (raw as { game_id?: unknown } | null)?.game_id !== this.gameId) return
+    if (event === 'picking') {
+      const pick = this.team === 'hiders' ? parsePick(raw) : null
+      const cur = pick ? this.picks.get(pick.userId) : undefined
+      if (!pick || (cur && (cur.round > pick.round || (cur.round === pick.round && cur.at >= pick.at)))) return
+      this.picks.set(pick.userId, pick)
+      return this.emit()
+    }
+    if (event !== 'position') return
     const p = parsePosition(raw)
     if (!p || (raw as { game_id?: unknown }).game_id !== this.gameId) return
     if (this.mergePosition(p)) this.emit()
@@ -400,7 +420,7 @@ export class GameSync {
           this.settle()
         },
         presence,
-        // Seeker positions arrive on both team topics.
+        // Seeker positions arrive on both team topics, hider picks on the hiders' topic.
         topic !== gameTopic(this.gameId) ? (event, raw) => this.onSignal(event, raw) : undefined,
       )
     }
@@ -521,6 +541,7 @@ export class GameSync {
       present: this.present,
       staleSince: this.staleSince,
       positions: [...this.positions.values()],
+      picks: [...this.picks.values()],
     }
   }
 }
