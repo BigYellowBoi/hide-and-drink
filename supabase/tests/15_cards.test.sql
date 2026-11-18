@@ -73,19 +73,20 @@ select public.set_play_area(pg_temp.gid(), current_setting('test.area_id')::uuid
 
 -- ---------------------------------------------------------------- deck snapshot
 
+-- A deck set at create time may name cards that don't exist (or were retired since): start
+-- drops them. set_deck refuses them outright.
 select throws_ok(
-  $$ select public.start_game(pg_temp.gid(), pg_temp.uid(8), pg_temp.seq()) $$,
-  'P0001', 'invalid_deck', 'unknown cards in config.deck are refused'
+  $$ select public.set_deck(pg_temp.gid(), '{"cheers":1,"nope":2}'::jsonb, pg_temp.uid(8)) $$,
+  'P0001', 'invalid_deck', 'unknown cards in a deck are refused'
 );
-select public.update_config(pg_temp.gid(),
-  '{"hiding_period_s":1800,"hand_limit":3,"deck":{"cheers":0}}'::jsonb, pg_temp.uid(9), pg_temp.seq());
+select public.set_deck(pg_temp.gid(), '{"cheers":0}'::jsonb, pg_temp.uid(9));
 select throws_ok(
   $$ select public.start_game(pg_temp.gid(), pg_temp.uid(10), pg_temp.seq()) $$,
   'P0001', 'deck_empty', 'a deck with no cards is refused'
 );
-select public.update_config(pg_temp.gid(), '{"hiding_period_s":1800,"hand_limit":3,"deck":{
-  "cheers":1,"right_turn":1,"escape":1,"distant_cuisine":1,"clash":1,"bonus_red":4,"veto":1,"nathan":0}}'::jsonb,
-  pg_temp.uid(11), pg_temp.seq());
+select public.set_deck(pg_temp.gid(), '{
+  "cheers":1,"right_turn":1,"escape":1,"distant_cuisine":1,"clash":1,"bonus_red":4,"veto":1,"nathan":0}'::jsonb,
+  pg_temp.uid(11));
 select lives_ok($$ select public.start_game(pg_temp.gid(), pg_temp.uid(12), pg_temp.seq()) $$, 'game starts');
 
 select is(

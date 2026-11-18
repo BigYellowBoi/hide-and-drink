@@ -13,6 +13,10 @@ import { SlideToConfirm } from './SlideToConfirm'
 import { LazyGameMap, LazyPlayAreaEditor } from './lazyMap'
 import type { PlayAreaDraft } from './PlayAreaEditor'
 import { areaKm2, formatKm2 } from '../map/playArea'
+import type { SyncTransport } from '../sync/transport'
+import { useLibrary } from '../library/useLibrary'
+import { deckTotals, matchesPreset, parseDeck } from '../library/library'
+import { CardLibrary } from './CardLibrary'
 
 const TEAMS: { id: Team; label: string }[] = [
   { id: 'hiders', label: 'Hiders' },
@@ -22,13 +26,14 @@ const other = (t: Team): Team => (t === 'hiders' ? 'seekers' : 'hiders')
 
 interface Props {
   sync: GameSync
+  transport: SyncTransport
   lobby: LobbyState
   userId: string | null
   canAct: boolean
   presence: (userId: string) => Presence
 }
 
-export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
+export function Lobby({ sync, transport, lobby, userId, canAct, presence }: Props) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [areas, setAreas] = useState<PlayAreaSummary[] | null>(null)
@@ -36,6 +41,8 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
   const [editing, setEditing] = useState<'new' | 'current' | null>(null)
   /** Player whose remove button has been tapped once (tap again to confirm). */
   const [removing, setRemoving] = useState<string | null>(null)
+  const [deckOpen, setDeckOpen] = useState(false)
+  const { library, error: libraryError } = useLibrary(transport)
 
   const isHost = userId !== null && userId === lobby.hostId
   const me = lobby.players.find((p) => p.userId === userId)
@@ -270,6 +277,28 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
         </Suspense>
       )}
 
+      <DeckSummary
+        library={library}
+        deck={parseDeck(lobby.config.deck)}
+        isHost={isHost}
+        onOpen={() => setDeckOpen(true)}
+      />
+
+      {deckOpen && (
+        <CardLibrary
+          transport={transport}
+          library={library}
+          loadError={libraryError}
+          canAct={canAct}
+          onClose={() => setDeckOpen(false)}
+          deckBuilder={{
+            deck: parseDeck(lobby.config.deck),
+            editable: isHost,
+            onSave: (deck) => sync.action('set_deck', { p_deck: deck }, { fresh: false }),
+          }}
+        />
+      )}
+
       <details className="card">
         <summary>
           <h2>Game settings</h2>
@@ -312,5 +341,50 @@ export function Lobby({ sync, lobby, userId, canAct, presence }: Props) {
         </p>
       )}
     </>
+  )
+}
+
+function DeckSummary({
+  library,
+  deck,
+  isHost,
+  onOpen,
+}: {
+  library: ReturnType<typeof useLibrary>['library']
+  deck: ReturnType<typeof parseDeck>
+  isHost: boolean
+  onOpen: () => void
+}) {
+  const totals = library ? deckTotals(deck, library.cards) : null
+  const preset = library?.presets.find((p) => matchesPreset(deck, p, library.cards))
+  return (
+    <section className="card">
+      <h2>Deck</h2>
+      {!library || !totals ? (
+        <p className="muted">Loading…</p>
+      ) : (
+        <>
+          <p className="deck-total">
+            {totals.total} cards{preset ? <span className="muted"> · {preset.name}</span> : null}
+          </p>
+          <ul className="deck-cats">
+            {library.categories
+              .filter((c) => c.active)
+              .map((c) => (
+                <li key={c.id} style={{ ['--cat' as string]: c.colour }}>
+                  <span className="cat-swatch" />
+                  {c.name} <span className="muted">{totals.byCategory[c.id] ?? 0}</span>
+                </li>
+              ))}
+          </ul>
+          {totals.total === 0 && <p className="bad small-note">{describeCode('deck_empty')}</p>}
+        </>
+      )}
+      <div className="row">
+        <button className="small secondary" onClick={onOpen}>
+          {isHost ? 'Build deck' : 'See deck'}
+        </button>
+      </div>
+    </section>
   )
 }

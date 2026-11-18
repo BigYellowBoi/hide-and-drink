@@ -2227,3 +2227,297 @@ button.pcard {
   user-select: none;
   -webkit-user-select: none;
 }
+
+/* ------------------------------------------------------------------ card library + deck builder */
+
+/* Full-screen page over the app (deck builder, card library, card editor). */
+.sheet-page {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.sheet-page .sheet-page {
+  z-index: 61;
+}
+
+.sheet-page-body {
+  flex: 1 1 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 16px calc(24px + env(safe-area-inset-bottom, 0px));
+}
+
+textarea {
+  font: inherit;
+  color: inherit;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--r-input);
+  border: 2px solid var(--line);
+  background: var(--bg);
+  resize: vertical;
+}
+
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--text);
+}
+
+textarea.mono {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 13px;
+}
+
+.segmented-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+fieldset.field {
+  border: 0;
+  padding: 0;
+  margin-inline: 0;
+}
+
+.param-teams .row {
+  margin-top: 0;
+}
+
+.card-preview {
+  max-width: 280px;
+  margin: 8px auto 0;
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.stepper button {
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.stepper-count {
+  min-width: 32px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cat-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: 16px -16px 0;
+  padding: 0 16px 4px;
+}
+
+button.cat-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 6px 14px;
+  background: transparent;
+  color: var(--text);
+  border-color: var(--line);
+  white-space: nowrap;
+}
+
+button.cat-tab.on {
+  background: var(--surface-2);
+  border-color: var(--cat, var(--text));
+}
+
+.cat-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--cat, var(--text-muted));
+  flex: 0 0 auto;
+}
+
+.cat-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.cat-actions {
+  margin-top: 12px;
+}
+
+.cat-form h3 {
+  margin-top: 0;
+}
+
+.cat-form-row {
+  display: grid;
+  grid-template-columns: 1fr 88px;
+  gap: 12px;
+}
+
+.cat-form-row .field {
+  margin-top: 0;
+}
+
+.cat-colour input {
+  padding: 4px;
+  height: 48px;
+}
+
+.lib-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.lib-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.lib-row.lib-off .lib-main,
+.lib-row.lib-off .stepper-count {
+  opacity: 0.45;
+}
+
+button.lib-main,
+.lib-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 48px;
+  padding: 4px 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--text);
+  font-weight: 400;
+  text-align: left;
+}
+
+.lib-name {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.lib-meta {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.presets h3 {
+  margin-top: 8px;
+}
+
+.preset-chip {
+  display: inline-flex;
+  align-items: stretch;
+  border: 2px solid var(--line);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+
+.preset-chip.on {
+  border-color: var(--ok);
+}
+
+.preset-chip button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.preset-chip.on .preset-apply {
+  background: var(--surface-2);
+}
+
+button.preset-delete {
+  padding: 4px 12px;
+  border-left: 1px solid var(--line);
+  color: var(--text-muted);
+}
+
+button.preset-delete.danger {
+  background: var(--seeker);
+  color: var(--seeker-ink);
+}
+
+.preset-save {
+  margin-top: 8px !important;
+}
+
+.preset-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.preset-form input {
+  min-height: 40px;
+  padding: 6px 12px;
+}
+
+.deck-total {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.deck-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  font-size: 15px;
+}
+
+.deck-cats li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sheet-page .editor-bar {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.sheet-page .editor-bar > :first-child {
+  justify-self: start;
+}
+
+.sheet-page .editor-bar > :last-child {
+  justify-self: end;
+}

@@ -11,6 +11,11 @@ describe('config fields', () => {
     expect(paths.some((p) => p.endsWith('todo') || p === 'schema_version')).toBe(false)
   })
 
+  it('leaves config.deck to the deck builder', () => {
+    const paths = configGroups({ hand_limit: 6, deck: { veto: 2 } }).flatMap((g) => g.fields.map((f) => f.path.join('.')))
+    expect(paths).toEqual(['hand_limit'])
+  })
+
   it('infers kinds and units from values and key suffixes', () => {
     const fields = configGroups({ a_s: 300, b_m: null, c: true, d: ['x'], e: null, f: 'text' }).flatMap((g) => g.fields)
     expect(fields.map((f) => [f.kind, f.unit])).toEqual([
