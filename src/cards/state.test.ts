@@ -7,6 +7,8 @@ import {
   cardUtility,
   castBlocker,
   castChoice,
+  castCost,
+  costPayer,
   deriveCards,
   lockedUntil,
   nextVetoLockS,
@@ -190,6 +192,20 @@ describe('cardFacts', () => {
     expect(cardFacts(s.deck.escape)).toEqual(['3 min, then 10 min if missed', "Can't veto"])
     expect(cardFacts(s.deck.cuisine)).toEqual(['Blocks questions'])
     expect(cardFacts(s.deck.bonus)).toEqual(['+4 min'])
+  })
+})
+
+describe('cast costs', () => {
+  it('a curse costs the seekers, anything else the hider, unless params.cost_team says', () => {
+    const s = deriveCards([started])
+    const curse = { ...s.deck.escape, castCost: 'drink' as const }
+    expect(castCost(curse)).toBe('drink')
+    expect(costPayer(curse)).toBe('seekers')
+    const dbl = { ...s.deck.cuisine, category: 'drink', castCost: null, params: { cost: 'shot' } }
+    expect(castCost(dbl)).toBe('shot')
+    expect(costPayer(dbl)).toBe('hiders')
+    expect(costPayer({ ...curse, params: { cost_team: 'hiders' } })).toBe('hiders')
+    expect(castCost({ ...curse, castCost: 'free' })).toBeNull()
   })
 })
 

@@ -584,3 +584,19 @@ export function cardFacts(c: CardDef): string[] {
 }
 
 export const COST_LABEL: Record<string, string> = { free: 'Free', drink: 'Drink', shot: 'Shot' }
+
+/** Cast cost: the printed one, or params.cost (e.g. the shot for Double Rewards). null: free. */
+export function castCost(c: CardDef): 'drink' | 'shot' | null {
+  const cost = c.castCost ?? (typeof c.params.cost === 'string' ? c.params.cost : null)
+  return cost === 'drink' || cost === 'shot' ? cost : null
+}
+
+/**
+ * Who drinks a card's cast cost (and owes the photo proof), as play_card decides: the
+ * card's params.cost_team, else the seekers for a curse and the hiders for anything else.
+ */
+export function costPayer(c: CardDef): 'hiders' | 'seekers' {
+  const t = c.params.cost_team
+  if (t === 'hiders' || t === 'seekers') return t
+  return c.category === 'curse' ? 'seekers' : 'hiders'
+}
