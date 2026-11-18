@@ -7,6 +7,9 @@ import {
   cardUtility,
   castBlocker,
   castChoice,
+  castCost,
+  clearable,
+  costPayer,
   deriveCards,
   lockedUntil,
   nextVetoLockS,
@@ -152,6 +155,35 @@ describe('deriveCards', () => {
     expect(effectPhase(f.effects[0], t0 + 900_000)).toBe('over')
   })
 
+  it('a timed task (follow-on) can be marked done until the lock starts; a plain timed one cannot', () => {
+    const t0 = Date.parse('2026-11-20T10:00:00Z')
+    const played = ev('card_played', {
+      instance_id: 'i9',
+      card: deck[1],
+      played_at: '2026-11-20T10:00:00Z',
+      effect_id: 'e2',
+      duration_s: 180,
+      ends_at: '2026-11-20T10:03:00Z',
+      followup_s: 600,
+    })
+    const s = deriveCards([started, played])
+    expect(clearable(s.effects[0], t0 + 60_000)).toBe(true)
+    expect(clearable(s.effects[0], t0 + 200_000)).toBe(true)
+
+    const asked = deriveCards([started, played, ev('effect_clear_requested', { effect_id: 'e2' })])
+    expect(effectPhase(asked.effects[0], t0 + 60_000)).toBe('awaiting_confirm')
+    expect(clearable(asked.effects[0], t0 + 60_000)).toBe(false)
+    const done = deriveCards([started, played, ev('effect_clear_requested', { effect_id: 'e2' }), ev('effect_cleared', { effect_id: 'e2' })])
+    expect(effectPhase(done.effects[0], t0 + 60_000)).toBe('over')
+    expect(effectPhase(done.effects[0], t0 + 200_000)).toBe('over')
+
+    const locked = deriveCards([started, played, ev('effect_followup_started', { effect_id: 'e2', ends_at: '2026-11-20T10:14:00Z' })])
+    expect(clearable(locked.effects[0], t0 + 300_000)).toBe(false)
+
+    const plain = deriveCards([started, ev('card_played', { ...played.payload, followup_s: null })])
+    expect(clearable(plain.effects[0], t0 + 60_000)).toBe(false)
+  })
+
   it('time bonuses count only while held in the hand', () => {
     const draw = ev(
       'cards_drawn',
@@ -190,6 +222,20 @@ describe('cardFacts', () => {
     expect(cardFacts(s.deck.escape)).toEqual(['3 min, then 10 min if missed', "Can't veto"])
     expect(cardFacts(s.deck.cuisine)).toEqual(['Blocks questions'])
     expect(cardFacts(s.deck.bonus)).toEqual(['+4 min'])
+  })
+})
+
+describe('cast costs', () => {
+  it('a curse costs the seekers, anything else the hider, unless params.cost_team says', () => {
+    const s = deriveCards([started])
+    const curse = { ...s.deck.escape, castCost: 'drink' as const }
+    expect(castCost(curse)).toBe('drink')
+    expect(costPayer(curse)).toBe('seekers')
+    const dbl = { ...s.deck.cuisine, category: 'drink', castCost: null, params: { cost: 'shot' } }
+    expect(castCost(dbl)).toBe('shot')
+    expect(costPayer(dbl)).toBe('hiders')
+    expect(costPayer({ ...curse, params: { cost_team: 'hiders' } })).toBe('hiders')
+    expect(castCost({ ...curse, castCost: 'free' })).toBeNull()
   })
 })
 

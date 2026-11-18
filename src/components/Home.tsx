@@ -3,7 +3,7 @@ import { createGame, joinGame } from '../sync/actions'
 import type { SyncTransport } from '../sync/transport'
 import { defaultConfig } from '../lobby/config'
 import { describeError } from '../lobby/messages'
-import { NAME_KEY, readLocal, writeLocal } from '../lib/storage'
+import { LAST_CODE_KEY, NAME_KEY, readLocal, writeLocal } from '../lib/storage'
 
 const CODE_RE = /^[A-HJ-NP-Z]{4}$/
 
@@ -29,19 +29,21 @@ interface Props {
 export function Home({ transport, onEnter, onSettings }: Props) {
   const [name, setName] = useState(() => readLocal(NAME_KEY) ?? '')
   const [linkCode] = useState(codeFromUrl)
-  const [code, setCode] = useState(linkCode)
+  // A link's code wins; else the last game's, so a phone that dropped out can rejoin in a tap.
+  const [code, setCode] = useState(() => linkCode || (CODE_RE.test(readLocal(LAST_CODE_KEY) ?? '') ? readLocal(LAST_CODE_KEY)! : ''))
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
   const trimmed = name.trim()
   const codeOk = CODE_RE.test(code)
 
-  const run = async (fn: () => Promise<{ game_id: string }>) => {
+  const run = async (fn: () => Promise<{ game_id: string; code?: string }>) => {
     setBusy(true)
     setErr(null)
     writeLocal(NAME_KEY, trimmed)
     try {
       const res = await fn()
+      if (res.code) writeLocal(LAST_CODE_KEY, res.code)
       clearJoinParam()
       onEnter(res.game_id)
     } catch (e) {

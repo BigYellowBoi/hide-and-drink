@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { effectPhase, effectTimer, liveEffects, questionsBlockedBy, type CardsState, type Effect } from '../cards/state'
+import { clearable, effectPhase, effectTimer, liveEffects, questionsBlockedBy, type CardsState, type Effect } from '../cards/state'
 import { formatClock } from '../hiding/state'
 import { describeError } from '../lobby/messages'
 import type { GameSync } from '../sync/engine'
@@ -115,7 +115,7 @@ function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf 
           </button>
         </span>
       )}
-      {phase === 'until_cleared' &&
+      {clearable(e, now) &&
         (team === 'seekers' ? (
           <button className="small" disabled={busy || !canAct} onClick={() => void act('clear_effect', {})}>
             We did it

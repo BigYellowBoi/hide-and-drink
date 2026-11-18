@@ -27,7 +27,27 @@ export function projector(origin: LngLat) {
   }
 }
 
-export const radarCircle = (center: LngLat, radiusM: number): Feature<Polygon> => circlePolygon(center, radiusM, 96)
+/** Max gap (m) between a drawn circle's edge and the true circle, so it holds at street zoom. */
+const CIRCLE_TOLERANCE_M = 0.5
+/** Max spacing (m) of points along a straight shading edge (MapLibre draws straight in Mercator). */
+const EDGE_STEP_M = 100
+
+/** Vertices a circle needs so its chords stay within CIRCLE_TOLERANCE_M of the true circle. */
+export function circleSteps(radiusM: number): number {
+  if (!(radiusM > CIRCLE_TOLERANCE_M)) return 64
+  const steps = Math.ceil(Math.PI / Math.acos(1 - CIRCLE_TOLERANCE_M / radiusM))
+  return Math.min(1024, Math.max(64, steps))
+}
+
+/** A radar circle built on the sphere (geodesic points), with enough vertices for any zoom. */
+export const radarCircle = (center: LngLat, radiusM: number): Feature<Polygon> =>
+  circlePolygon(center, radiusM, circleSteps(radiusM))
+
+/** a to b with extra points every EDGE_STEP_M (b itself not included). */
+function densify(a: [number, number], b: [number, number]): [number, number][] {
+  const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / EDGE_STEP_M))
+  return Array.from({ length: n }, (_, i) => [a[0] + ((b[0] - a[0]) * i) / n, a[1] + ((b[1] - a[1]) * i) / n])
+}
 
 /**
  * Everywhere closer to `toward` than to the other end of a thermometer, as a big polygon
@@ -45,12 +65,15 @@ export function thermometerHalf(start: LngLat, end: LngLat, toward: 'start' | 'e
   const nx = -uy
   const ny = ux
   const S = 50_000
-  const ring = [
+  const corners: [number, number][] = [
     [nx * S, ny * S],
     [nx * S + ux * S, ny * S + uy * S],
     [-nx * S + ux * S, -ny * S + uy * S],
     [-nx * S, -ny * S],
-  ].map((xy) => p.toLngLat(xy as [number, number]))
+  ]
+  // The bisector edge (last corner back to the first) is the one that crosses the play
+  // area: densify it so the clipped edge stays straight on the map at any zoom.
+  const ring = [...corners.slice(0, 3), ...densify(corners[3], corners[0])].map((xy) => p.toLngLat(xy))
   return { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[...ring, ring[0]]] } }
 }
 
@@ -81,6 +104,79 @@ export const keepIn = (a: Area | null, f: Area): Area | null =>
 export const cutOut = (a: Area | null, f: Area): Area | null =>
   a ? (difference(featureCollection([a, f])) as Area | null) : null
 
+/** f clipped to the play area, so float slivers from earlier steps never draw outside it. */
+export function clipTo(area: Area, f: Area | null): Area | null {
+  if (!f) return null
+  try {
+    return cleanArea(keepIn(area, f))
+  } catch {
+    return cleanArea(f)
+  }
+}
+
+/** sin of the angle at which a ring may fold back on itself and still count as a spike. */
+const SPIKE_SIN = 1e-6
+
+/**
+ * Removes repeated points and spikes (the ring running out along an edge and straight back)
+ * from a ring. Turf's clipping leaves these where a cut line meets the play-area edge close
+ * to an existing vertex; MapLibre then triangulates the overlapping edges wrongly and
+ * hatches part of the remaining area. Returns null if nothing with area is left.
+ */
+export function cleanRing(ring: Position[]): Position[] | null {
+  let pts = ring.slice(0, -1)
+  let changed = true
+  while (changed && pts.length >= 3) {
+    changed = false
+    const out: Position[] = []
+    for (let i = 0; i < pts.length; i++) {
+      const a = out.length ? out[out.length - 1] : pts[pts.length - 1]
+      const b = pts[i]
+      const c = pts[(i + 1) % pts.length]
+      const [abx, aby] = [b[0] - a[0], b[1] - a[1]]
+      const [bcx, bcy] = [c[0] - b[0], c[1] - b[1]]
+      const ab = Math.hypot(abx, aby)
+      const bc = Math.hypot(bcx, bcy)
+      if (ab === 0) {
+        changed = true
+        continue
+      }
+      // Folds straight back (or near enough): b is the tip of a spike.
+      if (bc > 0 && abx * bcx + aby * bcy < 0 && Math.abs(abx * bcy - aby * bcx) <= SPIKE_SIN * ab * bc) {
+        changed = true
+        continue
+      }
+      out.push(b)
+    }
+    pts = out
+  }
+  if (pts.length < 3) return null
+  let twice = 0
+  for (let i = 0; i < pts.length; i++) {
+    const [x1, y1] = pts[i]
+    const [x2, y2] = pts[(i + 1) % pts.length]
+    twice += x1 * y2 - x2 * y1
+  }
+  // Under ~1 m² (in degrees² at city latitudes): a sliver, not an area.
+  if (Math.abs(twice) / 2 < 1e-10) return null
+  return [...pts, pts[0]]
+}
+
+/** cleanRing on every ring; drops polygons whose outer ring has nothing left. */
+export function cleanArea(a: Area | null): Area | null {
+  if (!a) return null
+  const polys = (a.geometry.type === 'Polygon' ? [a.geometry.coordinates] : a.geometry.coordinates)
+    .map((rings) => {
+      const outer = cleanRing(rings[0])
+      return outer ? [outer, ...rings.slice(1).map(cleanRing).filter((r): r is Position[] => r !== null)] : null
+    })
+    .filter((p): p is Position[][] => p !== null)
+  if (!polys.length) return null
+  return polys.length === 1
+    ? { ...a, geometry: { type: 'Polygon', coordinates: polys[0] } }
+    : { ...a, geometry: { type: 'MultiPolygon', coordinates: polys } }
+}
+
 /** Play area narrowed by every constraint. null: nothing left (answers contradict). */
 export function applyConstraints(area: Area, constraints: readonly Constraint[]): Area | null {
   let out: Area | null = area
@@ -90,6 +186,45 @@ export function applyConstraints(area: Area, constraints: readonly Constraint[])
       out = 'keep' in c ? keepIn(out, c.keep!) : cutOut(out, c.cut)
     } catch {
       // Degenerate geometry from one answer shouldn't break the whole map: skip it.
+    }
+  }
+  return out
+}
+
+// ------------------------------------------------------------------ drawing
+
+/**
+ * The same area as polygons without holes, for MapLibre to fill. A polygon with a hole is
+ * split in two along a north-south line through the hole, again until none is left. Holes
+ * that touch their outer ring (common when answers cut a wedge that meets the play-area
+ * edge) are mis-triangulated once MapLibre snaps them to tile pixels: whole triangles of the
+ * remaining area got hatched. Hole-free pieces can't do that.
+ */
+export function holeFree(a: Area | null, depth = 0): Area[] {
+  if (!a) return []
+  const polys = a.geometry.type === 'Polygon' ? [a.geometry.coordinates] : a.geometry.coordinates
+  const out: Area[] = []
+  for (const rings of polys) {
+    const poly: Area = { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: rings } }
+    if (rings.length < 2 || depth >= 12) {
+      out.push(poly)
+      continue
+    }
+    const xs = rings[1].map((c) => c[0])
+    const cut = (Math.min(...xs) + Math.max(...xs)) / 2
+    const all = rings[0].map((c) => c[1])
+    const [s, n] = [Math.min(...all) - 1, Math.max(...all) + 1]
+    const ex = rings[0].map((c) => c[0])
+    const [w, e] = [Math.min(...ex) - 1, Math.max(...ex) + 1]
+    const box = (x0: number, x1: number): Area => ({
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'Polygon', coordinates: [[[x0, s], [x1, s], [x1, n], [x0, n], [x0, s]]] },
+    })
+    try {
+      for (const half of [keepIn(poly, box(w, cut)), keepIn(poly, box(cut, e))]) out.push(...holeFree(cleanArea(half), depth + 1))
+    } catch {
+      out.push(poly)
     }
   }
   return out

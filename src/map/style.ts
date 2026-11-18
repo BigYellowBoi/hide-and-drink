@@ -96,7 +96,9 @@ export function mapStyle(pack: CityPack): StyleSpecification {
         paint: { 'fill-color': MAP_COLORS.bg, 'fill-opacity': 0.6 },
       },
       // Ruled-out area: hatch (image added by GameMap on load) so streets show through.
-      { id: 'ruled', type: 'fill', source: 'ruled', paint: { 'fill-pattern': 'hatch' } },
+      // No antialiasing: the hatch comes in hole-free pieces, and antialiased edges would
+      // draw a faint seam where two pieces meet.
+      { id: 'ruled', type: 'fill', source: 'ruled', paint: { 'fill-pattern': 'hatch', 'fill-antialias': false } },
       // Where the hider can still be: a white edge inside the hatch, so it reads at a glance.
       {
         id: 'remaining',

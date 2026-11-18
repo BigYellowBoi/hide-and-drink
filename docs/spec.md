@@ -40,7 +40,7 @@ Source of truth for building the app. The shared roadmap doc is a read-only over
 | Cast cost | Card field `cast_cost`: free / drink / shot, shown when cast. |
 | Veto | Veto button on curses with `can_veto: true`. Server counts vetoes per run; lock = base + step x vetoes_used (from config), starting when any earlier lock ends. Opens a drink proof for the seekers. |
 | 5 min reply | Default answer deadline 300 s, overridable per question type. Missed deadline logs a penalty shot event. |
-| Photo proof | Each drink the app knows about (cast cost, drink cards, veto, missed deadline) asks the drinking team for a photo, shown to both teams in the log. |
+| Photo proof | Each drink the app knows about (cast cost, drink cards, veto, missed deadline) asks the drinking team for a photo, shown to both teams in the log. A curse's cast cost is drunk by the seekers (card `params.cost_team` overrides); other cards' costs by the hider. |
 | Station zone (open) | If enabled, bar picker only offers bars inside a station zone. |
 
 ## 4. Sync and concurrency

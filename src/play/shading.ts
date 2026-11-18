@@ -3,9 +3,11 @@ import type { AreaCollection } from '../map/playArea'
 import {
   applyConstraints,
   areaFeature,
+  clipTo,
   cutOut,
   distancesToArea,
   distanceM,
+  holeFree,
   isLngLat,
   keepIn,
   radarCircle,
@@ -114,7 +116,7 @@ export function constraintOf(q: Question, ctx?: PackContext): Constraint | null 
 export interface Shading {
   /** Where the hider can still be. null: answers contradict each other. */
   remaining: Area | null
-  /** Hatched on the map: play area minus remaining. */
+  /** Hatched on the map: play area minus remaining, as hole-free pieces (see holeFree). */
   ruledOut: FeatureCollection
 }
 
@@ -143,10 +145,12 @@ export function shade(playArea: AreaCollection, answered: readonly Question[], c
   const area = areaFeature(playArea)
   const constraints = answered.map((q) => cachedConstraint(q, ctx)).filter((c): c is Constraint => c !== null)
   if (!constraints.length) return { remaining: area, ruledOut: EMPTY }
-  const remaining = applyConstraints(area, constraints)
-  if (!remaining) return { remaining: null, ruledOut: { type: 'FeatureCollection', features: [area] } }
-  const out = cutOut(area, remaining)
-  return { remaining, ruledOut: { type: 'FeatureCollection', features: out ? [out] : [] } }
+  // Every step is clipped to the play area polygon (lon/lat, turf), so neither the hatch
+  // nor the remaining outline can leave it.
+  const remaining = clipTo(area, applyConstraints(area, constraints))
+  if (!remaining) return { remaining: null, ruledOut: { type: 'FeatureCollection', features: holeFree(area) } }
+  const out = clipTo(area, cutOut(area, remaining))
+  return { remaining, ruledOut: { type: 'FeatureCollection', features: holeFree(out) } }
 }
 
 export interface Venue {

@@ -97,6 +97,11 @@ export class GameSync {
   private gapTimer: ReturnType<typeof setTimeout> | null = null
   private retryTimer: ReturnType<typeof setTimeout> | null = null
   private pollTimer: ReturnType<typeof setInterval> | null = null
+  /** Signed in and member confirmed; until then start() keeps retrying. */
+  private connected = false
+  private startRetry: ReturnType<typeof setTimeout> | null = null
+  private startAttempts = 0
+  private connecting = false
 
   private listeners = new Set<() => void>()
   private snapshot: SyncSnapshot
@@ -127,6 +132,19 @@ export class GameSync {
   async start(): Promise<void> {
     if (this.started) return
     this.started = true
+    await this.connect()
+  }
+
+  /**
+   * Sign in, check membership and join the topics. A failure to reach the server (opened
+   * with no signal, a token refresh that timed out) is not the end of the game: stay
+   * offline and try again, so a reopened phone gets back into its game by itself.
+   */
+  private async connect(): Promise<void> {
+    if (this.connecting || this.connected || this.stopped) return
+    this.connecting = true
+    if (this.startRetry) clearTimeout(this.startRetry)
+    this.startRetry = null
     this.setStatus('connecting')
     try {
       this.userId = await this.transport.signIn()
@@ -140,8 +158,14 @@ export class GameSync {
       this.pollTimer = setInterval(() => {
         if (this.status === 'live') void this.resync({ quiet: true })
       }, this.opts.pollIntervalMs)
-    } catch (e) {
-      this.fail(e instanceof Error ? e.message : String(e))
+      this.connected = true
+    } catch {
+      if (this.stopped) return
+      this.setStatus('offline')
+      const wait = Math.min(15_000, 1000 * 2 ** this.startAttempts++)
+      this.startRetry = setTimeout(() => void this.connect(), wait)
+    } finally {
+      this.connecting = false
     }
   }
 
@@ -149,7 +173,7 @@ export class GameSync {
     this.stopped = true
     for (const ch of this.channels.values()) ch.unsubscribe()
     this.channels.clear()
-    for (const t of [this.gapTimer, this.retryTimer]) if (t) clearTimeout(t)
+    for (const t of [this.gapTimer, this.retryTimer, this.startRetry]) if (t) clearTimeout(t)
     if (this.pollTimer) clearInterval(this.pollTimer)
     this.listeners.clear()
   }
@@ -163,6 +187,7 @@ export class GameSync {
     const hiddenFor = this.hiddenAt === null ? 0 : this.now() - this.hiddenAt
     this.hiddenAt = null
     if (!this.running) return
+    if (!this.connected) return void this.connect()
     // Assume nothing about what happened while hidden: block actions until caught up.
     if (hiddenFor >= this.opts.rejoinAfterHiddenMs) {
       this.clock.clear()
@@ -177,6 +202,10 @@ export class GameSync {
   setOnline(online: boolean): void {
     this.online = online
     if (!this.running) return
+    if (!this.connected) {
+      if (online) void this.connect()
+      return
+    }
     if (online) {
       this.rejoinTopics()
       void this.sampleClock(1)

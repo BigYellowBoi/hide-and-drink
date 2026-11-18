@@ -4,10 +4,11 @@ import {
   bannedSet,
   cardOf,
   castBlocker,
+  castCost,
   castChoice,
+  costPayer,
   handBonusS,
   isPlayable,
-  type CardDef,
   type CardRef,
   type CardsState,
   type PendingDraw,
@@ -141,7 +142,9 @@ function Hand({ sync, cards, canAct, ctx }: Props & { ctx: CastContext }) {
                         : !ready
                           ? `Pick ${need - picks.length} more`
                           : castCost(def)
-                            ? `Cast (costs a ${castCost(def)})`
+                            ? costPayer(def) === 'seekers'
+                              ? `Cast (seekers drink a ${castCost(def)})`
+                              : `Cast (costs you a ${castCost(def)})`
                             : 'Cast'
                     }
                     disabled={!canAct || busy || !ready}
@@ -174,12 +177,6 @@ function Hand({ sync, cards, canAct, ctx }: Props & { ctx: CastContext }) {
       )}
     </section>
   )
-}
-
-/** Cast cost: the printed one, or params.cost (e.g. the shot for Double Rewards). */
-const castCost = (c: CardDef) => {
-  const cost = c.castCost ?? (typeof c.params.cost === 'string' ? c.params.cost : null)
-  return cost && cost !== 'free' ? cost : null
 }
 
 const toggle = (list: string[], id: string, max: number) =>

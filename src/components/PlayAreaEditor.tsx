@@ -7,6 +7,7 @@ import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter'
 import { importMapLink, MapLinkError } from '../map/mapLink'
 import { areaKm2, boundsOf, collectionOf, formatKm2, polygonsOf, type AreaCollection } from '../map/playArea'
 import { MAP_COLORS } from '../map/style'
+import { resetGestures } from '../map/gestures'
 import { GameMap } from './GameMap'
 
 export interface PlayAreaDraft {
@@ -153,17 +154,54 @@ export function PlayAreaEditor({ city, initial, initialName, ownedId, busy, canA
     return () => document.documentElement.classList.remove('scroll-locked')
   }, [])
 
+  // Terra Draw turns map panning off while a corner or shape is dragged and back on at its
+  // own pointer-up. A release it misses (finger lifted over the sheet, a cancelled touch)
+  // would leave the map stuck, so any release with no drag in progress turns panning back on.
+  useEffect(() => {
+    const release = () =>
+      requestAnimationFrame(() => {
+        const map = mapRef.current
+        if (map && !map.dragPan.isEnabled()) resetGestures(map)
+      })
+    window.addEventListener('pointerup', release, true)
+    window.addEventListener('pointercancel', release, true)
+    return () => {
+      window.removeEventListener('pointerup', release, true)
+      window.removeEventListener('pointercancel', release, true)
+    }
+  }, [])
+
+  // Leaving the editor: stop Terra Draw (its modes and listeners) and hand the map back with
+  // panning and double-tap zoom on.
   useEffect(
     () => () => {
-      drawRef.current?.stop()
+      const draw = drawRef.current
       drawRef.current = null
+      const map = mapRef.current
+      mapRef.current = null
+      try {
+        if (draw?.enabled) {
+          draw.setMode('static')
+          draw.stop()
+        }
+        if (map) {
+          resetGestures(map)
+          map.doubleClickZoom.enable()
+        }
+      } catch {
+        // The map may already be gone.
+      }
     },
     [],
   )
 
   const pick = (t: Tool) => {
     setTool(t)
-    drawRef.current?.setMode(t === 'draw' ? 'polygon' : 'select')
+    const draw = drawRef.current
+    if (!draw) return
+    draw.setMode(t === 'draw' ? 'polygon' : 'select')
+    // A mode switch mid-drag skips Terra Draw's own re-enable.
+    if (mapRef.current) resetGestures(mapRef.current)
   }
 
   const deleteSelected = () => {

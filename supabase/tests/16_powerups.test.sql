@@ -267,8 +267,9 @@ select lives_ok(format($$ select pg_temp.play(%L, 33, '{"bans":[{"type":"radar",
 reset role;
 select is((select jsonb_array_length(payload -> 'bans') from pg_temp.last_event('card_played')), 3,
   'the bans are public');
-select is((select count(*)::int from public.drink_proofs where game_id = pg_temp.gid() and label = 'Curse of Drained Brain'),
-  1, 'its shot cast cost opens a proof');
+select is(array(select team::text || ':' || cost from public.drink_proofs
+                  where game_id = pg_temp.gid() and label = 'Curse of Drained Brain'),
+  array['seekers:shot'], 'its shot cast cost opens a proof for the seekers, who pay a curse''s cost');
 set local role authenticated;
 select throws_ok($$ select pg_temp.ask(34, '500m') $$, 'P0001', 'question_banned', 'a banned question is refused');
 select pg_temp.seeker();
