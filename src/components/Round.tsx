@@ -25,6 +25,7 @@ import {
   lockedUntil,
   powerupAction,
   questionsBlockedBy,
+  triviaWaiting,
   vetoable,
   type CardsState,
 } from '../cards/state'
@@ -38,7 +39,7 @@ import { BarPicker } from './BarPicker'
 import { HiderCountContext } from './hiderCount'
 import { PrivateLabel } from './PrivateLabel'
 import { DeadlineRing } from './DeadlineRing'
-import { BlockedBanner, ConfirmClear, EffectStrip, EffectsPanel } from './EffectsPanel'
+import { BlockedBanner, ConfirmClear, EffectStrip, EffectsPanel, TriviaPrompt } from './EffectsPanel'
 import { HandPanel } from './HandPanel'
 import type { MapDot } from './GameMap'
 import { LazyGameMap } from './lazyMap'
@@ -85,6 +86,9 @@ interface Shared {
   seekerDots: MapDot[]
   goMap: () => void
   goHand: () => void
+  goEffects: () => void
+  /** The host can mark a trivia curse all correct by hand. */
+  isHost: boolean
   /** The open question's tool (radar circle, thermometer line). */
   tool: FeatureCollection | undefined
   tab: Tab
@@ -156,6 +160,8 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
     seekerDots,
     goMap: () => setTab('map'),
     goHand: () => setTab('hand'),
+    goEffects: () => setTab('effects'),
+    isHost: !!userId && userId === lobby.hostId,
     tool,
     tab,
     now,
@@ -180,7 +186,7 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
       {tab === 'questions' && <QuestionList questions={play.questions} />}
 
       {tab === 'effects' && team && (
-        <EffectsPanel sync={sync} cards={cards} team={team} canAct={canAct} now={now} config={lobby.config} nameOf={nameOf} />
+        <EffectsPanel sync={sync} cards={cards} team={team} canAct={canAct} now={now} config={lobby.config} nameOf={nameOf} isHost={shared.isHost} />
       )}
 
       {tab === 'log' && (
@@ -214,7 +220,9 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
           <button key={id} className={tab === id ? 'on' : ''} aria-current={tab === id} onClick={() => setTab(id)}>
             {label}
             {id === 'questions' && play.pending && <span className="tab-dot" aria-label="needs answer" />}
-            {id === 'hand' && cards.draws.length > 0 && <span className="tab-dot" aria-label="cards to keep" />}
+            {id === 'hand' && (cards.draws.length > 0 || triviaWaiting(cards, 'hiders').length > 0) && (
+              <span className="tab-dot" aria-label="cards to act on" />
+            )}
             {id === 'effects' &&
               (liveEffects(cards, now).length > 0 || cards.played.some((p) => vetoable(cards, p, now))) && (
                 <span className="tab-dot" aria-label="curses in play" />
@@ -297,6 +305,7 @@ function HiderView({
   seekerDots,
   goMap,
   goHand,
+  isHost,
   tool,
   tab,
   now,
@@ -381,6 +390,7 @@ function HiderView({
         .map((e) => (
           <ConfirmClear key={e.id} sync={sync} effect={e} canAct={canAct} proofPath={evidenceFor(cards, e.id)?.path ?? null} />
         ))}
+      {tab !== 'hand' && <TriviaPrompt effects={triviaWaiting(cards, 'hiders')} team="hiders" onOpen={goHand} />}
       {cards.draws.length > 0 && tab !== 'hand' && (
         <section className="card pick-prompt">
           <div>
@@ -402,7 +412,16 @@ function HiderView({
             canAct={canAct}
             ctx={{ city: lobby.city, pendingQuestion: !!play.pending, barChosen: !!bar }}
           />
-          <EffectsPanel sync={sync} cards={cards} team="hiders" canAct={canAct} now={now} config={lobby.config} nameOf={nameOf} />
+          <EffectsPanel
+            sync={sync}
+            cards={cards}
+            team="hiders"
+            canAct={canAct}
+            now={now}
+            config={lobby.config}
+            nameOf={nameOf}
+            isHost={isHost}
+          />
         </>
       )}
       {picking && tab !== 'map' && (
@@ -513,6 +532,7 @@ function SeekerView({
   seekerDots,
   tool,
   tab,
+  goEffects,
   now,
   nameOf,
   dev,
@@ -562,6 +582,7 @@ function SeekerView({
         </section>
       )}
 
+      {tab !== 'effects' && <TriviaPrompt effects={triviaWaiting(cards, 'seekers')} team="seekers" onOpen={goEffects} />}
       {tab === 'map' && <EffectStrip cards={cards} now={now} />}
       {tab === 'map' && (
         <section className="card map-card">

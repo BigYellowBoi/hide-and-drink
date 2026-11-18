@@ -7,6 +7,7 @@ import {
   evidenceFor,
   liveEffects,
   questionsBlockedBy,
+  triviaTodo,
   type CardsState,
   type DrinkProof,
   type Effect,
@@ -19,6 +20,7 @@ import { CardFace } from './CardFace'
 import { BanList, CardUtility, LockBanner, VetoButton, VetoSummary } from './CardExtras'
 import { useProofPhoto } from './useProofPhoto'
 import { PhotoThumb } from './PhotoThumb'
+import { TriviaBox } from './TriviaBox'
 
 interface Props {
   sync: GameSync
@@ -29,6 +31,8 @@ interface Props {
   /** Game config (veto lock lengths). */
   config: Record<string, unknown>
   nameOf: (userId: string | null) => string
+  /** The host can mark a trivia curse all correct by hand. */
+  isHost?: boolean
 }
 
 const minutes = (s: number | null) => (s ? `${Math.round(s / 60)} min` : '')
@@ -98,7 +102,7 @@ export function BlockedBanner({ effects, team }: { effects: readonly Effect[]; t
   )
 }
 
-function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf }: Props & { effect: Effect }) {
+function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf, isHost = false }: Props & { effect: Effect }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const phase = effectPhase(e, now)
@@ -143,6 +147,7 @@ function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf 
             Waiting for the seekers to do it{evidence ? ' and send a photo' : ''}.
           </span>
         ))}
+      {e.behaviour === 'trivia' && <TriviaBox sync={sync} effect={e} team={team} canAct={canAct} isHost={isHost} nameOf={nameOf} />}
       {evidence?.path && phase === 'awaiting_confirm' && <PhotoThumb path={evidence.path} bucket={DRINK_BUCKET} alt="Proof photo" />}
       {phase === 'awaiting_confirm' && (
         <span className="muted small">{team === 'seekers' ? 'Waiting for the hider to confirm.' : 'Seekers say they did it. Confirm above.'}</span>
@@ -210,7 +215,11 @@ export function EffectStrip({ cards, now }: { cards: CardsState; now: number }) 
               <EffectBar endsAt={t[0]} totalS={t[1]} now={now} label={effectPhase(e, now) === 'followup' ? 'Locked' : 'Left'} />
             ) : (
               <span className="muted small">
-                {effectPhase(e, now) === 'followup_available'
+                {e.trivia
+                  ? e.trivia.questions
+                    ? `Trivia: ${e.trivia.questions.filter((q) => q.correct).length} of ${e.trivia.questions.length} right`
+                    : 'Trivia: waiting for the questions'
+                  : effectPhase(e, now) === 'followup_available'
                   ? "Time's up. Missed it? See Effects"
                   : effectPhase(e, now) === 'awaiting_confirm'
                     ? 'Waiting for the hider'
@@ -223,6 +232,31 @@ export function EffectStrip({ cards, now }: { cards: CardsState; now: number }) 
         )
       })}
     </ul>
+  )
+}
+
+/** A trivia curse waiting on this team, pinned on top of the other tabs. */
+export function TriviaPrompt({ effects, team, onOpen }: { effects: readonly Effect[]; team: Team; onOpen: () => void }) {
+  const e = effects[0]
+  if (!e?.trivia) return null
+  const todo = triviaTodo(e, team)
+  const open = e.trivia.questions?.filter((q) => !q.correct).length ?? 0
+  const title =
+    todo === 'write'
+      ? `Write ${e.trivia.count} trivia questions`
+      : todo === 'mark'
+        ? `Mark ${open} trivia answer${open > 1 ? 's' : ''}`
+        : `Answer ${open} trivia question${open > 1 ? 's' : ''}`
+  return (
+    <section className="card pick-prompt confirm-clear" role="status">
+      <div>
+        <p className="eyebrow">{e.card.name}</p>
+        <h2>{title}</h2>
+      </div>
+      <button className="small" onClick={onOpen}>
+        Open
+      </button>
+    </section>
   )
 }
 
