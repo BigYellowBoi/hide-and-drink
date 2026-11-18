@@ -14,7 +14,7 @@ This is the audit of `supabase/migrations/` (up to `20261213090000_host_override
   - A hider does them directly.
   - A seeker host only files a request: public `override_requested` with the kind and reason, no details. The hiders get a banner. A hider carries it out by calling `host_override` with `request_id` and picks the details. Or they decline it (kind `decline`; the host can withdraw their own request the same way).
   - The public `override` event then says only what kind of thing changed (for example "Changed the hider's bar") with empty `params`. The details go in a hiders-only `override_detail` event. Leak test: `supabase/tests/24_host_overrides.test.sql`.
-- **Undo** (kind `undo`, `params.override_id`) needs both teams to agree (`20261214090000_undo_both_teams.sql`):
+- **Undo** (kind `undo`, `params.override_id`) needs both teams to agree (`20261215090000_undo_both_teams.sql`):
   - Any player on a team asks, with a reason. That files a public `override_requested` (kind `undo`) and counts as their team's yes. One open undo request per fix (`undo_already_requested`).
   - A player on the other team agrees with `host_override` kind `confirm` and the `request_id` (`override_confirmed`), or either team says no with kind `decline`. A second yes from the same team is refused (`already_confirmed`).
   - Phones show the request as a banner with Agree / No to the team that still has to answer.

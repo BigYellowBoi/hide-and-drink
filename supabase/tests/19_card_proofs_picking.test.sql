@@ -93,10 +93,14 @@ select lives_ok($$ select public.report_picking(pg_temp.gid(), null) $$, 'or tha
 reset role;
 select is(pg_temp.picks(':hiders'), 2, 'picks go to the hiders topic');
 select is(pg_temp.picks(':seekers') + pg_temp.picks(''), 0, 'and never to the seekers or the shared topic');
+-- Look the pick up by its bar (not "the one with a bar"): CI's Supabase stack has
+-- returned the null pick for the looser filter.
 select is(
-  (select array[payload ->> 'user_id', payload ->> 'venue_id', (payload ->> 'name' is not null)::text]
-     from realtime.messages where event = 'picking' and payload ->> 'venue_id' is not null),
-  array['44444444-4444-4444-4444-444444444444', split_part(current_setting('test.bars'), ',', 2), 'true'],
+  (select array_agg(array[payload ->> 'user_id', (payload ->> 'name' is not null)::text]::text order by id)
+     from realtime.messages
+    where topic = 'game:' || pg_temp.gid() || ':hiders' and event = 'picking'
+      and payload ->> 'venue_id' = split_part(current_setting('test.bars'), ',', 2)),
+  array[array['44444444-4444-4444-4444-444444444444', 'true']::text],
   'a pick names the hider, the bar and its name');
 select is(pg_temp.seq()::text, current_setting('test.seq_before_picks'), 'picks are not events');
 set local role authenticated;
