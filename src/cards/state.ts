@@ -406,11 +406,24 @@ export function effectPhase(e: Effect, now: number): EffectPhase {
   if (e.behaviour === 'until_cleared') {
     return e.status === 'cleared' ? 'over' : e.status === 'clear_requested' ? 'awaiting_confirm' : 'until_cleared'
   }
+  if (e.status === 'cleared') return 'over'
+  if (e.status === 'clear_requested') return 'awaiting_confirm'
   if (e.endsAt !== null && now < e.endsAt) return 'running'
   if (e.followupEndsAt !== null) return now < e.followupEndsAt ? 'followup' : 'over'
   // A follow-on can be started for a while after the countdown; after that it drops off.
   if (e.followupS && e.endsAt !== null && now < e.endsAt + FOLLOWUP_WINDOW_MS) return 'followup_available'
   return 'over'
+}
+
+/**
+ * Seekers can say they've done it (the hider confirms): until_cleared curses, and timed
+ * ones with a follow-on (a task with a deadline, e.g. Escape) until the follow-on starts.
+ */
+export function clearable(e: Effect, now: number): boolean {
+  if (e.status !== 'active') return false
+  const phase = effectPhase(e, now)
+  if (e.behaviour === 'until_cleared') return phase === 'until_cleared'
+  return e.followupS !== null && e.followupEndsAt === null && (phase === 'running' || phase === 'followup_available')
 }
 
 /** How long after a timed card ends its "missed it?" button stays up. */

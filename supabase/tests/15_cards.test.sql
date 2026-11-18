@@ -8,7 +8,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(58);
+select plan(65);
 
 insert into auth.users (id) values
   ('11111111-1111-1111-1111-111111111111'),
@@ -362,6 +362,45 @@ select throws_ok(
   format($$ select public.start_followup(pg_temp.gid(), %L, pg_temp.uid(75), pg_temp.seq()) $$, current_setting('test.e3')),
   'P0001', 'no_followup', 'cards without followup_s have none'
 );
+
+-- Timed with a follow-on is a task: seekers can mark it done (hider confirms), until the lock starts.
+select pg_temp.as_user('33333333-3333-3333-3333-333333333333');
+select throws_ok(
+  format($$ select public.clear_effect(pg_temp.gid(), %L, pg_temp.uid(176), pg_temp.seq()) $$, current_setting('test.e2')),
+  'P0001', 'effect_not_active', 'missed it: once the lock runs it can''t be cleared'
+);
+select throws_ok(
+  format($$ select public.clear_effect(pg_temp.gid(), %L, pg_temp.uid(177), pg_temp.seq()) $$, current_setting('test.e3')),
+  'P0001', 'effect_not_active', 'a plain timed curse just runs out'
+);
+reset role;
+-- A fresh Escape: countdown running, no lock yet.
+update public.card_effects set ends_at = now() + interval '3 minutes', followup_ends_at = null
+ where id = current_setting('test.e2')::uuid;
+set local role authenticated;
+select lives_ok(
+  format($$ select public.clear_effect(pg_temp.gid(), %L, pg_temp.uid(178), pg_temp.seq()) $$, current_setting('test.e2')),
+  'seekers say they got out while the countdown runs'
+);
+select pg_temp.as_user('22222222-2222-2222-2222-222222222222');
+select lives_ok(
+  format($$ select public.confirm_clear(pg_temp.gid(), %L, true, pg_temp.uid(179), pg_temp.seq()) $$, current_setting('test.e2')),
+  'hider confirms'
+);
+reset role;
+select is((select status from public.card_effects where id = current_setting('test.e2')::uuid), 'cleared', 'Escape cleared');
+update public.card_effects set ends_at = now() - interval '1 second' where id = current_setting('test.e2')::uuid;
+set local role authenticated;
+select pg_temp.as_user('33333333-3333-3333-3333-333333333333');
+select throws_ok(
+  format($$ select public.start_followup(pg_temp.gid(), %L, pg_temp.uid(181), pg_temp.seq()) $$, current_setting('test.e2')),
+  'P0001', 'effect_not_active', 'a cleared task has no lock'
+);
+select throws_ok(
+  format($$ select public.start_followup(pg_temp.gid(), %L, pg_temp.uid(182), pg_temp.seq()) $$, current_setting('test.e2')),
+  'P0001', 'effect_not_active', 'still none on retry'
+);
+select pg_temp.as_user('22222222-2222-2222-2222-222222222222');
 
 -- ---------------------------------------------------------------- time bonus, text, unsupported
 

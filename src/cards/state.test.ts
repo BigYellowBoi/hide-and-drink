@@ -8,6 +8,7 @@ import {
   castBlocker,
   castChoice,
   castCost,
+  clearable,
   costPayer,
   deriveCards,
   lockedUntil,
@@ -152,6 +153,35 @@ describe('deriveCards', () => {
     expect(effectPhase(f.effects[0], t0 + 300_000)).toBe('followup')
     expect(effectTimer(f.effects[0], t0 + 300_000)).toEqual([t0 + 840_000, 600])
     expect(effectPhase(f.effects[0], t0 + 900_000)).toBe('over')
+  })
+
+  it('a timed task (follow-on) can be marked done until the lock starts; a plain timed one cannot', () => {
+    const t0 = Date.parse('2026-11-20T10:00:00Z')
+    const played = ev('card_played', {
+      instance_id: 'i9',
+      card: deck[1],
+      played_at: '2026-11-20T10:00:00Z',
+      effect_id: 'e2',
+      duration_s: 180,
+      ends_at: '2026-11-20T10:03:00Z',
+      followup_s: 600,
+    })
+    const s = deriveCards([started, played])
+    expect(clearable(s.effects[0], t0 + 60_000)).toBe(true)
+    expect(clearable(s.effects[0], t0 + 200_000)).toBe(true)
+
+    const asked = deriveCards([started, played, ev('effect_clear_requested', { effect_id: 'e2' })])
+    expect(effectPhase(asked.effects[0], t0 + 60_000)).toBe('awaiting_confirm')
+    expect(clearable(asked.effects[0], t0 + 60_000)).toBe(false)
+    const done = deriveCards([started, played, ev('effect_clear_requested', { effect_id: 'e2' }), ev('effect_cleared', { effect_id: 'e2' })])
+    expect(effectPhase(done.effects[0], t0 + 60_000)).toBe('over')
+    expect(effectPhase(done.effects[0], t0 + 200_000)).toBe('over')
+
+    const locked = deriveCards([started, played, ev('effect_followup_started', { effect_id: 'e2', ends_at: '2026-11-20T10:14:00Z' })])
+    expect(clearable(locked.effects[0], t0 + 300_000)).toBe(false)
+
+    const plain = deriveCards([started, ev('card_played', { ...played.payload, followup_s: null })])
+    expect(clearable(plain.effects[0], t0 + 60_000)).toBe(false)
   })
 
   it('time bonuses count only while held in the hand', () => {
