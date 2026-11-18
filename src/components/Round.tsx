@@ -47,7 +47,7 @@ import { PrivateLabel } from './PrivateLabel'
 import { DeadlineRing } from './DeadlineRing'
 import { timerTone } from '../lib/timers'
 import { useTimerAlert } from '../lib/useTimerAlert'
-import { BlockedBanner, ConfirmClear, CurseCheckPrompt, EffectStrip, EffectsPanel, TriviaPrompt } from './EffectsPanel'
+import { BlockedBanner, ConfirmClear, CurseCheckPrompt, EffectStrip, EffectsPanel, OtherBlockedBanners, TriviaPrompt } from './EffectsPanel'
 import { DrinkNotice } from './DrinkNotice'
 import { HandPanel } from './HandPanel'
 import type { MapDot } from './GameMap'
@@ -687,6 +687,7 @@ function SeekerView({
     <>
       <DrinkProofs sync={sync} cards={cards} team="seekers" canAct={canAct} />
       {blocked.length > 0 && tab !== 'effects' && <BlockedBanner effects={blocked} team="seekers" />}
+      {tab !== 'effects' && <OtherBlockedBanners cards={cards} team="seekers" />}
       {tab !== 'effects' && <LockBanner cards={cards} team="seekers" now={now} />}
       {cards.moving && tab !== 'effects' && (
         <div className="blocked-banner" role="status">

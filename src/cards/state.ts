@@ -737,6 +737,20 @@ export const liveEffects = (s: CardsState, now: number) => s.effects.filter((e) 
 export const questionsBlockedBy = (s: CardsState): Effect[] =>
   s.effects.filter((e) => e.blocksQuestions && (e.status === 'active' || e.status === 'clear_requested'))
 
+/**
+ * Curses in force that block something else on the honour system (params.blocks, e.g.
+ * 'transport' for Clash, Sculling, Moll), grouped by what they block, oldest first.
+ */
+export function otherBlocks(s: CardsState): [string, Effect[]][] {
+  const out = new Map<string, Effect[]>()
+  for (const e of s.effects) {
+    const what = typeof e.card.params.blocks === 'string' ? e.card.params.blocks.trim() : ''
+    if (!what || (e.status !== 'active' && e.status !== 'clear_requested')) continue
+    out.set(what, [...(out.get(what) ?? []), e])
+  }
+  return [...out]
+}
+
 /** The countdown an effect shows now: [ends at, total seconds], or null. */
 export function effectTimer(e: Effect, now: number): [number, number] | null {
   const phase = effectPhase(e, now)

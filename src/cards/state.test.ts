@@ -29,6 +29,7 @@ import {
   triviaTodo,
   triviaWaiting,
   drinkTeams,
+  otherBlocks,
 } from './state'
 
 let seq = 0
@@ -540,5 +541,22 @@ describe('playtest 2: Moll 1 of 3, seeker-confirmed curses, drink cards', () => 
       ev('card_played', { round: 1, instance_id: 'i1', card: all }),
     ])
     expect(drinkTeams(s.played[0])).toEqual(['hiders', 'seekers'])
+  })
+})
+
+describe('curses blocking transport', () => {
+  it('groups curses in force by what they block, until cleared', () => {
+    const clash = card('clash', 'until_cleared', { blocks_questions: false, blocks: 'transport' })
+    const moll = card('moll', 'trivia', { blocks: 'transport', count: 3 })
+    const events = [
+      ev('game_started', { round: 1, deck: [clash, moll] }),
+      ev('card_played', { round: 1, instance_id: 'i1', card: clash, effect_id: 'e1' }),
+      ev('card_played', { round: 1, instance_id: 'i2', card: moll, effect_id: 'e2', count: 3 }),
+    ]
+    let s = deriveCards(events)
+    expect(otherBlocks(s).map(([what, es]) => [what, es.map((e) => e.card.name)])).toEqual([['transport', ['CLASH', 'MOLL']]])
+    expect(questionsBlockedBy(s)).toEqual([])
+    s = deriveCards([...events, ev('effect_cleared', { effect_id: 'e1' }), ev('effect_cleared', { effect_id: 'e2' })])
+    expect(otherBlocks(s)).toEqual([])
   })
 })

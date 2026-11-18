@@ -6,6 +6,7 @@ import {
   effectTimer,
   evidenceFor,
   liveEffects,
+  otherBlocks,
   questionsBlockedBy,
   triviaTodo,
   type CardsState,
@@ -45,6 +46,7 @@ export function EffectsPanel(props: Props) {
   return (
     <>
       {blocked.length > 0 && <BlockedBanner effects={blocked} team={team} />}
+      <OtherBlockedBanners cards={cards} team={team} />
       <LockBanner cards={cards} team={team} now={now} />
       {cards.moving && (
         <div className="blocked-banner" role="status">
@@ -89,15 +91,26 @@ export function EffectsPanel(props: Props) {
   )
 }
 
-export function BlockedBanner({ effects, team }: { effects: readonly Effect[]; team: Team }) {
+export function BlockedBanner({ effects, team, what = 'questions' }: { effects: readonly Effect[]; team: Team; what?: string }) {
   return (
     <div className="blocked-banner" role="status">
-      <strong>Questions blocked</strong>
+      <strong>{what.charAt(0).toUpperCase() + what.slice(1)} blocked</strong>
       <p>
         {team === 'seekers' ? 'Until you complete ' : 'Seekers must complete '}
         {effects.map((e) => e.card.name).join(' and ')}.
       </p>
     </div>
+  )
+}
+
+/** One yellow banner per thing curses block besides questions (params.blocks, e.g. transport). */
+export function OtherBlockedBanners({ cards, team }: { cards: CardsState; team: Team }) {
+  return (
+    <>
+      {otherBlocks(cards).map(([what, effects]) => (
+        <BlockedBanner key={what} what={what} effects={effects} team={team} />
+      ))}
+    </>
   )
 }
 
