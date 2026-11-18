@@ -2,7 +2,9 @@ import { Suspense, useMemo, useState } from 'react'
 import type { FeatureCollection } from 'geojson'
 import type { LobbyState, StartedRound } from '../lobby/state'
 import { deriveHiding, formatClock, hidingZone, positionAge, roundClock, type HidingZoneConfig } from '../hiding/state'
-import { useGeolocation, type GeoError } from '../hiding/useGeolocation'
+import type { GeoError } from '../hiding/useGeolocation'
+import { isDevMode } from '../hiding/devPosition'
+import { usePosition } from '../hiding/usePosition'
 import { usePositionReporter } from '../hiding/usePositionReporter'
 import { useServerNow } from '../hiding/useServerNow'
 import { useWakeLock } from '../hiding/useWakeLock'
@@ -87,6 +89,9 @@ interface Shared {
   now: number
   nameOf: (userId: string | null) => string
   layer: LayerLookup | null
+  /** Dev/playtest mode: positions come from long-pressing the map, not GPS. */
+  dev: boolean
+  userId: string | null
 }
 
 /**
@@ -158,6 +163,8 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
     now,
     nameOf,
     layer,
+    dev: isDevMode(lobby.config),
+    userId,
   }
 
   return (
@@ -318,9 +325,11 @@ function HiderView({
   now,
   nameOf,
   layer,
+  dev,
+  userId,
 }: HiderProps) {
-  // Hider GPS stays on this phone: it sorts bars, suggests answers and draws "you" on the map.
-  const { fix, error } = useGeolocation(true)
+  // Hider GPS (or playtest point) stays on this phone: it sorts bars, suggests answers and draws "you" on the map.
+  const { fix, error, place } = usePosition(dev, sync.gameId, userId)
   const hiding = useMemo(() => deriveHiding(events, started.round), [events, started.round])
   const bar = hiding.bar
   const picking = !bar || hiding.moving
@@ -438,7 +447,7 @@ function HiderView({
         </section>
       )}
 
-      {tab === 'map' && picking && <GeoNote error={error} waiting={!fix} />}
+      {tab === 'map' && picking && <GeoNote error={error} waiting={!fix} dev={dev} />}
       {tab === 'map' &&
         (picking || !bar ? (
           <BarPicker
@@ -449,6 +458,7 @@ function HiderView({
             zone={zone}
             canAct={canAct}
             fix={fix}
+            onLongPress={place}
             late={clock.phase === 'seeking' && !hiding.moving}
             timeNote={hiding.moving ? `Moving from ${bar?.name ?? 'your bar'}` : `${formatClock(clock.ms)} left to hide`}
           />
@@ -473,7 +483,7 @@ function HiderView({
               {!hiding.frozen && (
                 <p className="ok small-note">Clear: no seeker within {formatDistance(zone.freezeRadiusM)}.</p>
               )}
-              <GeoNote error={error} waiting={!fix} />
+              <GeoNote error={error} waiting={!fix} dev={dev} />
             </section>
             <EffectStrip cards={cards} now={now} />
             <section className="card map-card">
@@ -484,6 +494,7 @@ function HiderView({
                   className="play-map"
                   overlay={overlay}
                   focus={focus}
+                  onLongPress={place}
                 />
               </Suspense>
               <p className="muted small">
@@ -524,9 +535,12 @@ function SeekerView({
   tab,
   now,
   nameOf,
+  dev,
+  userId,
 }: SeekerProps) {
-  // Mounted for the whole round, whatever the tab, so everyone keeps getting this phone's position.
-  const { fix, error } = useGeolocation(true)
+  // Mounted for the whole round, whatever the tab, so everyone keeps getting this phone's position
+  // (in playtest mode, the point long-pressed on the map).
+  const { fix, error, place } = usePosition(dev, sync.gameId, userId)
   const lastSent = usePositionReporter(sync, fix, canAct, zone.locationIntervalS, true)
   // Web apps get no GPS in the background, so sharing needs the app open with the screen on.
   const [keepAwake, setKeepAwake] = useState(() => readLocal(AWAKE_KEY) !== 'off')
@@ -572,14 +586,20 @@ function SeekerView({
       {tab === 'map' && (
         <section className="card map-card">
           <Suspense fallback={<div className="game-map play-map" />}>
-            <LazyGameMap city={lobby.city} playArea={started.playArea} className="play-map" overlay={overlay} />
+            <LazyGameMap
+              city={lobby.city}
+              playArea={started.playArea}
+              className="play-map"
+              overlay={overlay}
+              onLongPress={place}
+            />
           </Suspense>
           <p className="muted small">
             {clock.phase === 'hiding' ? 'Questions open when the clock hits zero. ' : ''}
             Hatched: ruled out by answers. Suggestions, not rulings.
             {fix && lastSent ? ` Sharing your location every ${Math.round(zone.locationIntervalS)} s.` : ''}
           </p>
-          <GeoNote error={error} seeker />
+          <GeoNote error={error} seeker dev={dev} waiting={dev && !fix} />
           <label className="toggle awake-toggle">
             <input
               type="checkbox"
@@ -629,6 +649,7 @@ function SeekerView({
           now={now}
           fix={fix}
           geoError={error}
+          onLongPress={place}
         />
       )}
     </>
@@ -636,7 +657,26 @@ function SeekerView({
 }
 
 
-function GeoNote({ error, seeker = false, waiting = false }: { error: GeoError | null; seeker?: boolean; waiting?: boolean }) {
+function GeoNote({
+  error,
+  seeker = false,
+  waiting = false,
+  dev = false,
+}: {
+  error: GeoError | null
+  seeker?: boolean
+  waiting?: boolean
+  dev?: boolean
+}) {
+  if (dev) {
+    return (
+      <p className={`${waiting ? 'dev-note' : 'muted'} small-note`}>
+        {waiting
+          ? 'Playtest mode: long-press the map to set your position.'
+          : 'Playtest mode: long-press the map to move yourself.'}
+      </p>
+    )
+  }
   if (!error) {
     return waiting ? <p className="muted small-note">Waiting for GPS: you'll appear on the map once it has a fix.</p> : null
   }

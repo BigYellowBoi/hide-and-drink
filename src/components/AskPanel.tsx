@@ -35,6 +35,8 @@ interface Props {
   /** This phone's GPS (the seeker view already watches it and shares it with the team). */
   fix: Fix | null
   geoError: GeoError | null
+  /** Dev/playtest mode: long-press the map to move this phone's position. */
+  onLongPress?: (lngLat: [number, number]) => void
 }
 
 const startKey = (gameId: string) => `hd.thermometer.${gameId}`
@@ -57,6 +59,7 @@ export function AskPanel({
   now,
   fix,
   geoError,
+  onLongPress,
 }: Props) {
   const [types, setTypes] = useState<QuestionType[] | null>(null)
   const [type, setType] = useState<string>('radar')
@@ -127,7 +130,9 @@ export function AskPanel({
   else if (banned.has(banKey(type, option.id))) blocker = 'That question is banned for the rest of the run.'
   else if ((type === 'radar' || type === 'thermometer') && (!distance || distance < 10)) blocker = 'Type a distance.'
   else if ((MAP_TYPES.includes(type) || type === 'thermometer') && !here)
-    blocker = 'Waiting for GPS. Or tap the map to place yourself.'
+    blocker = onLongPress
+      ? 'Long-press the map to set your position, or tap to place the tool.'
+      : 'Waiting for GPS. Or tap the map to place yourself.'
   else if (type === 'thermometer' && !start) blocker = 'Mark where you start, then travel.'
   else if (type === 'thermometer' && distance && travelled < distance) blocker = `Travel ${km(distance - travelled)} more.`
   if (hidingLeft > 0) blocker = `Questions open when hiding ends (${formatClock(hidingLeft)}).`
@@ -248,18 +253,22 @@ export function AskPanel({
       {(MAP_TYPES.includes(type) || type === 'thermometer') && (
         <>
       <Suspense fallback={<div className="game-map ask-map" />}>
-        <LazyGameMap city={city} playArea={playArea} className="ask-map" overlay={overlay} onTap={setTapped} tapNames={false} />
+        <LazyGameMap city={city} playArea={playArea} className="ask-map" overlay={overlay} onTap={setTapped} onLongPress={onLongPress} tapNames={false} />
       </Suspense>
       <p className="muted small">
         {tapped ? (
           <>
             Using the point you tapped.{' '}
             <button className="link" onClick={() => setTapped(null)}>
-              Use GPS
+              {fix?.fake ? 'Use my position' : 'Use GPS'}
             </button>
           </>
+        ) : fix?.fake ? (
+          'Using your playtest position (long-press the map to move it). Tap the map to place the tool by hand.'
         ) : fix ? (
           `Using GPS${fix.accuracyM !== null ? ` (±${Math.round(fix.accuracyM)} m)` : ''}. Tap the map to place it by hand.`
+        ) : onLongPress ? (
+          'Playtest mode: long-press the map to set your position, or tap to place the tool by hand.'
         ) : (
           `${geoError === 'denied' ? 'Location is blocked.' : 'Waiting for GPS.'} Tap the map to place yourself.`
         )}
