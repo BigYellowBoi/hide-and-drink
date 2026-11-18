@@ -5,7 +5,11 @@ import {
   effectPhase,
   effectTimer,
   evidenceFor,
+  hiderProofKind,
   liveEffects,
+  proofDone,
+  proofKind,
+  setupFor,
   otherBlocks,
   questionsBlockedBy,
   triviaTodo,
@@ -121,6 +125,10 @@ function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf 
   const timer = effectTimer(e, now)
   const played = cards.played.find((p) => p.effectId === e.id)
   const evidence = evidenceFor(cards, e.id)
+  const setup = setupFor(cards, e.id)
+  const setupMedia = hiderProofKind(e.card) ?? 'photo'
+  // The hiders' first step (e.g. Unguided Tourist's screenshot): the seekers wait for it.
+  const waitingForHiders = !!setup && !proofDone(setup)
 
   const act = async (fn: string, params: Record<string, unknown>) => {
     setBusy(true)
@@ -151,10 +159,32 @@ function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf 
           </button>
         </span>
       )}
+      {setup &&
+        (waitingForHiders ? (
+          <span className="muted small">
+            {team === 'hiders'
+              ? `Send the seekers your ${setupMedia} (pinned on top of your screen).`
+              : `Waiting for the hiders' ${setupMedia}.`}
+          </span>
+        ) : (
+          setup.path && (
+            <span className="effect-actions">
+              <span className="muted small">{team === 'hiders' ? `Your ${setupMedia}:` : `The hiders' ${setupMedia}:`}</span>
+              <PhotoThumb path={setup.path} bucket={DRINK_BUCKET} alt={`The hiders' ${setupMedia}`} />
+            </span>
+          )
+        ))}
       {clearable(e, now) &&
+        !waitingForHiders &&
         (team === 'seekers' ? (
           evidence && !evidence.path && !evidence.resolution ? (
-            <EvidenceClear sync={sync} proof={evidence} canAct={canAct && !busy} onSent={() => act('clear_effect', {})} />
+            <EvidenceClear
+              sync={sync}
+              proof={evidence}
+              media={proofKind(e.card) ?? 'photo'}
+              canAct={canAct && !busy}
+              onSent={() => act('clear_effect', {})}
+            />
           ) : (
             <button className="small" disabled={busy || !canAct} onClick={() => void act('clear_effect', {})}>
               We did it
@@ -177,28 +207,73 @@ function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf 
   )
 }
 
-/** Seekers: a curse with photo proof is cleared by sending the photo, then "we did it". */
-function EvidenceClear({ sync, proof, canAct, onSent }: { sync: GameSync; proof: DrinkProof; canAct: boolean; onSent: () => Promise<void> }) {
-  const { input, photo, busy, err, take, send } = useProofPhoto(sync, proof.id)
+/** Seekers: a curse with photo or video proof is cleared by sending it, then "we did it". */
+function EvidenceClear({
+  sync,
+  proof,
+  media,
+  canAct,
+  onSent,
+}: {
+  sync: GameSync
+  proof: DrinkProof
+  media: 'photo' | 'video'
+  canAct: boolean
+  onSent: () => Promise<void>
+}) {
+  const { box, photo, busy, err, send } = useProofPhoto(sync, proof.id, media, !canAct)
   return (
     <span className="effect-actions">
-      {input}
-      <span className="muted small">Photo proof needed: the hider sees it before confirming.</span>
-      {photo && <img className="photo-preview" src={photo.url} alt="Your proof" />}
-      <span className="confirm-row">
-        <button className="secondary small" disabled={!!busy || !canAct} onClick={take}>
-          {photo ? 'Retake' : 'Take photo'}
-        </button>
-        <button
-          className="small"
-          disabled={!photo || !!busy || !canAct}
-          onClick={() => void send().then((ok) => (ok ? onSent() : undefined))}
-        >
-          {busy ?? 'Send, we did it'}
-        </button>
-      </span>
+      <span className="muted small">{media === 'video' ? 'Video' : 'Photo'} proof needed: the hider sees it before confirming.</span>
+      {box}
+      <button
+        className="small"
+        disabled={!photo || !!busy || !canAct}
+        onClick={() => void send().then((ok) => (ok ? onSent() : undefined))}
+      >
+        {busy ?? 'Send, we did it'}
+      </button>
       {err && <span className="bad small">{err}</span>}
     </span>
+  )
+}
+
+/**
+ * Hiders: the first step of a curse with params.hider_proof (Unguided Tourist's Street View
+ * screenshot, Bird Guide's video), pinned on every tab until it is sent. The seekers can't
+ * say they did it before it arrives.
+ */
+export function SetupProofs({ sync, cards, canAct }: { sync: GameSync; cards: CardsState; canAct: boolean }) {
+  const open = cards.proofs.filter(
+    (p) =>
+      p.kind === 'setup' &&
+      !proofDone(p) &&
+      cards.effects.some((e) => e.id === p.effectId && (e.status === 'active' || e.status === 'clear_requested')),
+  )
+  return (
+    <>
+      {open.map((p) => {
+        const effect = cards.effects.find((e) => e.id === p.effectId)!
+        return <SetupProofCard key={p.id} sync={sync} proof={p} effect={effect} canAct={canAct} />
+      })}
+    </>
+  )
+}
+
+function SetupProofCard({ sync, proof, effect, canAct }: { sync: GameSync; proof: DrinkProof; effect: Effect; canAct: boolean }) {
+  const media = hiderProofKind(effect.card) ?? 'photo'
+  const { box, photo, busy, err, send } = useProofPhoto(sync, proof.id, media, !canAct)
+  return (
+    <section className="card drink-proof" role="alert">
+      <p className="eyebrow">Send the seekers your {media}</p>
+      <h2>{effect.card.name}</h2>
+      {effect.card.text && <p className="muted small">{effect.card.text}</p>}
+      {box}
+      <button className="wide" disabled={!photo || !!busy || !canAct} onClick={() => void send()}>
+        {busy ?? 'Send to the seekers'}
+      </button>
+      {err && <p className="bad">{err}</p>}
+    </section>
   )
 }
 
@@ -234,7 +309,9 @@ export function EffectStrip({ cards, now }: { cards: CardsState; now: number }) 
                 {e.trivia
                   ? e.trivia.questions
                     ? `Trivia: ${e.trivia.questions.filter((q) => q.correct).length} of ${e.trivia.questions.length} right`
-                    : 'Trivia: waiting for the questions'
+                    : e.trivia.lastFailed
+                      ? `Trivia: ${e.trivia.lastFailed.right ? `only ${e.trivia.lastFailed.right}` : 'none'} right, waiting for new questions`
+                      : 'Trivia: waiting for the questions'
                   : effectPhase(e, now) === 'awaiting_seekers'
                   ? 'Waiting for the seekers to confirm'
                   : effectPhase(e, now) === 'followup_available'

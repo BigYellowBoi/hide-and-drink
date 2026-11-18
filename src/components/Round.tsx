@@ -47,7 +47,17 @@ import { PrivateLabel } from './PrivateLabel'
 import { DeadlineRing } from './DeadlineRing'
 import { timerTone } from '../lib/timers'
 import { useTimerAlert } from '../lib/useTimerAlert'
-import { BlockedBanner, ConfirmClear, CurseCheckPrompt, EffectStrip, EffectsPanel, OtherBlockedBanners, TriviaPrompt } from './EffectsPanel'
+import {
+  BlockedBanner,
+  ConfirmClear,
+  CurseCheckPrompt,
+  EffectStrip,
+  EffectsPanel,
+  OtherBlockedBanners,
+  SetupProofs,
+  TriviaPrompt,
+} from './EffectsPanel'
+import { ProofToast } from './ProofToast'
 import { DrinkNotice } from './DrinkNotice'
 import { HandPanel } from './HandPanel'
 import type { MapDot } from './GameMap'
@@ -251,6 +261,7 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
         )
       })}
       {team && <DrinkNotice gameId={sync.gameId} cards={cards} team={team} now={now} />}
+      <ProofToast cards={cards} team={team} now={now} nameOf={nameOf} />
       {fix && (
         <FixSomething
           sync={sync}
@@ -503,6 +514,7 @@ function HiderView({
           venues={lobby.venues}
         />
       )}
+      <SetupProofs sync={sync} cards={cards} canAct={canAct} />
       {cards.effects
         .filter((e) => e.status === 'clear_requested')
         .map((e) => (

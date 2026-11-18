@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '../sync/types'
-import { deriveHiding, formatClock, hidingZone, positionAge, roundClock } from './state'
+import { clockLabel, deriveHiding, formatClock, hidingZone, positionAge, roundClock } from './state'
 
 let seq = 0
 const ev = (type: string, payload: Record<string, unknown>): GameEvent => ({
@@ -100,5 +100,14 @@ describe('deriveHiding: Move', () => {
     expect(s.bar?.venueId).toBe('a')
     const moved = deriveHiding([chosen, move, ev('bar_chosen', { venue_id: 'b', name: 'B', lng: 153.01, lat: -27, moved: true }, 3)], 1)
     expect(moved).toMatchObject({ moving: false, bar: { venueId: 'b' } })
+  })
+})
+
+describe('clockLabel', () => {
+  it('reads like the main clock: time left while hiding, time since seeking started after', () => {
+    const start = 1_000_000
+    expect(clockLabel(start + 60_000, start, 53)).toBe('+0:07')
+    expect(clockLabel(start + 53_000 + 41 * 60_000, start, 53)).toBe('+41:00')
+    expect(clockLabel(start + 10_000, start, 1800)).toBe('−29:50')
   })
 })

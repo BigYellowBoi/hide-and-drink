@@ -106,6 +106,16 @@ export function roundClock(startedAt: number, hidingPeriodS: number, serverNow: 
   return serverNow < endsAt ? { phase: 'hiding', ms: endsAt - serverNow } : { phase: 'seeking', ms: serverNow - endsAt }
 }
 
+/**
+ * A timeline time as the main clock read at that moment: "+41:00" into seeking, or "−12:30"
+ * (time left to hide) during the hiding period. Counted from when seeking started, not from
+ * the start of the round, so it matches the clock in the top bar.
+ */
+export function clockLabel(at: number, startedAt: number, hidingPeriodS: number): string {
+  const c = roundClock(startedAt, hidingPeriodS, at)
+  return c.phase === 'hiding' ? `−${formatClock(c.ms)}` : `+${formatClock(c.ms, { up: true })}`
+}
+
 /** m:ss, or h:mm:ss from an hour. Counts down rounding up, so 0:00 only once time is up. */
 export function formatClock(ms: number, { up = false } = {}): string {
   const total = Math.max(0, up ? Math.floor(ms / 1000) : Math.ceil(ms / 1000))

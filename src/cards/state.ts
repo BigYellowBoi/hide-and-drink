@@ -54,6 +54,8 @@ export interface Trivia {
   questions: TriviaQuestion[] | null
   /** The host marked everything right by hand. */
   forced: boolean
+  /** The last set thrown out for too few right (need_right): how many were right of how many. */
+  lastFailed: { right: number; total: number } | null
 }
 
 /** A played timed, until_cleared or trivia card. */
@@ -125,13 +127,14 @@ export interface Roll {
 /**
  * A photo the app asked for. Open until the team sends one. kind 'drink': a drink (cast cost,
  * a card's params.drinks, veto, missed deadline). kind 'evidence': a curse's params.proof
- * photo, sent before the seekers can say they did it (effectId).
+ * photo or video, sent before the seekers can say they did it (effectId). kind 'setup': the
+ * hiders' first step for a curse with params.hider_proof (e.g. Unguided Tourist's screenshot).
  */
 export interface DrinkProof {
   id: string
   seq: number
   team: 'hiders' | 'seekers'
-  kind: 'drink' | 'evidence'
+  kind: 'drink' | 'evidence' | 'setup'
   cost: 'drink' | 'shot'
   label: string
   path: string | null
@@ -140,6 +143,10 @@ export interface DrinkProof {
   instanceId: string | null
   /** Closed by the host without a photo: not owed, or drunk without proof. */
   resolution: 'cancelled' | 'waived' | null
+  /** Server time the photo came in or the host closed it, for the "done" toast. */
+  doneAt: number | null
+  /** Who sent the photo. */
+  by: string | null
 }
 
 export interface CardsState {
@@ -340,7 +347,7 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
               status: awaiting ? 'awaiting_seekers' : 'active',
               trivia:
                 card.behaviour === 'trivia'
-                  ? { count: num(p.count) ?? triviaCount(card), need: triviaNeed(card), topic: triviaTopic(card), questions: null, forced: false }
+                  ? { count: num(p.count) ?? triviaCount(card), need: triviaNeed(card), topic: triviaTopic(card), questions: null, forced: false, lastFailed: null }
                   : null,
               seekerConfirm: awaiting ? (str(p.seeker_confirm) ?? 'Does this curse apply to you right now?') : null,
             },
@@ -420,6 +427,8 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
         effectId: null,
         instanceId: str(p.instance_id),
         resolution: null,
+        doneAt: null,
+        by: null,
       }
       const who = team === 'hiders' ? 'Hiders' : 'Seekers'
       return log(
@@ -433,7 +442,21 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
       if (!id || !effectId) return state
       const team = p.team === 'hiders' ? 'hiders' : 'seekers'
       const instanceId = state.effects.find((x) => x.id === effectId)?.instanceId ?? null
-      const proof: DrinkProof = { id, seq: e.seq, team, kind: 'evidence', cost: 'drink', label: str(p.label) ?? 'Curse', path: null, effectId, instanceId, resolution: null }
+      const kind = p.kind === 'setup' ? 'setup' : 'evidence'
+      const proof: DrinkProof = {
+        id,
+        seq: e.seq,
+        team,
+        kind,
+        cost: 'drink',
+        label: str(p.label) ?? 'Curse',
+        path: null,
+        effectId,
+        instanceId,
+        resolution: null,
+        doneAt: null,
+        by: null,
+      }
       return { ...state, proofs: [...state.proofs, proof] }
     }
     case 'drink_proved': {
@@ -441,9 +464,11 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
       const path = str(p.path)
       const proof = state.proofs.find((x) => x.id === id)
       if (!id || !path) return state
-      const next = { ...state, proofs: state.proofs.map((x) => (x.id === id ? { ...x, path } : x)) }
+      const doneAt = time(undefined, e.created_at)
+      const next = { ...state, proofs: state.proofs.map((x) => (x.id === id ? { ...x, path, doneAt, by: str(p.by) } : x)) }
       const who = p.team === 'hiders' ? 'Hiders' : 'Seekers'
-      const text = proof?.kind === 'evidence' ? `${who} sent proof: ${proof.label}` : `${who} drank: ${proof?.label ?? 'drink'}`
+      const text =
+        proof?.kind === 'evidence' || proof?.kind === 'setup' ? `${who} sent proof: ${proof.label}` : `${who} drank: ${proof?.label ?? 'drink'}`
       return log({ kind: 'proof', text, photo: path, photoBucket: DRINK_BUCKET, ...linkTo(proof?.instanceId) }, next)
     }
     case 'effect_clear_requested': {
@@ -454,9 +479,14 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
     }
     case 'effect_clear_rejected': {
       const id = str(p.effect_id)
-      // The server reopens the curse's photo proof: the next try needs a new photo.
+      // The server reopens the seekers' photo proof (never the hiders' setup): the next try needs a new photo.
       const next = updateEffect(
-        { ...state, proofs: state.proofs.map((x) => (x.effectId !== null && x.effectId === id ? { ...x, path: null } : x)) },
+        {
+          ...state,
+          proofs: state.proofs.map((x) =>
+            x.kind === 'evidence' && x.effectId !== null && x.effectId === id && !x.resolution ? { ...x, path: null, doneAt: null } : x,
+          ),
+        },
         id,
         (x) => ({ ...x, status: 'active' }),
       )
@@ -529,7 +559,11 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
         reset ? 'not enough right: the hider sends new questions' : null,
       ]
       if (reset) {
-        const cleared = updateTrivia(next, id, (t) => ({ ...t, questions: null }))
+        const cleared = updateTrivia(next, id, (t) => ({
+          ...t,
+          questions: null,
+          lastFailed: { right: t.questions?.filter((q) => q.correct).length ?? 0, total: t.questions?.length ?? t.count },
+        }))
         return log({ kind: 'penalty', text: `${effectName(next, id)}: ${parts.filter(Boolean).join('; ')}`, ...effectLink(next, id) }, cleared)
       }
       return log(
@@ -559,8 +593,9 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
       const id = str(p.proof_id)
       const resolution: 'cancelled' | 'waived' = p.resolution === 'cancelled' ? 'cancelled' : 'waived'
       const proof = state.proofs.find((x) => x.id === id)
-      const next = { ...state, proofs: state.proofs.map((x) => (x.id === id ? { ...x, resolution } : x)) }
-      if (!proof || proof.kind === 'evidence') return next
+      const doneAt = time(undefined, e.created_at)
+      const next = { ...state, proofs: state.proofs.map((x) => (x.id === id ? { ...x, resolution, doneAt } : x)) }
+      if (!proof || proof.kind !== 'drink') return next
       const who = proof.team === 'hiders' ? 'Hiders' : 'Seekers'
       return log({ kind: 'override', text: `${who}: ${proof.label} ${resolution === 'cancelled' ? 'cancelled' : 'done, no photo needed'}` }, next)
     }
@@ -880,6 +915,13 @@ export function cardUtility(c: CardDef): { kind: 'dice'; dice: number } | { kind
 export const openProofs = (s: CardsState, team: 'hiders' | 'seekers') =>
   s.proofs.filter((p) => p.kind === 'drink' && p.team === team && !p.path && !p.resolution)
 
+/** The hiders' first-step proof for a curse (params.hider_proof), or null. */
+export const setupFor = (s: CardsState, effectId: string): DrinkProof | null =>
+  s.proofs.find((p) => p.kind === 'setup' && p.effectId === effectId) ?? null
+
+/** A proof is done once the photo is in or the host closed it. */
+export const proofDone = (p: DrinkProof) => !!p.path || !!p.resolution
+
 /** The photo proof a curse's effect needs before the seekers can say they did it, or null. */
 export const evidenceFor = (s: CardsState, effectId: string): DrinkProof | null =>
   s.proofs.find((p) => p.kind === 'evidence' && p.effectId === effectId) ?? null
@@ -942,9 +984,14 @@ export function costPayer(c: CardDef): 'hiders' | 'seekers' {
   return 'hiders'
 }
 
-/** params.proof: 'photo' (the app collects it) or 'video' (shown in person). */
+/** params.proof: 'photo' or 'video', both collected by the app. */
 export function proofKind(c: CardDef): 'photo' | 'video' | null {
   return c.params.proof === 'photo' || c.params.proof === 'video' ? c.params.proof : null
+}
+
+/** params.hider_proof: what the hiders send first when they cast it ('photo' or 'video'). */
+export function hiderProofKind(c: CardDef): 'photo' | 'video' | null {
+  return c.params.hider_proof === 'photo' || c.params.hider_proof === 'video' ? c.params.hider_proof : null
 }
 
 const BEHAVIOUR_LABEL: Record<string, string> = {
@@ -990,8 +1037,10 @@ export function cardDetails(c: CardDef): { label: string; value: string }[] {
             : 'Photo',
     })
   } else if (proof === 'video') {
-    rows.push({ label: 'Proof', value: 'Video: show it to the other team' })
+    rows.push({ label: 'Proof', value: 'Video: the seekers send one before they can say they did it' })
   }
+  const first = hiderProofKind(c)
+  if (first) rows.push({ label: 'Hiders first', value: `The hiders send a ${first} when they cast it` })
   const facts = cardFacts(c).filter((f) => !/ proof$/.test(f) && f !== "Can't veto")
   if (facts.length) rows.push({ label: 'Rules', value: facts.join(' · ') })
   if ((c.behaviour === 'until_cleared' || c.behaviour === 'trivia') && typeof c.params.blocks === 'string') rows.push({ label: 'Blocks', value: cap(c.params.blocks) })
@@ -1003,3 +1052,31 @@ export function drinkTeams(p: PlayedCard): ('hiders' | 'seekers')[] {
   const d = p.card.params.drinks
   return Array.isArray(d) ? d.filter((t): t is 'hiders' | 'seekers' => t === 'hiders' || t === 'seekers') : []
 }
+
+/**
+ * Keep button when the hand is full: what is kept and what goes, by name. Discarding the
+ * new card itself reads "Discard X, keep your hand", never "keep new card, discard X".
+ */
+export function keepDiscardLabel(keptNew: readonly string[], discardedNew: readonly string[], discardedHand: readonly string[]): string {
+  const list = (n: readonly string[]) => n.join(', ')
+  if (!discardedHand.length) return `Discard ${list(discardedNew)}, keep your hand`
+  const gone = list([...discardedNew, ...discardedHand])
+  if (!keptNew.length) return `Discard ${gone}`
+  return `Keep ${list(keptNew)}, discard ${gone}`
+}
+
+/** Toast text for a proof that just came in or was closed by the host. */
+export function proofToastText(p: DrinkProof, team: 'hiders' | 'seekers' | null, nameOf: (id: string | null) => string): { title: string; body: string } {
+  const who = p.team === team ? 'Your team' : p.team === 'hiders' ? 'The hiders' : 'The seekers'
+  if (p.resolution) {
+    return {
+      title: p.resolution === 'cancelled' ? `${p.label}: cancelled` : `${p.label}: done`,
+      body: p.resolution === 'cancelled' ? `${who} don't owe it (host fix).` : `${who} did it, no photo needed (host fix).`,
+    }
+  }
+  const by = p.by ? nameOf(p.by) : who
+  if (p.kind === 'setup') return { title: `${p.label}: the hiders sent theirs`, body: `Sent by ${by}. It's in the curse and the log.` }
+  if (p.kind === 'evidence') return { title: `${p.label}: proof sent`, body: `Sent by ${by}.` }
+  return { title: `${who === 'Your team' ? 'Your team' : who} drank: ${p.label}`, body: `${p.cost === 'shot' ? 'Shot' : 'Drink'} done, photo by ${by}.` }
+}
+

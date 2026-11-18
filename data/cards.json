@@ -238,7 +238,8 @@
       "params": {
         "blocks_questions": true,
         "proof": "photo",
-        "radius_m": 150
+        "radius_m": 150,
+        "hider_proof": "photo"
       },
       "active": true,
       "cast_cost": "free",
@@ -254,7 +255,8 @@
       "params": {
         "blocks_questions": true,
         "proof": "video",
-        "max_s": 300
+        "max_s": 300,
+        "hider_proof": "video"
       },
       "active": true,
       "cast_cost": "free",
@@ -269,7 +271,8 @@
       "text": "Take a photo of a car. The seekers must take a photo of a more expensive car before asking another question.",
       "params": {
         "blocks_questions": true,
-        "proof": "photo"
+        "proof": "photo",
+        "hider_proof": "photo"
       },
       "active": true,
       "cast_cost": "free",
@@ -374,7 +377,8 @@
       "text": "Hiders must pick a drink from their bar menu (any branded alcohol). Seekers need to find the same one and drink it before asking another question.",
       "params": {
         "blocks_questions": true,
-        "proof": "photo"
+        "proof": "photo",
+        "hider_proof": "photo"
       },
       "active": true,
       "cast_cost": "free",
@@ -437,7 +441,8 @@
       "params": {
         "blocks_questions": false,
         "blocks": "transport",
-        "proof": "video"
+        "proof": "video",
+        "hider_proof": "video"
       },
       "active": true,
       "cast_cost": "drink",

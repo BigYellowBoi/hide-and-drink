@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import type { FeatureCollection } from 'geojson'
 import type { GameSync } from '../sync/engine'
 import type { AreaCollection } from '../map/playArea'
@@ -9,6 +9,7 @@ import { suggestAnswer, type HiderZone } from '../play/shading'
 import type { LayerLookup } from '../play/features'
 import type { VenueEdits } from '../venues/state'
 import { photoPath, shrinkPhoto, uploadPhoto } from '../play/photos'
+import { MediaBox } from './MediaBox'
 import { supabase } from '../lib/supabase'
 import { ANSWERS, answerText, candidatesOf, km, NULL_ANSWER, optionText, questionLabel, questionText, shownEnd, type Question } from '../play/state'
 import { LockIcon, PrivateLabel } from './PrivateLabel'
@@ -70,7 +71,6 @@ export function AnswerSheet({
   const [photo, setPhoto] = useState<Photo | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
   const suggestion = useMemo(() => suggestAnswer(q, zone, layer), [q, zone, layer])
   const late = now > q.deadlineAt
   // Buzz the hider's phone a minute before the deadline and when it passes.
@@ -263,18 +263,12 @@ export function AnswerSheet({
       )}
       {q.type === 'photos' && (
         <div className="photo-answer">
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            hidden
-            onChange={(e) => void pickPhoto(e.target.files?.[0])}
+          <MediaBox
+            media="photo"
+            picked={photo ? { url: photo.url, kind: 'photo' } : null}
+            disabled={!!busy || !canAct}
+            onPick={(f) => void pickPhoto(f)}
           />
-          {photo && <img className="photo-preview" src={photo.url} alt="Your photo" />}
-          <button className="secondary wide" disabled={!!busy || !canAct} onClick={() => fileRef.current?.click()}>
-            {photo ? 'Retake photo' : 'Take photo'}
-          </button>
         </div>
       )}
       <button className="wide" disabled={!ready || !!busy || !canAct} onClick={() => void send()}>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  keepDiscardLabel,
   banKey,
   bannedSet,
   cardOf,
@@ -305,10 +306,12 @@ function DrawChooser({ sync, cards, draw, canAct }: Props & { draw: PendingDraw 
   }
 
   // Name what goes, so the button never reads as keeping the card just picked to discard.
-  const discardNames = [...kept, ...cards.hand]
-    .filter((c) => discard.includes(c.instanceId))
-    .map((c) => cardOf(cards, c.cardId).name)
-    .join(', ')
+  const nameOfCard = (c: { cardId: string }) => cardOf(cards, c.cardId).name
+  const overflowLabel = keepDiscardLabel(
+    kept.filter((c) => !discard.includes(c.instanceId)).map(nameOfCard),
+    kept.filter((c) => discard.includes(c.instanceId)).map(nameOfCard),
+    cards.hand.filter((c) => discard.includes(c.instanceId)).map(nameOfCard),
+  )
 
   const send = async () => {
     setBusy(true)
@@ -363,7 +366,7 @@ function DrawChooser({ sync, cards, draw, canAct }: Props & { draw: PendingDraw 
           ? 'Keeping…'
           : ready
             ? overflow > 0
-              ? `Keep ${draw.pick === 1 ? 'new card' : `${draw.pick} new cards`}, discard ${discardNames}`
+              ? overflowLabel
               : `Keep ${draw.pick === 1 ? 'this card' : 'these cards'}`
             : keep.length < draw.pick
               ? `Pick ${draw.pick - keep.length} more`

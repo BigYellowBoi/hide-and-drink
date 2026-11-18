@@ -1,6 +1,6 @@
 import { useContext, type CSSProperties } from 'react'
 import type { LobbyState } from '../lobby/state'
-import { formatClock } from '../hiding/state'
+import { clockLabel, formatClock, hidingPeriodAt } from '../hiding/state'
 import { buildTimeline, answerPhoto } from '../play/timeline'
 import { questionTool } from '../play/overlays'
 import { typeColour, type QuestionType } from '../play/questionTypes'
@@ -40,7 +40,9 @@ const FALLBACK = '#A9B4BF'
  * cleared, drink proofs, penalties in amber). Hider-only rows carry a lock.
  */
 export function Timeline({ questions, log, cards, now, lobby, types, team, round, canAct, shownId, onShow, onShade, nameOf }: Props) {
-  const roundStart = lobby.started?.startedAt ?? 0
+  // Times read like the main clock: from when seeking started (−m:ss while hiding).
+  const started = lobby.started
+  const clock = (at: number) => (started ? clockLabel(at, started.startedAt, hidingPeriodAt(started, now)) : '')
   const items = buildTimeline(questions, log, cards.played)
   return (
     <section className="card">
@@ -51,9 +53,9 @@ export function Timeline({ questions, log, cards, now, lobby, types, team, round
         <ol className="timeline">
           {items.map((it) =>
             it.kind === 'entry' ? (
-              <Row key={`e${it.seq}`} entry={it.entry} roundStart={roundStart} />
+              <Row key={`e${it.seq}`} entry={it.entry} clock={clock} />
             ) : it.kind === 'curse' ? (
-              <CurseCard key={`c${it.played.instanceId}`} played={it.played} entries={it.entries} cards={cards} now={now} roundStart={roundStart} />
+              <CurseCard key={`c${it.played.instanceId}`} played={it.played} entries={it.entries} cards={cards} now={now} clock={clock} />
             ) : (
               <QuestionCard
                 key={it.question.id}
@@ -61,7 +63,7 @@ export function Timeline({ questions, log, cards, now, lobby, types, team, round
                 entries={it.entries}
                 photo={answerPhoto(log, it.question.id)}
                 colour={typeColour(types, it.question.type) ?? FALLBACK}
-                roundStart={roundStart}
+                clock={clock}
                 asker={nameOf(it.question.askedBy)}
                 canShade={team === 'seekers' && canAct && it.question.round === round && it.question.answer !== null}
                 shown={shownId === it.question.id}
@@ -76,8 +78,8 @@ export function Timeline({ questions, log, cards, now, lobby, types, team, round
   )
 }
 
-function Time({ at, roundStart }: { at: number; roundStart: number }) {
-  return <span className="log-time">+{formatClock(Math.max(0, at - roundStart), { up: true })}</span>
+function Time({ label }: { label: string }) {
+  return <span className="log-time">{label}</span>
 }
 
 function Private() {
@@ -122,13 +124,13 @@ function CurseCard({
   entries,
   cards,
   now,
-  roundStart,
+  clock,
 }: {
   played: PlayedCard
   entries: readonly LogEntry[]
   cards: CardsState
   now: number
-  roundStart: number
+  clock: (at: number) => string
 }) {
   const c = p.card
   const cost = castCost(c)
@@ -139,7 +141,7 @@ function CurseCard({
       <div className="tl-head">
         <span className="tl-type">{c.categoryName || 'Curse'}</span>
         <span className="tl-head-end">
-          <Time at={p.playedAt} roundStart={roundStart} />
+          <Time label={clock(p.playedAt)} />
           <CardInfoButton card={c} />
         </span>
       </div>
@@ -158,7 +160,7 @@ function CurseCard({
             <li key={l.seq} className={`log-${l.kind}`}>
               <span className="log-dot" style={l.colour ? { background: l.colour } : undefined} aria-hidden="true" />
               <span>
-                <FixText l={l} /> <span className="muted small">+{formatClock(Math.max(0, l.at - roundStart), { up: true })}</span>
+                <FixText l={l} /> <span className="muted small">{clock(l.at)}</span>
                 {l.photo && <PhotoThumb path={l.photo} bucket={l.photoBucket} alt="Proof photo" />}
                 {l.private && <Private />}
               </span>
@@ -182,11 +184,11 @@ function FixText({ l }: { l: LogEntry }) {
   )
 }
 
-function Row({ entry: l, roundStart }: { entry: LogEntry; roundStart: number }) {
+function Row({ entry: l, clock }: { entry: LogEntry; clock: (at: number) => string }) {
   return (
     <li className={`tl-row log-${l.kind}`}>
       <span className="log-dot" style={l.colour ? { background: l.colour } : undefined} aria-hidden="true" />
-      <Time at={l.at} roundStart={roundStart} />
+      <Time label={clock(l.at)} />
       <span>
         <FixText l={l} />
         {l.photo && <PhotoThumb path={l.photo} bucket={l.photoBucket} alt={l.photoBucket ? 'Proof photo' : 'Answer photo'} />}
@@ -201,7 +203,7 @@ interface CardProps {
   entries: readonly LogEntry[]
   photo: string | null
   colour: string
-  roundStart: number
+  clock: (at: number) => string
   asker: string
   canShade: boolean
   shown: boolean
@@ -209,7 +211,7 @@ interface CardProps {
   onShade: (q: Question) => void
 }
 
-function QuestionCard({ q, entries, photo, colour, roundStart, asker, canShade, shown, onShow, onShade }: CardProps) {
+function QuestionCard({ q, entries, photo, colour, clock, asker, canShade, shown, onShow, onShade }: CardProps) {
   const open = q.answer === null && q.closedBy === null
   const mult = q.rewardMultiplier && q.rewardMultiplier !== 1 ? ` (×${q.rewardMultiplier})` : ''
   const mappable = questionTool(q).features.length > 0
@@ -218,7 +220,7 @@ function QuestionCard({ q, entries, photo, colour, roundStart, asker, canShade, 
     <li className={`tl-question${open ? ' tl-open' : ''}`} style={{ '--type': colour } as CSSProperties}>
       <div className="tl-head">
         <span className="tl-type">{typeName(q.type)}</span>
-        <Time at={q.askedAt} roundStart={roundStart} />
+        <Time label={clock(q.askedAt)} />
       </div>
       <p className="tl-text">{questionText(q)}</p>
       <p className="muted small">Asked by {asker}</p>
@@ -230,7 +232,7 @@ function QuestionCard({ q, entries, photo, colour, roundStart, asker, canShade, 
             {q.closedBy ? '' : 'Answer: '}
             <strong>{outcomeText(q)}</strong>
             {q.late && <span className="penalty"> · late</span>}
-            {q.answeredAt !== null && <span className="muted small"> · +{formatClock(Math.max(0, q.answeredAt - roundStart), { up: true })}</span>}
+            {q.answeredAt !== null && <span className="muted small"> · {clock(q.answeredAt)}</span>}
           </>
         )}
       </p>
