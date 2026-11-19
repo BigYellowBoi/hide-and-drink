@@ -273,7 +273,8 @@
         "proof_prompt": "Film a bird for at least as long as the hiders' video.",
         "judge_question": "Did the seekers film their bird for as long or longer?",
         "judge_accept": "Yes",
-        "judge_reject": "No, shorter"
+        "judge_reject": "No, shorter",
+        "video_quality": "reduced"
       },
       "active": true,
       "cast_cost": "free",

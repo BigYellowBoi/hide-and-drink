@@ -20,10 +20,6 @@ export async function shrinkPhoto(file: Blob): Promise<Blob> {
   )
 }
 
-/** <game_id>/<question or proof id>/<file>.jpg */
-export const photoPath = (gameId: string, ownerId: string, fileId: string = crypto.randomUUID()) =>
-  `${gameId}/${ownerId}/${fileId.replace(/[^A-Za-z0-9_-]/g, '')}.jpg`
-
 /** Upload; returns the path to send with answer_question. Upserts so a retry is harmless. */
 export async function uploadPhoto(
   client: SupabaseClient,
@@ -37,31 +33,70 @@ export async function uploadPhoto(
   return path
 }
 
-const urls = new Map<string, Promise<string>>()
+interface Pending {
+  path: string
+  bucket: string
+  resolve: (url: string) => void
+  reject: (e: Error) => void
+}
 
-/** Signed URL (1 h) for showing a photo; cached per session. */
+/** Read URLs last an hour; refetch a little before. */
+const URL_TTL_MS = 50 * 60 * 1000
+const urls = new Map<string, { url: Promise<string>; at: number }>()
+let queue: Pending[] = []
+let flushing: ReturnType<typeof setTimeout> | null = null
+
+/** Old way, if media-read-url isn't deployed or reachable: a signed Storage URL (same rules, by RLS). */
+async function storageUrl(client: SupabaseClient, path: string, bucket: string): Promise<string> {
+  const { data, error } = await client.storage.from(bucket).createSignedUrl(path, 3600)
+  if (error || !data) throw new Error(error?.message ?? 'Photo not available')
+  return data.signedUrl
+}
+
+async function flush(client: SupabaseClient) {
+  flushing = null
+  const batch = queue.splice(0, 100)
+  if (queue.length) flushing = setTimeout(() => void flush(client), 0)
+  let granted: Record<string, string> | null = null
+  try {
+    const { data, error } = await client.functions.invoke('media-read-url', { body: { names: batch.map((b) => b.path) } })
+    if (!error && data && typeof data === 'object' && 'urls' in data) granted = (data as { urls: Record<string, string> }).urls
+  } catch {
+    granted = null
+  }
+  for (const b of batch) {
+    if (granted) {
+      // Left out: this team may not see it (or it is gone).
+      if (granted[b.path]) b.resolve(granted[b.path])
+      else b.reject(new Error('Photo not available'))
+    } else {
+      storageUrl(client, b.path, b.bucket).then(b.resolve, b.reject)
+    }
+  }
+}
+
+/**
+ * Read URL (1 h) for showing a photo or video: from media-read-url (R2 or Storage, only
+ * what this phone's team may see; batched), else a signed Storage URL. Cached per session.
+ */
 export function photoUrl(client: SupabaseClient, path: string, bucket = PHOTO_BUCKET): Promise<string> {
   const key = `${bucket}/${path}`
-  let p = urls.get(key)
-  if (!p) {
-    p = client.storage
-      .from(bucket)
-      .createSignedUrl(path, 3600)
-      .then(({ data, error }) => {
-        if (error || !data) throw new Error(error?.message ?? 'Photo not available')
-        return data.signedUrl
-      })
-    urls.set(key, p)
-    p.catch(() => urls.delete(key))
-  }
-  return p
+  const hit = urls.get(key)
+  if (hit && Date.now() - hit.at < URL_TTL_MS) return hit.url
+  const url = new Promise<string>((resolve, reject) => {
+    queue.push({ path, bucket, resolve, reject })
+    flushing ??= setTimeout(() => void flush(client), 20)
+  })
+  urls.set(key, { url, at: Date.now() })
+  url.catch(() => urls.delete(key))
+  return url
 }
 
 // ------------------------------------------------------------------- videos
 
 /**
- * Supabase's free plan caps one file at 50 MB (the drink-photos bucket limit). Videos over
- * this are squeezed on the phone first; a little headroom under the cap.
+ * Supabase's free plan caps one file at 50 MB (the drink-photos bucket limit). On the
+ * Supabase path (no R2, or R2 full: src/play/media.ts) videos over this are squeezed first.
  */
 export const MAX_VIDEO_BYTES = 48 * 1024 * 1024
 /** Bitrate for squeezed videos: 5 min at 480p comes out around 30 MB. */
@@ -79,10 +114,6 @@ export function videoType(blob: Blob): { contentType: string; ext: string } | nu
   const ext = VIDEO_EXT[type]
   return ext ? { contentType: type, ext } : null
 }
-
-/** <game_id>/<owner id>/<file>.<ext> for a video. */
-export const videoPath = (gameId: string, ownerId: string, ext: string, fileId: string = crypto.randomUUID()) =>
-  `${gameId}/${ownerId}/${fileId.replace(/[^A-Za-z0-9_-]/g, '')}.${ext}`
 
 export const megabytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`
 

@@ -140,6 +140,14 @@ export const COMMON_FIELDS: ParamField[] = [
     hint: 'Shown next to the seekers\' upload, e.g. Film yourselves chugging one quicker',
   },
   {
+    key: 'video_quality',
+    label: 'Video quality',
+    kind: 'select',
+    options: [{ value: 'reduced', label: 'Reduced: may be shrunk to 480p' }],
+    when: (p) => p.proof === 'video' || p.hider_proof === 'video',
+    hint: 'Default full quality. Pick reduced for videos with no people or drinks in them (e.g. a bird): they stay full quality only while media storage is under half full',
+  },
+  {
     key: 'judge_question',
     label: 'Hider decides',
     kind: 'text',

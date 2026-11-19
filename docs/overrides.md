@@ -110,6 +110,7 @@ This is the audit of `supabase/migrations/` (up to `20261219090100_rounds_scorin
 | `question_type_not_supported`, `no_map_data`, `option_not_configured`, `position_outside_map`, `invalid_distance`, `not_far_enough`, `invalid_params` | `ask_question` (`_question_params`) | `ask_question` override (sent without map data) and `set_answer` |
 | `question_not_pending` | `answer_question`, `set_trivia`... | `reopen_question`, `set_answer` |
 | `invalid_answer`, `photo_not_uploaded` (answers) | `answer_question` (`_check_answer`) | `set_answer` (free text) |
+| `media_not_allowed`, `media_too_big`, `invalid_media_type` (uploads; R2 full sends them to Supabase, reduced videos squeezed: `docs/r2.md`) | Edge Function `media-upload-url` (`media_upload_grant`) | `set_answer` (answer without the photo), `waive_proof` (proof without it) |
 | `no_pending_question`, `nothing_to_randomize` | `play_card` veto/randomize | `void_answer` (= veto), `ask_question` (= randomize) |
 | `bar_already_chosen` | `choose_bar` | `set_bar` |
 | `venue_not_allowed`, `venue_not_found`, `same_bar` | `choose_bar` | `set_bar` (any known venue, or a pin) |

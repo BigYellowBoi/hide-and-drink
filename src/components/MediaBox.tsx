@@ -2,8 +2,11 @@ import { useId } from 'react'
 
 interface Props {
   media: 'photo' | 'video'
-  picked: { url: string; kind: 'photo' | 'video' } | null
+  /** note: size and type of the picked file, so we can see what the phone handed over. */
+  picked: { url: string; kind: 'photo' | 'video'; note?: string } | null
   disabled?: boolean
+  /** Upload under way: label, and the share sent when known. */
+  progress?: { label: string; fraction: number | null } | null
   onPick: (file: File | undefined) => void
 }
 
@@ -11,7 +14,7 @@ interface Props {
  * Upload box for a photo or video. No `capture` attribute, so the phone offers the camera,
  * the photo library (screenshots included) or files. Shows the preview once picked; tap to change.
  */
-export function MediaBox({ media, picked, disabled, onPick }: Props) {
+export function MediaBox({ media, picked, disabled, progress, onPick }: Props) {
   const id = useId()
   const what = media === 'video' ? 'video' : 'photo'
   return (
@@ -40,10 +43,20 @@ export function MediaBox({ media, picked, disabled, onPick }: Props) {
         <span className="media-box-label">
           <strong>{picked ? `Change ${what}` : `Add ${what}`}</strong>
           <span className="muted small">
-            {media === 'video' ? 'Record now or pick one from your videos' : 'Take one now, or pick from your photos or screenshots'}
+            {picked?.note
+              ? picked.note
+              : media === 'video'
+                ? 'Record now or pick one from your videos'
+                : 'Take one now, or pick from your photos or screenshots'}
           </span>
         </span>
       </label>
+      {progress && (
+        <div className="media-progress" role="status">
+          <progress max={1} value={progress.fraction ?? undefined} aria-label={progress.label} />
+          <span className="muted small">{progress.label}</span>
+        </div>
+      )}
     </div>
   )
 }

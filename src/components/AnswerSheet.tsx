@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useMemo, useState } from 'react'
 import type { FeatureCollection } from 'geojson'
 import type { GameSync } from '../sync/engine'
 import type { AreaCollection } from '../map/playArea'
@@ -8,9 +8,8 @@ import { isLngLat } from '../play/geo'
 import { suggestAnswer, type HiderZone } from '../play/shading'
 import type { LayerLookup } from '../play/features'
 import type { VenueEdits } from '../venues/state'
-import { photoPath, shrinkPhoto, uploadPhoto } from '../play/photos'
-import { MediaBox } from './MediaBox'
-import { supabase } from '../lib/supabase'
+import { PHOTO_BUCKET } from '../play/photos'
+import { useMediaPick } from './useProofPhoto'
 import { ANSWERS, answerText, candidatesOf, km, NULL_ANSWER, optionText, questionLabel, questionText, shownEnd, type Question } from '../play/state'
 import { LockIcon, PrivateLabel } from './PrivateLabel'
 import { DeadlineRing } from './DeadlineRing'
@@ -40,12 +39,6 @@ interface Props {
   rewardMultiplier?: number
 }
 
-interface Photo {
-  blob: Blob
-  url: string
-  path: string
-}
-
 /**
  * Hider's answer sheet: sits at the top until answered. The suggestion is only a
  * suggestion; nothing is sent until the hider picks an answer and taps Send.
@@ -68,7 +61,6 @@ export function AnswerSheet({
 }: Props) {
   const [choice, setChoice] = useState<string | null>(null)
   const [text, setText] = useState('')
-  const [photo, setPhoto] = useState<Photo | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const suggestion = useMemo(() => suggestAnswer(q, zone, layer), [q, zone, layer])
@@ -96,29 +88,10 @@ export function AnswerSheet({
   ]
   const typed = kind === 'text' || kind === 'number'
   const typedAnswer = typed && text.trim() && (kind === 'text' || /^\d{1,4}$/.test(text.trim())) ? text.trim() : null
-  const answer = choice ?? typedAnswer
-
-  useEffect(
-    () => () => {
-      if (photo) URL.revokeObjectURL(photo.url)
-    },
-    [photo],
-  )
-
-  const pickPhoto = async (file: File | undefined) => {
-    if (!file) return
-    setErr(null)
-    setBusy('Preparing photo…')
-    try {
-      const blob = await shrinkPhoto(file)
-      setPhoto({ blob, url: URL.createObjectURL(blob), path: photoPath(sync.gameId, q.id) })
-      setChoice(null)
-    } catch (e) {
-      setErr(describeError(e))
-    } finally {
-      setBusy(null)
-    }
-  }
+  const photoPick = useMediaPick(sync, q.id, 'photo', !!busy || !canAct, PHOTO_BUCKET)
+  const photo = photoPick.photo
+  // A photo picked replaces a chosen answer (choosing one clears the photo).
+  const answer = photo ? null : (choice ?? typedAnswer)
 
   const overlay = useMemo(
     () => ({
@@ -140,10 +113,7 @@ export function AnswerSheet({
     setErr(null)
     try {
       let a = answer
-      if (!a && photo && supabase) {
-        setBusy('Uploading photo…')
-        a = await uploadPhoto(supabase, photo.path, photo.blob)
-      }
+      if (!a && photo) a = await photoPick.upload()
       if (!a) return
       setBusy('Sending…')
       await sync.action('answer_question', { p_question_id: q.id, p_answer: a })
@@ -167,7 +137,7 @@ export function AnswerSheet({
   const draw = Math.round(q.reward.draw * rewardMultiplier)
   const pick = Math.round(q.reward.pick * rewardMultiplier)
   const sendLabel =
-    busy ?? (answer ? `Send “${answerText(q, answer)}”` : photo ? 'Send photo' : typed ? 'Type an answer' : 'Pick an answer')
+    busy ?? photoPick.busy ?? (answer ? `Send “${answerText(q, answer)}”` : photo ? 'Send photo' : typed ? 'Type an answer' : 'Pick an answer')
   const ref = q.params
 
   return (
@@ -234,12 +204,12 @@ export function AnswerSheet({
         {buttons.map(([a, label]) => (
           <button
             key={a}
-            className={`answer${choice === a ? ' on' : ''}`}
-            aria-pressed={choice === a}
+            className={`answer${!photo && choice === a ? ' on' : ''}`}
+            aria-pressed={!photo && choice === a}
             disabled={!!busy || !canAct}
             onClick={() => {
-              setChoice(choice === a ? null : a)
-              setPhoto(null)
+              setChoice(!photo && choice === a ? null : a)
+              photoPick.clear()
             }}
           >
             {label}
@@ -263,15 +233,10 @@ export function AnswerSheet({
       )}
       {q.type === 'photos' && (
         <div className="photo-answer">
-          <MediaBox
-            media="photo"
-            picked={photo ? { url: photo.url, kind: 'photo' } : null}
-            disabled={!!busy || !canAct}
-            onPick={(f) => void pickPhoto(f)}
-          />
+          {photoPick.box}
         </div>
       )}
-      <button className="wide" disabled={!ready || !!busy || !canAct} onClick={() => void send()}>
+      <button className="wide" disabled={!ready || !!busy || !!photoPick.busy || !canAct} onClick={() => void send()}>
         {sendLabel}
       </button>
       {late && <p className="flag">Deadline passed: a shot for your team is logged. You still need to answer.</p>}
