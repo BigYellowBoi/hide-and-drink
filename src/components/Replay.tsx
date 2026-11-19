@@ -13,6 +13,10 @@ import { LazyGameMap } from './lazyMap'
 import { TimelineItemView } from './Timeline'
 import { PrivateWordContext } from './hiderCount'
 import { DownloadButton } from './PastGames'
+import type { SavedGame } from '../replay/saved'
+import { MediaSourceContext, zipMediaSource } from '../replay/mediaSource'
+import type { CityPack } from '../map/cityPack'
+import type { QuestionType } from '../play/questionTypes'
 
 const PLAY_EVERY_MS = 2500
 
@@ -54,7 +58,36 @@ export function Replay({ transport, gameId, onBack }: { transport: SyncTransport
   )
 }
 
-function ReplayView({ data }: { data: ReplayData }) {
+/** A downloaded game opened from its zip (Home > Open a saved game): no server needed. */
+export function SavedReplay({ saved, onBack }: { saved: SavedGame; onBack: () => void }) {
+  const source = useMemo(() => zipMediaSource(saved.media), [saved.media])
+  useEffect(() => () => source.revoke(), [source])
+  return (
+    <>
+      <header className="settings-bar">
+        <button className="small secondary" onClick={onBack}>
+          Back
+        </button>
+        <h1 className="settings-title">Saved game</h1>
+        <span />
+      </header>
+      <MediaSourceContext.Provider value={source.get}>
+        <ReplayView data={saved.data} cityPack={saved.pack} savedTypes={saved.types} />
+      </MediaSourceContext.Provider>
+    </>
+  )
+}
+
+function ReplayView({
+  data,
+  cityPack = null,
+  savedTypes = null,
+}: {
+  data: ReplayData
+  /** Saved game: the map data and question types from its zip. */
+  cityPack?: CityPack | null
+  savedTypes?: QuestionType[] | null
+}) {
   const replay = useMemo(() => buildReplay(data.events), [data.events])
   const names_ = useMemo(() => new Map(data.players.map((p) => [p.user_id, p.name])), [data.players])
   const nameOf = useCallback((id: string | null) => (id ? (names_.get(id) ?? 'Player') : 'Someone'), [names_])
@@ -84,7 +117,8 @@ function ReplayView({ data }: { data: ReplayData }) {
 
   const round = roundAt(replay, t)
   const city = data.game.city
-  const types = useQuestionTypes(city)
+  const serverTypes = useQuestionTypes(city)
+  const types = savedTypes ?? serverTypes
   const track = useMemo(() => (round ? trackAt(data.track, round.round, t, nameOf) : { paths: [], dots: [] }), [data.track, round, t, nameOf])
   const overlay = useMemo(
     () => ({
@@ -116,7 +150,7 @@ function ReplayView({ data }: { data: ReplayData }) {
       </section>
 
       <Suspense fallback={<div className="game-map replay-map" />}>
-        <LazyGameMap city={city} playArea={round?.started.playArea ?? null} className="replay-map" overlay={overlay} hideVenues />
+        <LazyGameMap city={city} playArea={round?.started.playArea ?? null} className="replay-map" overlay={overlay} hideVenues cityPack={cityPack} />
       </Suspense>
 
       <section className="card replay-controls">

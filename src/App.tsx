@@ -15,7 +15,8 @@ import { Lobby } from './components/Lobby'
 import { Round, TopbarClock, type FixState } from './components/Round'
 import { BetweenRounds } from './components/BetweenRounds'
 import { FinalScreen } from './components/FinalScreen'
-import { Replay } from './components/Replay'
+import { Replay, SavedReplay } from './components/Replay'
+import type { SavedGame } from './replay/saved'
 import { StaleBanner } from './components/StaleBanner'
 import { presenceOf } from './sync/presence'
 import { isDevMode } from './hiding/devPosition'
@@ -191,6 +192,8 @@ export default function App() {
   const [settings, setSettings] = useState(false)
   /** A past game's replay, opened from Home or the final screen. */
   const [replay, setReplay] = useState<string | null>(null)
+  /** A downloaded game opened from its zip. */
+  const [saved, setSaved] = useState<SavedGame | null>(null)
 
   const [attempt, setAttempt] = useState(0)
 
@@ -209,6 +212,8 @@ export default function App() {
             </div>
             <p className="bad">Backend not configured (see .env.example).</p>
           </>
+        ) : saved ? (
+          <SavedReplay saved={saved} onBack={() => setSaved(null)} />
         ) : replay ? (
           <Replay transport={transport} gameId={replay} onBack={() => setReplay(null)} />
         ) : gameId ? (
@@ -231,6 +236,7 @@ export default function App() {
             onEnter={enter}
             onSettings={() => setSettings(true)}
             onReplay={(id) => setReplay(id)}
+            onOpenSaved={setSaved}
           />
         )}
         <p className="muted small app-version">{buildLabel()}</p>

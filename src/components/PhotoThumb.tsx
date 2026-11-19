@@ -1,21 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { isVideoPath, photoUrl } from '../play/photos'
+import { MediaSourceContext } from '../replay/mediaSource'
 
 /** Photo or video from a private bucket (signed URL): answer photos by default. Tap a photo to open full size. */
 export function PhotoThumb({ path, bucket, alt = 'Answer photo' }: { path: string; bucket?: string; alt?: string }) {
   const [url, setUrl] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
+  // A saved game opened from its zip shows the files in the zip.
+  const source = useContext(MediaSourceContext)
   useEffect(() => {
-    if (!supabase) return
+    const client = supabase
+    const get = source ?? (client ? (p: string) => photoUrl(client, p, bucket) : null)
+    if (!get) return
     let live = true
-    photoUrl(supabase, path, bucket)
+    get(path)
       .then((u) => live && setUrl(u))
       .catch(() => live && setFailed(true))
     return () => {
       live = false
     }
-  }, [path, bucket])
+  }, [path, bucket, source])
   const video = isVideoPath(path)
   if (failed) return <span className="muted">{video ? 'Video' : 'Photo'} unavailable</span>
   if (!url) return <span className="photo-thumb photo-loading" aria-label={video ? 'Loading video' : 'Loading photo'} />

@@ -45,6 +45,7 @@ export function PastGames({ transport, onOpen }: { transport: SyncTransport; onO
   const [games, setGames] = useState<PastGame[] | null>(null)
   const [usage, setUsage] = useState<{ r2_bytes: number; r2_free_bytes: number } | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [confirm, setConfirm] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -60,7 +61,7 @@ export function PastGames({ transport, onOpen }: { transport: SyncTransport; onO
         setGames(g)
         setUsage(u)
       })
-      .catch((e: unknown) => live && setErr(describeError(e)))
+      .catch(() => live && setLoadFailed(true))
     return () => {
       live = false
     }
@@ -82,6 +83,14 @@ export function PastGames({ transport, onOpen }: { transport: SyncTransport; onO
     }
   }
 
+  if (loadFailed && !games) {
+    return (
+      <section className="card past-games">
+        <h2>Past games</h2>
+        <p className="muted small">Past games need a connection. Saved games (zips) open without one.</p>
+      </section>
+    )
+  }
   if (!games?.length && !err) return null
 
   return (
