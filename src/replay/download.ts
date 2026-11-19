@@ -4,6 +4,9 @@ import { photoUrl } from '../play/photos'
 import type { ReplayData } from './api'
 import { buildReplay } from './state'
 import { gameSummary, zipMediaPath } from './summary'
+import { SAVED } from './saved'
+import { loadCityPack } from '../map/cityPack'
+import { loadQuestionTypes } from '../play/questionTypes'
 
 export interface DownloadProgress {
   done: number
@@ -22,9 +25,10 @@ export const eventsJson = (data: ReplayData) =>
   JSON.stringify({ exported_at: new Date().toISOString(), ...data }, null, 2)
 
 /**
- * One zip with the event history (events.json), a readable summary (summary.txt) and every
- * photo and video as stored (R2 originals, older files from the Supabase buckets). Files are
- * fetched one at a time while the zip is written, so read URLs don't expire on a big game.
+ * One zip with the event history (events.json), a readable summary (summary.txt), the map data
+ * and question types (so Open a saved game needs no server) and every photo and video as stored
+ * (R2 originals, older files from the Supabase buckets). Files are fetched one at a time while
+ * the zip is written, so read URLs don't expire on a big game.
  */
 export async function downloadGameZip(
   client: SupabaseClient,
@@ -35,8 +39,13 @@ export async function downloadGameZip(
   let done = 0
   const missing: string[] = []
   async function* files() {
-    yield { name: 'events.json', input: eventsJson(data) }
-    yield { name: 'summary.txt', input: gameSummary(data, buildReplay(data.events)) }
+    yield { name: SAVED.events, input: eventsJson(data) }
+    yield { name: SAVED.summary, input: gameSummary(data, buildReplay(data.events)) }
+    // The map and question types, so Open a saved game plays it back without the server.
+    const pack = await loadCityPack(client, data.game.city).catch(() => null)
+    if (pack) yield { name: SAVED.pack, input: JSON.stringify(pack) }
+    const types = await loadQuestionTypes(client, data.game.city).catch(() => null)
+    if (types) yield { name: SAVED.types, input: JSON.stringify(types) }
     for (const m of data.media) {
       try {
         const res = await fetch(await photoUrl(client, m.name, m.bucket))

@@ -81,6 +81,8 @@ interface Props {
   onLongPress?: (lngLat: [number, number]) => void
   /** The game's venue edits: hidden venues drop off the venue dots, custom ones appear. */
   venues?: VenueEdits
+  /** Map data to use instead of loading it from the server (a saved game's zip). */
+  cityPack?: CityPack | null
 }
 
 /** Popup content: the name (or distance) and an "Open in Google Maps" link for the point. */
@@ -137,12 +139,13 @@ function describeFeature(layer: string, props: Record<string, unknown>): string 
 }
 
 /** MapLibre map of the city pack: streets, water, transit lines, stations, venues and the play area. */
-export function GameMap({ city, playArea, onReady, className, tapNames = true, overlay, onBarTap, focus, hideVenues = false, onTap, onLongPress, venues }: Props) {
+export function GameMap({ city, playArea, onReady, className, tapNames = true, overlay, onBarTap, focus, hideVenues = false, onTap, onLongPress, venues, cityPack = null }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   /** The play area the view was last fitted to (JSON). */
   const fittedArea = useRef<string | null>(null)
-  const [pack, setPack] = useState<CityPack | null>(null)
+  const [loadedPack, setPack] = useState<CityPack | null>(null)
+  const pack = cityPack ?? loadedPack
   const [error, setError] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
   const onReadyRef = useRef(onReady)
@@ -160,7 +163,7 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
   }, [onReady, onBarTap, onTap, onLongPress])
 
   useEffect(() => {
-    if (!supabase) return
+    if (!supabase || cityPack) return
     let live = true
     loadCityPack(supabase, city)
       .then((p) => live && setPack(p))
@@ -168,7 +171,7 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
     return () => {
       live = false
     }
-  }, [city])
+  }, [city, cityPack])
 
   useEffect(() => {
     if (!pack || !container.current) return
@@ -439,7 +442,7 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
   return (
     <div className={`game-map ${className ?? ''}`}>
       <div ref={container} className="game-map-canvas" />
-      {!loaded && <p className="game-map-status muted">{error ?? (supabase ? 'Loading map…' : 'Map needs the backend.')}</p>}
+      {!loaded && <p className="game-map-status muted">{error ?? (supabase || pack ? 'Loading map…' : 'Map needs the backend.')}</p>}
     </div>
   )
 }

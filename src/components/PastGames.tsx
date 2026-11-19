@@ -4,7 +4,7 @@ import type { SyncTransport } from '../sync/transport'
 import { describeError } from '../lobby/messages'
 import { formatDuration } from '../rounds/state'
 import { deleteGame, fetchMediaUsage, fetchReplay, listPastGames, type PastGame, type ReplayData } from '../replay/api'
-import { downloadGameZip, type DownloadProgress } from '../replay/download'
+import type { DownloadProgress } from '../replay/download'
 import { gameTeams, gameWinner, storageLabel } from '../replay/pastGames'
 
 /** Download one game as a zip (events, summary, every photo and video). */
@@ -16,6 +16,8 @@ export function DownloadButton({ gameId, data, small = false }: { gameId: string
     setErr(null)
     setProgress({ done: 0, total: 0 })
     try {
+      // The zip code loads only when someone downloads.
+      const { downloadGameZip } = await import('../replay/download')
       await downloadGameZip(supabase, data ?? (await fetchReplay(supabase, gameId)), setProgress)
     } catch (e) {
       setErr(describeError(e))
@@ -45,6 +47,7 @@ export function PastGames({ transport, onOpen }: { transport: SyncTransport; onO
   const [games, setGames] = useState<PastGame[] | null>(null)
   const [usage, setUsage] = useState<{ r2_bytes: number; r2_free_bytes: number } | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [confirm, setConfirm] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -60,7 +63,7 @@ export function PastGames({ transport, onOpen }: { transport: SyncTransport; onO
         setGames(g)
         setUsage(u)
       })
-      .catch((e: unknown) => live && setErr(describeError(e)))
+      .catch(() => live && setLoadFailed(true))
     return () => {
       live = false
     }
@@ -82,6 +85,14 @@ export function PastGames({ transport, onOpen }: { transport: SyncTransport; onO
     }
   }
 
+  if (loadFailed && !games) {
+    return (
+      <section className="card past-games">
+        <h2>Past games</h2>
+        <p className="muted small">Past games need a connection. Saved games (zips) open without one.</p>
+      </section>
+    )
+  }
   if (!games?.length && !err) return null
 
   return (
