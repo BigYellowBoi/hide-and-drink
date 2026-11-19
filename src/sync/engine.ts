@@ -248,6 +248,29 @@ export class GameSync {
   }
 
   /**
+   * Wait until this phone has applied the event at `seq` (an action result's seq), so a
+   * follow-up action sends a fresh last_seen_seq. If it hasn't arrived after `timeoutMs`
+   * (dropped broadcast, or the last event is the other team's), fetch and carry on.
+   */
+  async caughtUp(seq: unknown, timeoutMs = 1500): Promise<void> {
+    if (typeof seq !== 'number' || this.sequencer.lastSeq >= seq) return
+    await new Promise<void>((resolve) => {
+      let done = false
+      const finish = () => {
+        if (done) return
+        done = true
+        clearTimeout(timer)
+        off()
+        resolve()
+      }
+      const off = this.subscribe(() => {
+        if (this.sequencer.lastSeq >= seq) finish()
+      })
+      const timer = setTimeout(() => void this.resync({ quiet: true }).finally(finish), timeoutMs)
+    })
+  }
+
+  /**
    * Send this seeker's GPS fix. Ephemeral and latest-wins: sent once, only while live, never
    * queued or retried (the next fix replaces it).
    */

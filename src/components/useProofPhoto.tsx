@@ -9,6 +9,7 @@ import { MediaBox } from './MediaBox'
 export type ProofMedia = 'photo' | 'video'
 
 interface Picked {
+  folder: string
   blob: Blob
   url: string
   path: string
@@ -17,20 +18,22 @@ interface Picked {
 }
 
 /**
- * Pick (camera, photo library or a screenshot), preview and send the photo or video for an
- * open proof: upload to drink-photos, then submit_drink_proof. Videos over the free plan's
- * 50 MB cap are squeezed on the phone first. Returns the picker box to render and the actions.
+ * Pick (camera, photo library or a screenshot) and preview a photo or video, to upload to
+ * drink-photos under `<game_id>/<folderId>/`. Videos over the free plan's 50 MB cap are
+ * squeezed on the phone first. Returns the picker box to render and upload().
  */
-export function useProofPhoto(sync: GameSync, proofId: string, media: ProofMedia = 'photo', disabled = false) {
-  const [photo, setPhoto] = useState<Picked | null>(null)
+export function useMediaPick(sync: GameSync, folderId: string, media: ProofMedia = 'photo', disabled = false) {
+  const [picked, setPhoto] = useState<Picked | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   useEffect(
     () => () => {
-      if (photo) URL.revokeObjectURL(photo.url)
+      if (picked) URL.revokeObjectURL(picked.url)
     },
-    [photo],
+    [picked],
   )
+  // A pick belongs to its folder: another card selected starts empty.
+  const photo = picked?.folder === folderId ? picked : null
 
   const pick = async (file: File | undefined) => {
     if (!file) return
@@ -47,11 +50,11 @@ export function useProofPhoto(sync: GameSync, proofId: string, media: ProofMedia
         }
         const t = videoType(blob)
         if (!t) throw new Error('That video format is not supported. Try recording it again.')
-        setPhoto({ blob, url: URL.createObjectURL(blob), path: videoPath(sync.gameId, proofId, t.ext), contentType: t.contentType, kind: 'video' })
+        setPhoto({ folder: folderId, blob, url: URL.createObjectURL(blob), path: videoPath(sync.gameId, folderId, t.ext), contentType: t.contentType, kind: 'video' })
       } else {
         setBusy('Preparing photo…')
         const blob = await shrinkPhoto(file)
-        setPhoto({ blob, url: URL.createObjectURL(blob), path: photoPath(sync.gameId, proofId), contentType: 'image/jpeg', kind: 'photo' })
+        setPhoto({ folder: folderId, blob, url: URL.createObjectURL(blob), path: photoPath(sync.gameId, folderId), contentType: 'image/jpeg', kind: 'photo' })
       }
     } catch (e) {
       setErr(describeError(e))
@@ -59,21 +62,14 @@ export function useProofPhoto(sync: GameSync, proofId: string, media: ProofMedia
       setBusy(null)
     }
   }
-  /** Upload and submit. Resolves true once the server has it. */
-  const send = async (): Promise<boolean> => {
-    if (!photo || !supabase) return false
-    setErr(null)
+  /** Upload the picked file. Resolves its path; throws on failure. */
+  const upload = async (): Promise<string> => {
+    if (!photo || !supabase) throw new Error('Pick a photo or video first.')
+    setBusy(photo.kind === 'video' ? `Uploading video (${megabytes(photo.blob.size)})…` : 'Uploading photo…')
     try {
-      setBusy(photo.kind === 'video' ? `Uploading video (${megabytes(photo.blob.size)})…` : 'Uploading photo…')
-      const path = await uploadPhoto(supabase, photo.path, photo.blob, DRINK_BUCKET, photo.contentType)
-      setBusy('Sending…')
-      await sync.action('submit_drink_proof', { p_proof_id: proofId, p_path: path })
+      return await uploadPhoto(supabase, photo.path, photo.blob, DRINK_BUCKET, photo.contentType)
+    } finally {
       setBusy(null)
-      return true
-    } catch (e) {
-      setErr(describeError(e))
-      setBusy(null)
-      return false
     }
   }
   const box = (
@@ -84,5 +80,29 @@ export function useProofPhoto(sync: GameSync, proofId: string, media: ProofMedia
       onPick={(f) => void pick(f)}
     />
   )
-  return { box, photo, busy, err, setErr, setBusy, send }
+  return { box, photo, busy, err, setErr, setBusy, upload }
+}
+
+/** Pick, preview and send the photo or video for an open proof: upload, then submit_drink_proof. */
+export function useProofPhoto(sync: GameSync, proofId: string, media: ProofMedia = 'photo', disabled = false) {
+  const m = useMediaPick(sync, proofId, media, disabled)
+  const { setErr, setBusy } = m
+  /** Upload and submit. Resolves true once the server has it. */
+  const send = async (): Promise<boolean> => {
+    setErr(null)
+    try {
+      const path = await m.upload()
+      setBusy('Sending…')
+      const res = (await sync.action('submit_drink_proof', { p_proof_id: proofId, p_path: path })) as { seq?: number } | null
+      // A follow-up action (We did it) must not race the drink_proved event.
+      await sync.caughtUp(res?.seq)
+      setBusy(null)
+      return true
+    } catch (e) {
+      setErr(describeError(e))
+      setBusy(null)
+      return false
+    }
+  }
+  return { box: m.box, photo: m.photo, busy: m.busy, err: m.err, setErr, setBusy, send }
 }

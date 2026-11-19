@@ -39,10 +39,12 @@ const BY_BEHAVIOUR: Record<string, ParamField[]> = {
     { key: 'duration_s', label: 'Duration', kind: 'minutes', required: true },
     { key: 'followup_s', label: 'Then a lock of', kind: 'minutes', hint: 'Optional follow-on timer if the task is missed' },
     { key: 'seeker_confirm', label: 'Ask the seekers first', kind: 'text', hint: "Only starts if they say yes, e.g. Are you in the hiders' bar?" },
+    { key: 'not_applicable', label: "Seekers can say it doesn't apply", kind: 'text', hint: 'Starts at once with a Not applicable button that cancels it, e.g. Only if you are in a bar' },
   ],
   until_cleared: [
     { key: 'blocks_questions', label: 'Blocks questions until done', kind: 'bool' },
     { key: 'seeker_confirm', label: 'Ask the seekers first', kind: 'text', hint: "Only starts if they say yes, e.g. Are you in the hiders' bar?" },
+    { key: 'not_applicable', label: "Seekers can say it doesn't apply", kind: 'text', hint: 'Starts at once with a Not applicable button that cancels it, e.g. Only if you are in a bar' },
   ],
   trivia: [
     { key: 'count', label: 'Questions', kind: 'int', hint: 'Default 3' },

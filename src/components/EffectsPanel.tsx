@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import {
+  canSayNotApplicable,
   clearable,
+  notApplicable,
   DRINK_BUCKET,
   effectPhase,
   effectTimer,
@@ -170,6 +172,7 @@ function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf 
           <span className="muted small">Waiting for the seekers to say if it applies: “{e.seekerConfirm}”</span>
         ))}
       {timer && <EffectBar endsAt={timer[0]} totalS={timer[1]} now={now} label={phase === 'followup' ? 'Locked' : 'Left'} />}
+      {team === 'seekers' && canSayNotApplicable(e, now) && <NotApplicable sync={sync} effect={e} canAct={canAct} />}
       {phase === 'followup_available' && (
         <span className="effect-actions">
           <span className="muted small">Time's up. Missed it?</span>
@@ -411,6 +414,31 @@ export function CurseCheck({ sync, effect: e, canAct }: { sync: GameSync; effect
           Yes, it applies
         </button>
       </span>
+      {err && <span className="bad small">{err}</span>}
+    </span>
+  )
+}
+
+/** Seekers: cancel a running curse that doesn't apply to them (params.not_applicable, e.g. Escape). */
+export function NotApplicable({ sync, effect: e, canAct }: { sync: GameSync; effect: Effect; canAct: boolean }) {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const cancel = async () => {
+    setBusy(true)
+    setErr(null)
+    try {
+      await sync.action('check_curse', { p_effect_id: e.id, p_applies: false })
+    } catch (x) {
+      setErr(describeError(x))
+      setBusy(false)
+    }
+  }
+  return (
+    <span className="effect-actions">
+      <span className="muted small">{notApplicable(e.card)} Be honest: the hiders see it.</span>
+      <button className="secondary small" disabled={busy || !canAct} onClick={() => void cancel()}>
+        Not applicable
+      </button>
       {err && <span className="bad small">{err}</span>}
     </span>
   )

@@ -371,6 +371,31 @@ describe('GameSync', () => {
     sync.stop()
   })
 
+  it('caughtUp waits for the action result\'s seq, then fetches if it never arrives', async () => {
+    const server = new FakeServer()
+    server.append('game_created')
+    const sync = await started(server)
+    let done = false
+    const e = server.append('drink_proved')
+    void sync.caughtUp(e.seq).then(() => (done = true))
+    await flush()
+    expect(done).toBe(false)
+    server.deliver(e)
+    await flush()
+    expect(done).toBe(true)
+
+    // Never broadcast: a fetch after the timeout catches up.
+    done = false
+    const fetches = server.fetchCount
+    const lost = server.append('drink_proved')
+    void sync.caughtUp(lost.seq).then(() => (done = true))
+    await vi.advanceTimersByTimeAsync(1600)
+    expect(done).toBe(true)
+    expect(server.fetchCount).toBeGreaterThan(fetches)
+    expect(sync.getSnapshot().lastSeq).toBe(lost.seq)
+    sync.stop()
+  })
+
   it('estimates the server clock offset', async () => {
     const server = new FakeServer()
     const sync = await started(server)

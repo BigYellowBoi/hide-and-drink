@@ -62,6 +62,14 @@
       "merge_same_name_within_m": 0
     },
     {
+      "id": "gtfs:train stations",
+      "label": "Train stations",
+      "from": "gtfs",
+      "geometry": "point",
+      "modes": ["rail"],
+      "merge_same_name_within_m": 300
+    },
+    {
       "id": "abs:suburbs_localities",
       "label": "Suburbs",
       "from": "abs",

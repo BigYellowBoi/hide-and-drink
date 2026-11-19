@@ -37,6 +37,9 @@ import {
   triviaWaiting,
   drinkTeams,
   otherBlocks,
+  castMedia,
+  canSayNotApplicable,
+  notApplicable,
 } from './state'
 
 let seq = 0
@@ -657,5 +660,50 @@ describe('judging a curse', () => {
     const s = deriveCards([started, played, ev('effect_clear_requested', { effect_id: 'e1' }), ev('effect_clear_rejected', { effect_id: 'e1' })])
     expect(s.effects[0].status).toBe('active')
     expect(s.log.at(-1)?.text).toBe('SCULLING: hider picked Hiders. Seekers try again')
+  })
+})
+
+describe('media sent with the card', () => {
+  const def = (c: ReturnType<typeof card>) => parseCard(c)!
+  it('asks for the cost photo when the hiders pay and drink proofs are on', () => {
+    const bridge = def(card('bridge', 'until_cleared', { proof: 'photo' }))
+    expect(castMedia(bridge, true)).toEqual({ cost: true, setup: null })
+    expect(castMedia(bridge, false)).toEqual({ cost: false, setup: null })
+    const seekersPay = def(card('x', 'text', { cost_team: 'seekers' }))
+    expect(castMedia(seekersPay, true).cost).toBe(false)
+    expect(castMedia(def(card('free', 'text', {}, { cast_cost: 'free' })), true).cost).toBe(false)
+  })
+  it("asks for the curse's first step, unless the seekers are asked first", () => {
+    const sculling = def(card('sculling', 'until_cleared', { hider_proof: 'video' }, { cast_cost: 'free' }))
+    expect(castMedia(sculling, true)).toEqual({ cost: false, setup: 'video' })
+    const checked = def(card('c', 'timed', { duration_s: 60, hider_proof: 'photo', seeker_confirm: 'Here?' }))
+    expect(castMedia(checked, true).setup).toBeNull()
+  })
+})
+
+describe('Not applicable', () => {
+  it('a curse with params.not_applicable can be cancelled while it runs, not once locked', () => {
+    const esc = card('esc2', 'timed', { duration_s: 180, followup_s: 600, not_applicable: 'Only in a bar.' })
+    const start = ev('game_started', { round: 1, deck: [esc], hand_limit: 4 })
+    const played = ev('card_played', {
+      round: 1,
+      instance_id: 'n1',
+      card: esc,
+      played_at: '2026-11-20T10:00:00Z',
+      effect_id: 'e9',
+      duration_s: 180,
+      ends_at: '2026-11-20T10:03:00Z',
+      followup_s: 600,
+    })
+    const s = deriveCards([start, played])
+    const e = s.effects[0]
+    const t0 = Date.parse('2026-11-20T10:01:00Z')
+    expect(notApplicable(e.card)).toBe('Only in a bar.')
+    expect(canSayNotApplicable(e, t0)).toBe(true)
+    const cancelled = deriveCards([start, played, ev('curse_checked', { round: 1, effect_id: 'e9', applies: false, not_applicable: true })])
+    expect(cancelled.effects[0].status).toBe('cleared')
+    expect(canSayNotApplicable(cancelled.effects[0], t0)).toBe(false)
+    expect(cancelled.log.at(-1)?.text).toContain('cancelled')
+    expect(canSayNotApplicable(deriveCards([start, ev('card_played', { round: 1, instance_id: 'n2', card: card('p', 'timed', { duration_s: 60 }), effect_id: 'e8', ends_at: '2026-11-20T10:03:00Z' })]).effects[0], t0)).toBe(false)
   })
 })
