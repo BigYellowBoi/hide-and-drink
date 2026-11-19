@@ -4,7 +4,7 @@ import type { SyncTransport } from '../sync/transport'
 import { describeError } from '../lobby/messages'
 import { formatDuration } from '../rounds/state'
 import { deleteGame, fetchMediaUsage, fetchReplay, listPastGames, type PastGame, type ReplayData } from '../replay/api'
-import { downloadGameZip, type DownloadProgress } from '../replay/download'
+import type { DownloadProgress } from '../replay/download'
 import { gameTeams, gameWinner, storageLabel } from '../replay/pastGames'
 
 /** Download one game as a zip (events, summary, every photo and video). */
@@ -16,6 +16,8 @@ export function DownloadButton({ gameId, data, small = false }: { gameId: string
     setErr(null)
     setProgress({ done: 0, total: 0 })
     try {
+      // The zip code loads only when someone downloads.
+      const { downloadGameZip } = await import('../replay/download')
       await downloadGameZip(supabase, data ?? (await fetchReplay(supabase, gameId)), setProgress)
     } catch (e) {
       setErr(describeError(e))

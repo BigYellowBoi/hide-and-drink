@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { openSavedGame, type SavedGame } from '../replay/saved'
+import type { SavedGame } from '../replay/saved'
 
 /** Home: open a game downloaded earlier (its zip) and watch the replay, no server needed. */
 export function OpenSavedGame({ onOpen }: { onOpen: (saved: SavedGame) => void }) {
@@ -11,6 +11,7 @@ export function OpenSavedGame({ onOpen }: { onOpen: (saved: SavedGame) => void }
     setBusy(true)
     setErr(null)
     try {
+      const { openSavedGame } = await import('../replay/saved')
       onOpen(await openSavedGame(file))
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))

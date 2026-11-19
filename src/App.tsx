@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { supabase } from './lib/supabase'
 import { GAME_KEY, LAST_CODE_KEY, NAME_KEY, readLocal, writeLocal } from './lib/storage'
 import { joinGame } from './sync/actions'
@@ -15,7 +15,7 @@ import { Lobby } from './components/Lobby'
 import { Round, TopbarClock, type FixState } from './components/Round'
 import { BetweenRounds } from './components/BetweenRounds'
 import { FinalScreen } from './components/FinalScreen'
-import { Replay, SavedReplay } from './components/Replay'
+import { lazyWithReload } from './lib/reloadOnStale'
 import type { SavedGame } from './replay/saved'
 import { StaleBanner } from './components/StaleBanner'
 import { presenceOf } from './sync/presence'
@@ -25,6 +25,9 @@ import { effectiveEvents } from './overrides/state'
 import { buildLabel } from './lib/version'
 
 const transport = supabase ? supabaseTransport(supabase) : null
+// Replays (and the zip code behind them) load only when opened, keeping the main bundle small.
+const Replay = lazyWithReload(() => import('./components/Replay').then((m) => ({ default: m.Replay })))
+const SavedReplay = lazyWithReload(() => import('./components/Replay').then((m) => ({ default: m.SavedReplay })))
 const asset = (f: string) => `${import.meta.env.BASE_URL}${f}`
 const TEAM_CHIP = { hiders: 'Hider', seekers: 'Seeker' } as const
 
@@ -213,9 +216,13 @@ export default function App() {
             <p className="bad">Backend not configured (see .env.example).</p>
           </>
         ) : saved ? (
-          <SavedReplay saved={saved} onBack={() => setSaved(null)} />
+          <Suspense fallback={<p className="muted">Loading replay…</p>}>
+            <SavedReplay saved={saved} onBack={() => setSaved(null)} />
+          </Suspense>
         ) : replay ? (
-          <Replay transport={transport} gameId={replay} onBack={() => setReplay(null)} />
+          <Suspense fallback={<p className="muted">Loading replay…</p>}>
+            <Replay transport={transport} gameId={replay} onBack={() => setReplay(null)} />
+          </Suspense>
         ) : gameId ? (
           <GameScreen
             key={`${gameId}:${attempt}`}
