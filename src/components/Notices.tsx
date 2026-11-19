@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { canSayNotApplicable, drinkTeams, effectTimer, type CardsState } from '../cards/state'
 import { readLocal, writeLocal } from '../lib/storage'
 import { answerText, NULL_ANSWER, questionLabel, type PlayState } from '../play/state'
+import { teamNotices } from '../cards/notices'
 import type { GameSync } from '../sync/engine'
+import type { GameEvent, Team } from '../sync/types'
 import { CardFace } from './CardFace'
 import { EffectBar, NotApplicable } from './EffectsPanel'
 import { PhotoThumb } from './PhotoThumb'
@@ -100,6 +102,47 @@ export function SeekerNotices({
           </section>
         )
       })}
+    </>
+  )
+}
+
+/**
+ * Both teams: the other team's moves that otherwise only change a screen quietly (the
+ * hider's verdict on We did it, vetoed or cancelled curses, bans, dice), until OK.
+ */
+export function TeamNotices({
+  gameId,
+  events,
+  cards,
+  team,
+  userId,
+  now,
+}: {
+  gameId: string
+  events: readonly GameEvent[]
+  cards: CardsState
+  team: Team
+  userId: string | null
+  now: number
+}) {
+  const [seen, done] = useSeen(gameId)
+  const all = useMemo(() => teamNotices(events, cards, team, userId), [events, cards, team, userId])
+  const shown = all.filter((n) => now - n.at < SHOW_MS && !seen.includes(n.key))
+  if (!shown.length) return null
+  return (
+    <>
+      {shown.map((n) => (
+        <section key={n.key} className="card pick-prompt drink-notice notice" role="alert">
+          <div>
+            <p className="eyebrow">{n.eyebrow}</p>
+            <h2>{n.title}</h2>
+            {n.body && <p className="muted small">{n.body}</p>}
+          </div>
+          <button className="small" onClick={() => done(n.key)}>
+            OK
+          </button>
+        </section>
+      ))}
     </>
   )
 }

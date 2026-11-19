@@ -63,7 +63,7 @@ import {
 } from './EffectsPanel'
 import { ProofToast } from './ProofToast'
 import { DrinkNotice } from './DrinkNotice'
-import { SeekerNotices } from './Notices'
+import { SeekerNotices, TeamNotices } from './Notices'
 import { HandPanel } from './HandPanel'
 import type { MapDot } from './GameMap'
 import { LazyGameMap } from './lazyMap'
@@ -267,6 +267,7 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
         )
       })}
       {team && <DrinkNotice gameId={sync.gameId} cards={cards} team={team} now={now} />}
+      {team && <TeamNotices gameId={sync.gameId} events={events} cards={cards} team={team} userId={userId} now={now} />}
       {team === 'seekers' && <SeekerNotices sync={sync} play={play} cards={cards} now={now} canAct={canAct} />}
       <ProofToast cards={cards} team={team} now={now} nameOf={nameOf} />
       {fix && (
