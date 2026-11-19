@@ -94,3 +94,27 @@ export const CORS_HEADERS: Record<string, string> = {
 
 export const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } })
+
+/** Object keys in an R2 (S3) ListObjectsV2 response, and the token for the next page. */
+export function parseListKeys(xml: string): { keys: string[]; next: string | null } {
+  const unescape = (s: string) =>
+    s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
+  const keys = [...xml.matchAll(/<Key>([^<]*)<\/Key>/g)].map((m) => unescape(m[1]))
+  const truncated = /<IsTruncated>true<\/IsTruncated>/.test(xml)
+  const token = xml.match(/<NextContinuationToken>([^<]*)<\/NextContinuationToken>/)?.[1]
+  return { keys, next: truncated && token ? unescape(token) : null }
+}
+
+/** A game's folder in the bucket: <game_id>/ (null for anything that isn't a game id). */
+export const gameFolder = (gameId: unknown) =>
+  typeof gameId === 'string' && new RegExp(`^${UUID}$`).test(gameId) ? `${gameId}/` : null
+
+/** Same length and same characters, compared without stopping at the first difference. */
+export function pinMatches(given: unknown, secret: string | undefined): boolean {
+  if (typeof given !== 'string' || !secret) return false
+  const a = new TextEncoder().encode(given.trim())
+  const b = new TextEncoder().encode(secret.trim())
+  let diff = a.length ^ b.length
+  for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a[i] ?? 0) ^ (b[i] ?? 0)
+  return b.length > 0 && diff === 0
+}

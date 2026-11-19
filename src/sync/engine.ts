@@ -286,6 +286,17 @@ export class GameSync {
     })
   }
 
+  /**
+   * Hiders: record this phone's position for the end-of-game replay. Server only: not
+   * broadcast, not an event, and no client can read it back until the game has ended.
+   */
+  async reportTrack(lng: number, lat: number, accuracyM: number | null): Promise<ActionResult> {
+    if (!this.snapshot.canAct || this.team !== 'hiders') {
+      return { ok: false, code: 'not_live', message: 'Not connected.', retryable: false }
+    }
+    return this.transport.call('report_track', { p_game_id: this.gameId, p_lng: lng, p_lat: lat, p_accuracy_m: accuracyM })
+  }
+
   /** Hiders: tell teammates which bar this phone has selected in the picker (null: none). Not an action. */
   async reportPicking(venueId: string | null): Promise<ActionResult> {
     if (!this.snapshot.canAct || this.team !== 'hiders') {

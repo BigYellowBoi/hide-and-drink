@@ -8,6 +8,7 @@ import { LazyGameMap } from './lazyMap'
 import { useLibrary } from '../library/useLibrary'
 import { CardLibrary } from './CardLibrary'
 import { PushToggle } from './PushToggle'
+import { AdminPin } from './AdminPin'
 import { buildLabel } from '../lib/version'
 
 const cityLabel = (c: string) => c.charAt(0).toUpperCase() + c.slice(1).replace(/_/g, ' ')
@@ -75,6 +76,10 @@ export function Settings({ transport, onBack }: { transport: SyncTransport; onBa
 
       <section className="card">
         <PushToggle transport={transport} />
+      </section>
+
+      <section className="card">
+        <AdminPin transport={transport} />
       </section>
 
       <section className="card">

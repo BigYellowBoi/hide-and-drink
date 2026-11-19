@@ -3,6 +3,7 @@ import { createGame, joinGame } from '../sync/actions'
 import type { SyncTransport } from '../sync/transport'
 import { defaultConfig } from '../lobby/config'
 import { describeError } from '../lobby/messages'
+import { PastGames } from './PastGames'
 import { LAST_CODE_KEY, NAME_KEY, readLocal, writeLocal } from '../lib/storage'
 
 const CODE_RE = /^[A-HJ-NP-Z]{4}$/
@@ -24,9 +25,10 @@ interface Props {
   transport: SyncTransport
   onEnter: (gameId: string) => void
   onSettings: () => void
+  onReplay: (gameId: string) => void
 }
 
-export function Home({ transport, onEnter, onSettings }: Props) {
+export function Home({ transport, onEnter, onSettings, onReplay }: Props) {
   const [name, setName] = useState(() => readLocal(NAME_KEY) ?? '')
   const [linkCode] = useState(codeFromUrl)
   // A link's code wins; else the last game's, so a phone that dropped out can rejoin in a tap.
@@ -110,6 +112,8 @@ export function Home({ transport, onEnter, onSettings }: Props) {
           Create game
         </button>
       </section>
+
+      <PastGames transport={transport} onOpen={onReplay} />
 
       {err && (
         <p className="bad sticky-error" role="alert">

@@ -1,7 +1,7 @@
 // R2 through its S3 API: presigned URLs (SigV4 query signing) and object checks.
 
 import { AwsClient } from 'npm:aws4fetch@1.0.20'
-import { objectUrl, type R2Config } from './media.ts'
+import { objectUrl, parseListKeys, type R2Config } from './media.ts'
 
 export function r2Client(cfg: R2Config) {
   const aws = new AwsClient({
@@ -33,5 +33,23 @@ export function r2Client(cfg: R2Config) {
     if (!res.ok && res.status !== 404) throw new Error(`R2 DELETE ${res.status}`)
   }
 
-  return { presign, size, remove }
+  /** Every key under a prefix (e.g. a game's folder), page by page. */
+  const list = async (prefix: string) => {
+    const keys: string[] = []
+    let token: string | null = null
+    do {
+      const url = new URL(`https://${cfg.accountId}.r2.cloudflarestorage.com/${encodeURIComponent(cfg.bucket)}`)
+      url.searchParams.set('list-type', '2')
+      url.searchParams.set('prefix', prefix)
+      if (token) url.searchParams.set('continuation-token', token)
+      const res = await aws.fetch(url.toString(), { method: 'GET' })
+      if (!res.ok) throw new Error(`R2 LIST ${res.status}`)
+      const page = parseListKeys(await res.text())
+      keys.push(...page.keys)
+      token = page.next
+    } while (token)
+    return keys
+  }
+
+  return { presign, size, remove, list }
 }

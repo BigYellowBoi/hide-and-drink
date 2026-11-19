@@ -3,9 +3,12 @@ import {
   cleanPicked,
   DEFAULT_LIMITS,
   errorCode,
+  gameFolder,
   isMediaName,
   mediaLimits,
   objectUrl,
+  parseListKeys,
+  pinMatches,
   r2Config,
   R2_FREE_BYTES,
 } from '../../supabase/functions/_shared/media'
@@ -49,5 +52,29 @@ describe('media functions', () => {
   it('pass on snake_case error codes only', () => {
     expect(errorCode('media_not_allowed')).toBe('media_not_allowed')
     expect(errorCode('relation "x" does not exist')).toBe('media_error')
+  })
+})
+
+describe('delete-game and admin-pin helpers', () => {
+  it('reads R2 list pages', () => {
+    const xml = `<ListBucketResult><IsTruncated>true</IsTruncated><Contents><Key>${G}/a/b.jpg</Key></Contents><Contents><Key>${G}/c/d&amp;e.mp4</Key></Contents><NextContinuationToken>tok==</NextContinuationToken></ListBucketResult>`
+    expect(parseListKeys(xml)).toEqual({ keys: [`${G}/a/b.jpg`, `${G}/c/d&e.mp4`], next: 'tok==' })
+    expect(parseListKeys('<ListBucketResult><IsTruncated>false</IsTruncated></ListBucketResult>')).toEqual({ keys: [], next: null })
+  })
+  it('only takes a game id as the folder to delete', () => {
+    expect(gameFolder(G)).toBe(`${G}/`)
+    expect(gameFolder('')).toBeNull()
+    expect(gameFolder('../x')).toBeNull()
+    expect(gameFolder(`${G}/x`)).toBeNull()
+  })
+  it('matches the PIN exactly, never without a secret', () => {
+    expect(pinMatches('4821', '4821')).toBe(true)
+    expect(pinMatches(' 4821 ', '4821\n')).toBe(true)
+    expect(pinMatches('4822', '4821')).toBe(false)
+    expect(pinMatches('482', '4821')).toBe(false)
+    expect(pinMatches('48210', '4821')).toBe(false)
+    expect(pinMatches('', '')).toBe(false)
+    expect(pinMatches('1234', undefined)).toBe(false)
+    expect(pinMatches(1234, '1234')).toBe(false)
   })
 })

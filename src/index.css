@@ -3491,3 +3491,120 @@ button.pcard.type-card.type-card-spent {
   height: 8px;
   accent-color: var(--hider);
 }
+
+/* Past games on Home (src/components/PastGames.tsx). */
+.storage-meter {
+  margin-bottom: 8px;
+}
+.storage-meter p {
+  margin: 0 0 4px;
+}
+.meter {
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.meter > span {
+  display: block;
+  height: 100%;
+  background: var(--hider);
+}
+.past-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.past-row {
+  border-top: 1px solid var(--line);
+  padding: 8px 0;
+}
+button.past-main {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  min-height: 44px;
+}
+.past-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.past-vs {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.past-actions {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.past-confirm {
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: var(--r-input);
+  background: var(--surface-2);
+}
+.past-confirm p {
+  margin: 0 0 8px;
+}
+
+/* Replay (src/components/Replay.tsx). */
+.replay-head h2 {
+  margin: 0;
+}
+.replay-head p {
+  margin: 2px 0;
+}
+.replay-map {
+  height: 52vh;
+  min-height: 260px;
+  margin-bottom: 12px;
+}
+.replay-scrub {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.replay-scrub input[type='range'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: var(--hider);
+}
+.replay-clock {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 64px;
+  text-align: right;
+}
+.replay-buttons {
+  margin-top: 8px;
+}
+.replay-buttons > button {
+  flex: 1 1 0;
+}
+.replay-count {
+  text-align: center;
+  margin: 6px 0 0;
+}
+.replay-spotlight {
+  margin: 0 0 12px;
+  padding: 0;
+}
+.replay-spotlight > li {
+  box-shadow: 0 0 0 2px var(--alert);
+}
+.replay-round .log-dot {
+  background: var(--alert);
+}
+.settings-bar > button:last-child:not(:first-child) {
+  justify-self: end;
+}

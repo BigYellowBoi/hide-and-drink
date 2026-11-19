@@ -5,7 +5,7 @@ import { deriveHiding, formatClock, hidingPeriodAt, hidingZone, positionAge, rou
 import type { GeoError } from '../hiding/useGeolocation'
 import { isDevMode } from '../hiding/devPosition'
 import { usePosition } from '../hiding/usePosition'
-import { usePositionReporter } from '../hiding/usePositionReporter'
+import { sendTrack, usePositionReporter } from '../hiding/usePositionReporter'
 import { useServerNow } from '../hiding/useServerNow'
 import { useWakeLock } from '../hiding/useWakeLock'
 import { readLocal, writeLocal } from '../lib/storage'
@@ -454,8 +454,10 @@ function HiderView({
   dev,
   userId,
 }: HiderProps) {
-  // Hider GPS (or playtest point) stays on this phone: it sorts bars, suggests answers and draws "you" on the map.
+  // Hider GPS (or playtest point) never reaches the seekers: it sorts bars, suggests answers and
+  // draws "you" on the map here, and goes to the server only for the end-of-game replay track.
   const { fix, error, place } = usePosition(dev, sync.gameId, userId)
+  usePositionReporter(sync, fix, canAct, zone.locationIntervalS, true, sendTrack)
   const hiding = useMemo(() => deriveHiding(events, started.round), [events, started.round])
   const bar = hiding.bar
   const picking = !bar || hiding.moving
