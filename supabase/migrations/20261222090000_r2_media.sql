@@ -13,7 +13,8 @@
 --   that would go past it goes to Supabase instead (shrunk, as before). Videos of cards with
 --   params.video_quality = 'reduced' (Bird Guide: no people or drinks in it) stay original
 --   only while the bucket is under the reduced share (default half); past that the phone
---   squeezes them to 480p first.
+--   squeezes them to 480p first. Past the per-file cap (default 2 GB) they are squeezed too,
+--   where any other file is refused.
 -- * Reading: a player reads a file if an event their team can see names it (drink_proved
 --   path, a photo question's answer) or their team may upload it right now. The storage
 --   policies of both Supabase buckets use the same rule, so seekers can no longer list a
@@ -260,10 +261,6 @@ begin
   if p_bytes is null or p_bytes <= 0 then
     raise exception 'invalid_media_size' using errcode = 'P0001';
   end if;
-  if p_bytes > p_max_bytes then
-    raise exception 'media_too_big' using errcode = 'P0001';
-  end if;
-
   if public._can_upload_question_photo(p_user, p_name) then
     if v_video then
       raise exception 'invalid_media_type' using errcode = 'P0001';
@@ -281,6 +278,14 @@ begin
   end if;
 
   v_reduced := v_video and public._media_reduced(v_game, v_folder);
+
+  -- Past the per-file cap: a reduced-quality video is squeezed, anything else refused.
+  if p_bytes > p_max_bytes then
+    if v_reduced and not v_squeezed then
+      return jsonb_build_object('squeeze', true, 'bucket', v_bucket);
+    end if;
+    raise exception 'media_too_big' using errcode = 'P0001';
+  end if;
 
   -- One reservation at a time, so two big uploads can't both squeeze into the last room.
   perform pg_advisory_xact_lock(hashtext('public.media_objects budget'));

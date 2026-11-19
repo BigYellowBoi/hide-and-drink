@@ -185,10 +185,25 @@ describe('uploadMedia', () => {
     expect(uploads).toEqual([])
   })
 
-  it('refuses files past the sanity cap before asking', async () => {
-    const huge = { size: 2_000_000_001, type: 'video/mp4' } as Blob
+  it('refuses photos past the sanity cap before asking', async () => {
+    const huge = { size: 2_000_000_001, type: 'image/jpeg' } as Blob
     const { client, calls } = fakeClient(() => r2Grant(1))
     await expect(uploadMedia(client, target, huge, () => {}, noWait)).rejects.toMatchObject({ code: 'media_too_big' })
     expect(calls).toEqual([])
+  })
+
+  it('asks about videos past the cap, so a reduced-quality one can be squeezed', async () => {
+    const huge = { size: 2_000_000_001, type: 'video/mp4' } as Blob
+    const { client } = fakeClient((_fn, body) =>
+      body.done ? { data: { ok: true } } : (body.picked as { squeezed?: boolean }).squeezed ? r2Grant(1) : { data: { squeeze: true } },
+    )
+    await uploadMedia(client, target, huge, () => {}, noWait)
+    expect(puts[0].size).toBe(4)
+  })
+
+  it('shows the refusal for a full-quality video past the cap', async () => {
+    const huge = { size: 2_000_000_001, type: 'video/mp4' } as Blob
+    const { client } = fakeClient(() => ({ error: httpError(400, { error: 'media_too_big' }) }))
+    await expect(uploadMedia(client, target, huge, () => {}, noWait)).rejects.toThrow(/4K 30 fps/)
   })
 })

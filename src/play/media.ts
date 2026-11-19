@@ -9,7 +9,7 @@ import { MAX_VIDEO_BYTES, megabytes, shrinkPhoto, squeezeVideo, uploadPhoto, vid
  * videos squeezed, as before.
  */
 
-/** Sanity cap for one original file. */
+/** Sanity cap for one original file (the function's default; reduced-quality videos past it are squeezed). */
 export const MAX_ORIGINAL_BYTES = 2_000_000_000
 
 export interface UploadProgress {
@@ -93,7 +93,7 @@ export class MediaError extends Error {
 }
 
 const MEDIA_MESSAGES: Record<string, string> = {
-  media_too_big: 'That file is too big (over 2 GB). Trim it and try again.',
+  media_too_big: 'That file is too big (over 2 GB). Trim it, or film at 4K 30 fps, and try again.',
   media_not_allowed: 'You can no longer send media for this.',
   media_exists: 'That file was already sent.',
   media_not_uploaded: 'The upload did not arrive. Try again.',
@@ -199,7 +199,8 @@ export async function uploadMedia(
 ): Promise<string> {
   const video = file.type.startsWith('video/')
   const what = video ? 'video' : 'photo'
-  if (file.size > MAX_ORIGINAL_BYTES) throw new MediaError('media_too_big')
+  // Videos past the cap ask anyway: reduced-quality ones are squeezed (the function says so).
+  if (!video && file.size > MAX_ORIGINAL_BYTES) throw new MediaError('media_too_big')
   const picked = pickedInfo(file)
 
   let blob = file

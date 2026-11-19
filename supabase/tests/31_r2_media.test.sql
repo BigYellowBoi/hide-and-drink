@@ -8,7 +8,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(38);
+select plan(40);
 
 insert into auth.users (id) values
   ('11111111-1111-1111-1111-111111111111'),
@@ -128,6 +128,11 @@ select is(pg_temp.grant_as(current_setting('test.A'), current_setting('test.p_bi
   'a big Bird Guide video past the reduced share is squeezed first');
 select is((select count(*)::int from public.media_objects where name = current_setting('test.p_bird')), 0,
   'and reserves nothing');
+select is(public.media_upload_grant(current_setting('test.A')::uuid, current_setting('test.p_bird'), 9000, 'video/mp4', '{}', 100000, 0.5, 8000),
+  '{"squeeze":true,"bucket":"drink-photos"}'::jsonb,
+  'a Bird Guide video past the file cap is squeezed, even with room to spare');
+select throws_ok($$ select public.media_upload_grant(current_setting('test.A')::uuid, current_setting('test.p_scull'), 9000, 'video/quicktime', '{}', 100000, 0.5, 8000) $$,
+  'P0001', 'media_too_big', 'a full-quality video past the file cap is refused');
 select is(pg_temp.grant_as(current_setting('test.A'), current_setting('test.p_bird'), 3000, 'video/mp4', '{"squeezed":true}'),
   '{"store":"r2","bucket":"drink-photos","quality":"squeezed"}'::jsonb,
   'the squeezed copy goes to R2');
