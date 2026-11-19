@@ -23,7 +23,7 @@ export interface MapOverlay {
   ruled?: FeatureCollection
   /** Where the hider can still be (white outline), when anything is ruled out. */
   remaining?: FeatureCollection
-  /** A question tool: radar circle, thermometer line (seeker red). */
+  /** A question tool: radar circle, thermometer line (seeker red; features with side 'hider' blue). */
   tool?: FeatureCollection
 }
 

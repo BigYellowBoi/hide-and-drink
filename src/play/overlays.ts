@@ -156,9 +156,13 @@ export const hasTool = (q: Question) => questionTool(q).features.length > 0
 /**
  * The hider's side of a question, drawn on the answer sheet's map next to the seekers' tool:
  * tentacles get the same circle around the hider, matching a line from the hider to their own
- * nearest feature with its distance.
+ * nearest feature with its distance. Tagged side: 'hider', drawn hider blue (seekers' side is red).
  */
 export function hiderTool(q: Question, hider: LngLat | null, layer?: LayerLookup | null): Feature[] {
+  return hiderSide(q, hider, layer).map((f) => ({ ...f, properties: { ...(f.properties ?? {}), side: 'hider' } }))
+}
+
+function hiderSide(q: Question, hider: LngLat | null, layer?: LayerLookup | null): Feature[] {
   if (!hider) return []
   const p = q.params
   if (q.type === 'tentacles' && typeof p.radius_m === 'number') {

@@ -132,7 +132,8 @@ select lives_ok(format($$ select pg_temp.play(%L, 21) $$, current_setting('test.
 reset role;
 select is(
   array(select label || ':' || team::text from public.drink_proofs where game_id = pg_temp.gid() order by label, team),
-  array['Cheers:hiders', 'Cheers:seekers'], 'only the card with params.proof = photo asks for drink photos');
+  array['Cheers:hiders', 'Cheers:seekers', 'Drinks All Round:hiders', 'Drinks All Round:seekers'],
+  'drink cards with params.proof = photo ask each drinking team for a photo');
 
 -- ---------------------------------------------------------------- curse evidence
 

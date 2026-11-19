@@ -490,8 +490,11 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
         id,
         (x) => ({ ...x, status: 'active' }),
       )
-      const name = next.effects.find((x) => x.id === id)?.card.name ?? 'Curse'
-      return log({ kind: 'penalty', text: `Hider says ${name} is not done yet`, ...effectLink(next, id) }, next)
+      const card = next.effects.find((x) => x.id === id)?.card
+      const name = card?.name ?? 'Curse'
+      const judge = card ? judgeOf(card) : null
+      const text = judge?.question ? `${name}: hider picked ${judge.reject}. Seekers try again` : `Hider says ${name} is not done yet`
+      return log({ kind: 'penalty', text, ...effectLink(next, id) }, next)
     }
     case 'curse_checked': {
       const id = str(p.effect_id)
@@ -992,6 +995,30 @@ export function proofKind(c: CardDef): 'photo' | 'video' | null {
 /** params.hider_proof: what the hiders send first when they cast it ('photo' or 'video'). */
 export function hiderProofKind(c: CardDef): 'photo' | 'video' | null {
   return c.params.hider_proof === 'photo' || c.params.hider_proof === 'video' ? c.params.hider_proof : null
+}
+
+const textParam = (c: CardDef, key: string): string | null => {
+  const v = c.params[key]
+  return typeof v === 'string' && v.trim() ? v.trim() : null
+}
+
+/** What the hiders send first (params.hider_proof_prompt), e.g. "Film your team chugging". */
+export const hiderProofPrompt = (c: CardDef) => textParam(c, 'hider_proof_prompt')
+
+/** What the seekers send to clear it (params.proof_prompt). */
+export const proofPrompt = (c: CardDef) => textParam(c, 'proof_prompt')
+
+/**
+ * How the hider judges the seekers' try (params.judge_question, judge_accept, judge_reject),
+ * e.g. Sculling: "Who drank quicker?" Seekers (clears it) or Hiders (they go again).
+ * Defaults to Confirm / Not yet.
+ */
+export function judgeOf(c: CardDef): { question: string | null; accept: string; reject: string } {
+  return {
+    question: textParam(c, 'judge_question'),
+    accept: textParam(c, 'judge_accept') ?? 'Confirm',
+    reject: textParam(c, 'judge_reject') ?? 'Not yet',
+  }
 }
 
 const BEHAVIOUR_LABEL: Record<string, string> = {

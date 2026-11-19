@@ -2599,6 +2599,32 @@ button.pcard {
   font-weight: 600;
 }
 
+.blocked-banner button {
+  margin-top: 8px;
+  background: var(--alert-ink);
+  color: var(--alert);
+}
+
+/* Hider judging a curse: their own proof next to the seekers' (e.g. Sculling videos). */
+.proof-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.proof-compare figure {
+  margin: 0;
+  min-width: 0;
+}
+
+.proof-compare .photo-preview,
+.proof-compare .photo-thumb {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 4;
+}
+
 .effect-list {
   display: grid;
   gap: 12px;

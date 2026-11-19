@@ -6,6 +6,9 @@ import {
   effectTimer,
   evidenceFor,
   hiderProofKind,
+  hiderProofPrompt,
+  judgeOf,
+  proofPrompt,
   liveEffects,
   proofDone,
   proofKind,
@@ -95,7 +98,18 @@ export function EffectsPanel(props: Props) {
   )
 }
 
-export function BlockedBanner({ effects, team, what = 'questions' }: { effects: readonly Effect[]; team: Team; what?: string }) {
+export function BlockedBanner({
+  effects,
+  team,
+  what = 'questions',
+  onOpen,
+}: {
+  effects: readonly Effect[]
+  team: Team
+  what?: string
+  /** Opens the Effects tab, where the seekers send their proof or say they did it. */
+  onOpen?: () => void
+}) {
   return (
     <div className="blocked-banner" role="status">
       <strong>{what.charAt(0).toUpperCase() + what.slice(1)} blocked</strong>
@@ -103,16 +117,21 @@ export function BlockedBanner({ effects, team, what = 'questions' }: { effects: 
         {team === 'seekers' ? 'Until you complete ' : 'Seekers must complete '}
         {effects.map((e) => e.card.name).join(' and ')}.
       </p>
+      {onOpen && (
+        <button className="small" onClick={onOpen}>
+          Open
+        </button>
+      )}
     </div>
   )
 }
 
 /** One yellow banner per thing curses block besides questions (params.blocks, e.g. transport). */
-export function OtherBlockedBanners({ cards, team }: { cards: CardsState; team: Team }) {
+export function OtherBlockedBanners({ cards, team, onOpen }: { cards: CardsState; team: Team; onOpen?: () => void }) {
   return (
     <>
       {otherBlocks(cards).map(([what, effects]) => (
-        <BlockedBanner key={what} what={what} effects={effects} team={team} />
+        <BlockedBanner key={what} what={what} effects={effects} team={team} onOpen={onOpen} />
       ))}
     </>
   )
@@ -164,7 +183,7 @@ function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf 
           <span className="muted small">
             {team === 'hiders'
               ? `Send the seekers your ${setupMedia} (pinned on top of your screen).`
-              : `Waiting for the hiders' ${setupMedia}.`}
+              : `Waiting for the hiders' ${setupMedia}. You can send yours once it arrives.`}
           </span>
         ) : (
           setup.path && (
@@ -181,6 +200,7 @@ function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf 
             <EvidenceClear
               sync={sync}
               proof={evidence}
+              prompt={proofPrompt(e.card)}
               media={proofKind(e.card) ?? 'photo'}
               canAct={canAct && !busy}
               onSent={() => act('clear_effect', {})}
@@ -192,11 +212,11 @@ function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf 
           )
         ) : (
           <span className="muted small">
-            Waiting for the seekers to do it{evidence ? ' and send a photo' : ''}.
+            Waiting for the seekers to do it{evidence ? ` and send a ${proofKind(e.card) ?? 'photo'}` : ''}.
           </span>
         ))}
       {e.behaviour === 'trivia' && <TriviaBox sync={sync} effect={e} team={team} canAct={canAct} nameOf={nameOf} />}
-      {evidence?.path && phase === 'awaiting_confirm' && <PhotoThumb path={evidence.path} bucket={DRINK_BUCKET} alt="Proof photo" />}
+      {evidence?.path && phase === 'awaiting_confirm' && <PhotoThumb path={evidence.path} bucket={DRINK_BUCKET} alt="Seekers' proof" />}
       {phase === 'awaiting_confirm' && (
         <span className="muted small">{team === 'seekers' ? 'Waiting for the hider to confirm.' : 'Seekers say they did it. Confirm above.'}</span>
       )}
@@ -211,12 +231,14 @@ function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf 
 function EvidenceClear({
   sync,
   proof,
+  prompt,
   media,
   canAct,
   onSent,
 }: {
   sync: GameSync
   proof: DrinkProof
+  prompt: string | null
   media: 'photo' | 'video'
   canAct: boolean
   onSent: () => Promise<void>
@@ -224,7 +246,10 @@ function EvidenceClear({
   const { box, photo, busy, err, send } = useProofPhoto(sync, proof.id, media, !canAct)
   return (
     <span className="effect-actions">
-      <span className="muted small">{media === 'video' ? 'Video' : 'Photo'} proof needed: the hider sees it before confirming.</span>
+      <span className="muted small">
+        {prompt ? `${prompt} ` : ''}
+        {media === 'video' ? 'Video' : 'Photo'} proof needed: the hider sees it before confirming.
+      </span>
       {box}
       <button
         className="small"
@@ -262,12 +287,13 @@ export function SetupProofs({ sync, cards, canAct }: { sync: GameSync; cards: Ca
 
 function SetupProofCard({ sync, proof, effect, canAct }: { sync: GameSync; proof: DrinkProof; effect: Effect; canAct: boolean }) {
   const media = hiderProofKind(effect.card) ?? 'photo'
+  const prompt = hiderProofPrompt(effect.card)
   const { box, photo, busy, err, send } = useProofPhoto(sync, proof.id, media, !canAct)
   return (
     <section className="card drink-proof" role="alert">
       <p className="eyebrow">Send the seekers your {media}</p>
       <h2>{effect.card.name}</h2>
-      {effect.card.text && <p className="muted small">{effect.card.text}</p>}
+      {prompt ? <p>{prompt}</p> : effect.card.text && <p className="muted small">{effect.card.text}</p>}
       {box}
       <button className="wide" disabled={!photo || !!busy || !canAct} onClick={() => void send()}>
         {busy ?? 'Send to the seekers'}
@@ -414,13 +440,17 @@ export function ConfirmClear({
   effect: e,
   canAct,
   proofPath = null,
+  setupPath = null,
 }: {
   sync: GameSync
   effect: Effect
   canAct: boolean
-  /** The seekers' photo, for a curse with photo proof. */
+  /** The seekers' photo or video, for a curse with proof. */
   proofPath?: string | null
+  /** The hiders' own first step (params.hider_proof), to compare against. */
+  setupPath?: string | null
 }) {
+  const judge = judgeOf(e.card)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const answer = async (accept: boolean) => {
@@ -435,16 +465,29 @@ export function ConfirmClear({
   }
   return (
     <section className="card confirm-clear" role="alert">
-      <p className="eyebrow">Seekers say they did it</p>
+      <p className="eyebrow">{judge.question ? 'Seekers sent theirs' : 'Seekers say they did it'}</p>
       <h2>{e.card.name}</h2>
-      {e.card.text && <p className="muted small">{e.card.text}</p>}
-      {proofPath && <PhotoThumb path={proofPath} bucket={DRINK_BUCKET} alt="Proof photo" />}
+      {judge.question ? <p>{judge.question}</p> : e.card.text && <p className="muted small">{e.card.text}</p>}
+      {setupPath && proofPath ? (
+        <div className="proof-compare">
+          <figure>
+            <figcaption className="eyebrow">Yours</figcaption>
+            <PhotoThumb path={setupPath} bucket={DRINK_BUCKET} alt="Your proof" />
+          </figure>
+          <figure>
+            <figcaption className="eyebrow">Seekers'</figcaption>
+            <PhotoThumb path={proofPath} bucket={DRINK_BUCKET} alt="Seekers' proof" />
+          </figure>
+        </div>
+      ) : (
+        proofPath && <PhotoThumb path={proofPath} bucket={DRINK_BUCKET} alt="Seekers' proof" />
+      )}
       <div className="confirm-row">
         <button className="secondary" disabled={busy || !canAct} onClick={() => void answer(false)}>
-          Not yet
+          {judge.reject}
         </button>
         <button disabled={busy || !canAct} onClick={() => void answer(true)}>
-          Confirm
+          {judge.accept}
         </button>
       </div>
       {err && <p className="bad">{err}</p>}

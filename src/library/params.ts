@@ -123,6 +123,29 @@ export const COMMON_FIELDS: ParamField[] = [
     ],
     hint: "The hiders send this when they cast it (e.g. a Street View screenshot); the seekers can't clear it before it arrives",
   },
+  {
+    key: 'hider_proof_prompt',
+    label: 'What the hiders send',
+    kind: 'text',
+    when: (p) => !!p.hider_proof,
+    hint: 'Shown on the hiders\' upload card, e.g. Film your team chugging a schooner',
+  },
+  {
+    key: 'proof_prompt',
+    label: 'What the seekers send',
+    kind: 'text',
+    when: (p) => !!p.proof,
+    hint: 'Shown next to the seekers\' upload, e.g. Film yourselves chugging one quicker',
+  },
+  {
+    key: 'judge_question',
+    label: 'Hider decides',
+    kind: 'text',
+    when: (p) => !!p.proof,
+    hint: 'Asked when the seekers send theirs, e.g. Who drank quicker? Default: just Confirm or Not yet',
+  },
+  { key: 'judge_accept', label: 'Button that clears it', kind: 'text', when: (p) => !!p.judge_question, hint: 'e.g. Seekers' },
+  { key: 'judge_reject', label: 'Button that sends them again', kind: 'text', when: (p) => !!p.judge_question, hint: 'e.g. Hiders' },
 ]
 
 export const fieldsFor = (behaviour: string): ParamField[] => [...(BY_BEHAVIOUR[behaviour] ?? []), ...COMMON_FIELDS]
