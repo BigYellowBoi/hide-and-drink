@@ -1,14 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
 import type { GameSync } from '../sync/engine'
+import type { ActionResult } from '../sync/transport'
 import type { Fix } from './useGeolocation'
+
+type Send = (sync: GameSync, lng: number, lat: number, accuracyM: number | null) => Promise<ActionResult>
+const sendPosition: Send = (sync, lng, lat, acc) => sync.reportPosition(lng, lat, acc)
+/** Hiders: the replay track only (server-side, hidden from everyone until the game ends). */
+export const sendTrack: Send = (sync, lng, lat, acc) => sync.reportTrack(lng, lat, acc)
 
 /**
  * Seekers: send the latest GPS fix to teammates (and the server's freeze check) every
  * intervalS while live. Nothing is queued: a fix that can't be sent now is replaced by the next.
  * A newly placed dev/playtest point is sent at once, so freeze tests don't wait an interval.
- * Returns the local time of the last successful report.
+ * Returns the local time of the last successful report. send: report_position (seekers, the
+ * default) or report_track (hiders: recorded for the replay, never shown to seekers).
  */
-export function usePositionReporter(sync: GameSync, fix: Fix | null, canAct: boolean, intervalS: number, enabled: boolean) {
+export function usePositionReporter(
+  sync: GameSync,
+  fix: Fix | null,
+  canAct: boolean,
+  intervalS: number,
+  enabled: boolean,
+  send: Send = sendPosition,
+) {
   const [lastSent, setLastSent] = useState<number | null>(null)
   const fixRef = useRef(fix)
   const canActRef = useRef(canAct)
@@ -29,7 +43,7 @@ export function usePositionReporter(sync: GameSync, fix: Fix | null, canAct: boo
       if (!moved && last !== null && Date.now() - last < intervalS * 1000) return
       inFlight = true
       try {
-        const res = await sync.reportPosition(f.lng, f.lat, f.accuracyM)
+        const res = await send(sync, f.lng, f.lat, f.accuracyM)
         if (res.ok) {
           last = Date.now()
           sentAt = f.at
@@ -45,7 +59,7 @@ export function usePositionReporter(sync: GameSync, fix: Fix | null, canAct: boo
     void tick()
     const t = setInterval(() => void tick(), 1000)
     return () => clearInterval(t)
-  }, [sync, intervalS, enabled])
+  }, [sync, intervalS, enabled, send])
 
   return lastSent
 }

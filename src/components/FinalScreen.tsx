@@ -3,9 +3,22 @@ import type { GameEvent } from '../sync/types'
 import type { LobbyState } from '../lobby/state'
 import { deriveRounds, formatDuration, names, sides } from '../rounds/state'
 import { Standings } from './BetweenRounds'
+import { DownloadButton } from './PastGames'
 
 /** The game is over: winner, totals and every round. The game can't be joined any more. */
-export function FinalScreen({ lobby, events, onHome }: { lobby: LobbyState; events: readonly GameEvent[]; onHome: () => void }) {
+export function FinalScreen({
+  gameId,
+  lobby,
+  events,
+  onHome,
+  onReplay,
+}: {
+  gameId: string
+  lobby: LobbyState
+  events: readonly GameEvent[]
+  onHome: () => void
+  onReplay: () => void
+}) {
   const rounds = useMemo(() => deriveRounds(events), [events])
   const result = rounds.result
   const winners = useMemo(() => new Set(result?.winners ?? []), [result])
@@ -67,7 +80,20 @@ export function FinalScreen({ lobby, events, onHome }: { lobby: LobbyState; even
         </section>
       )}
 
-      <button className="wide" onClick={onHome}>
+      <section className="card">
+        <h2>Replay</h2>
+        <p className="muted small-note">
+          Everyone's paths on the map and every question, answer, curse, photo and video in order, one at a time. Both teams see
+          everything now, hider-only moves included.
+        </p>
+        <div className="row">
+          <button onClick={onReplay}>Watch the replay</button>
+          <DownloadButton gameId={gameId} />
+        </div>
+        <p className="muted small">Download: one zip with the event history, a readable summary and every photo and video.</p>
+      </section>
+
+      <button className="wide secondary" onClick={onHome}>
         Back to home
       </button>
     </>

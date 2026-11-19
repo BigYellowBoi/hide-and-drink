@@ -412,6 +412,13 @@ verify_jwt = true
 [functions.media-read-url]
 verify_jwt = true
 
+# Admin PIN and deleting games (docs/admin.md): called by the phones with their Supabase session.
+[functions.admin-pin]
+verify_jwt = true
+
+[functions.delete-game]
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

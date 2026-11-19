@@ -1,11 +1,11 @@
 import { useContext, type CSSProperties } from 'react'
 import type { LobbyState } from '../lobby/state'
 import { clockLabel, formatClock, hidingPeriodAt } from '../hiding/state'
-import { buildTimeline, answerPhoto } from '../play/timeline'
+import { buildTimeline, answerPhoto, type TimelineItem } from '../play/timeline'
 import { questionTool } from '../play/overlays'
 import { typeColour, type QuestionType } from '../play/questionTypes'
 import { outcomeText, questionText, typeName, type LogEntry, type Question } from '../play/state'
-import { HiderCountContext } from './hiderCount'
+import { HiderCountContext, PrivateWordContext } from './hiderCount'
 import { LockIcon } from './PrivateLabel'
 import { PhotoThumb } from './PhotoThumb'
 import { CardInfoButton } from './CardFace'
@@ -51,30 +51,59 @@ export function Timeline({ questions, log, cards, now, lobby, types, team, round
         <p className="muted">Nothing yet. Questions, answers and cards show up here.</p>
       ) : (
         <ol className="timeline">
-          {items.map((it) =>
-            it.kind === 'entry' ? (
-              <Row key={`e${it.seq}`} entry={it.entry} clock={clock} />
-            ) : it.kind === 'curse' ? (
-              <CurseCard key={`c${it.played.instanceId}`} played={it.played} entries={it.entries} cards={cards} now={now} clock={clock} />
-            ) : (
-              <QuestionCard
-                key={it.question.id}
-                q={it.question}
-                entries={it.entries}
-                photo={answerPhoto(log, it.question.id)}
-                colour={typeColour(types, it.question.type) ?? FALLBACK}
-                clock={clock}
-                asker={nameOf(it.question.askedBy)}
-                canShade={team === 'seekers' && canAct && it.question.round === round && it.question.answer !== null}
-                shown={shownId === it.question.id}
-                onShow={onShow}
-                onShade={onShade}
-              />
-            ),
-          )}
+          {items.map((it) => (
+            <TimelineItemView
+              key={it.kind === 'entry' ? `e${it.seq}` : it.kind === 'curse' ? `c${it.played.instanceId}` : it.question.id}
+              it={it}
+              log={log}
+              cards={cards}
+              now={now}
+              types={types}
+              clock={clock}
+              nameOf={nameOf}
+              canShade={it.kind === 'question' && team === 'seekers' && canAct && it.question.round === round && it.question.answer !== null}
+              shownId={shownId}
+              onShow={onShow}
+              onShade={onShade}
+            />
+          ))}
         </ol>
       )}
     </section>
+  )
+}
+
+interface ItemProps {
+  it: TimelineItem
+  log: readonly LogEntry[]
+  cards: CardsState
+  now: number
+  types: readonly QuestionType[] | null
+  clock: (at: number) => string
+  nameOf: (userId: string | null) => string
+  canShade?: boolean
+  shownId?: string | null
+  onShow?: (q: Question) => void
+  onShade?: (q: Question) => void
+}
+
+/** One timeline item (question, curse or row), also used by the end-of-game replay. */
+export function TimelineItemView({ it, log, cards, now, types, clock, nameOf, canShade = false, shownId = null, onShow, onShade }: ItemProps) {
+  if (it.kind === 'entry') return <Row entry={it.entry} clock={clock} />
+  if (it.kind === 'curse') return <CurseCard played={it.played} entries={it.entries} cards={cards} now={now} clock={clock} />
+  return (
+    <QuestionCard
+      q={it.question}
+      entries={it.entries}
+      photo={answerPhoto(log, it.question.id)}
+      colour={typeColour(types, it.question.type) ?? FALLBACK}
+      clock={clock}
+      asker={nameOf(it.question.askedBy)}
+      canShade={canShade}
+      shown={shownId === it.question.id}
+      onShow={onShow}
+      onShade={onShade}
+    />
   )
 }
 
@@ -84,10 +113,11 @@ function Time({ label }: { label: string }) {
 
 function Private() {
   const hiders = useContext(HiderCountContext)
+  const word = useContext(PrivateWordContext)
   return (
     <span className="muted small">
       {' '}
-      <LockIcon /> {hiders > 1 ? 'only your team' : 'only you'}
+      <LockIcon /> {word ?? (hiders > 1 ? 'only your team' : 'only you')}
     </span>
   )
 }
@@ -207,14 +237,14 @@ interface CardProps {
   asker: string
   canShade: boolean
   shown: boolean
-  onShow: (q: Question) => void
-  onShade: (q: Question) => void
+  onShow?: (q: Question) => void
+  onShade?: (q: Question) => void
 }
 
 function QuestionCard({ q, entries, photo, colour, clock, asker, canShade, shown, onShow, onShade }: CardProps) {
   const open = q.answer === null && q.closedBy === null
   const mult = q.rewardMultiplier && q.rewardMultiplier !== 1 ? ` (×${q.rewardMultiplier})` : ''
-  const mappable = questionTool(q).features.length > 0
+  const mappable = !!onShow && questionTool(q).features.length > 0
   const manual = q.manualShading
   return (
     <li className={`tl-question${open ? ' tl-open' : ''}`} style={{ '--type': colour } as CSSProperties}>
@@ -261,12 +291,12 @@ function QuestionCard({ q, entries, photo, colour, clock, asker, canShade, shown
       {(mappable || canShade) && (
         <div className="row tl-actions">
           {mappable && (
-            <button className="secondary small" aria-pressed={shown} onClick={() => onShow(q)}>
+            <button className="secondary small" aria-pressed={shown} onClick={() => onShow?.(q)}>
               {shown ? 'On the map' : 'Show on map'}
             </button>
           )}
           {canShade && (
-            <button className="secondary small" onClick={() => onShade(q)}>
+            <button className="secondary small" onClick={() => onShade?.(q)}>
               Shade by hand
             </button>
           )}

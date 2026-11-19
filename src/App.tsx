@@ -15,6 +15,7 @@ import { Lobby } from './components/Lobby'
 import { Round, TopbarClock, type FixState } from './components/Round'
 import { BetweenRounds } from './components/BetweenRounds'
 import { FinalScreen } from './components/FinalScreen'
+import { Replay } from './components/Replay'
 import { StaleBanner } from './components/StaleBanner'
 import { presenceOf } from './sync/presence'
 import { isDevMode } from './hiding/devPosition'
@@ -30,11 +31,13 @@ function GameScreen({
   gameId,
   transport,
   onLeave,
+  onReplay,
   onRejoin,
 }: {
   gameId: string
   transport: SyncTransport
   onLeave: () => void
+  onReplay: () => void
   onRejoin: (gameId: string) => void
 }) {
   const game = useGameSync(gameId, transport)
@@ -132,7 +135,7 @@ function GameScreen({
         ) : lobby.status === 'lobby' ? (
           <Lobby sync={game.sync} transport={transport} lobby={lobby} userId={game.userId} canAct={game.canAct} presence={presence} />
         ) : ended ? (
-          <FinalScreen lobby={lobby} events={events} onHome={onLeave} />
+          <FinalScreen gameId={gameId} lobby={lobby} events={events} onHome={onLeave} onReplay={onReplay} />
         ) : lobby.status === 'round_over' ? (
           <BetweenRounds sync={game.sync} lobby={lobby} events={events} userId={game.userId} canAct={game.canAct} fix={fix} setFix={setFix} />
         ) : (
@@ -186,6 +189,8 @@ function GameScreen({
 export default function App() {
   const [gameId, setGameId] = useState<string | null>(() => readLocal(GAME_KEY))
   const [settings, setSettings] = useState(false)
+  /** A past game's replay, opened from Home or the final screen. */
+  const [replay, setReplay] = useState<string | null>(null)
 
   const [attempt, setAttempt] = useState(0)
 
@@ -204,12 +209,15 @@ export default function App() {
             </div>
             <p className="bad">Backend not configured (see .env.example).</p>
           </>
+        ) : replay ? (
+          <Replay transport={transport} gameId={replay} onBack={() => setReplay(null)} />
         ) : gameId ? (
           <GameScreen
             key={`${gameId}:${attempt}`}
             gameId={gameId}
             transport={transport}
             onLeave={() => enter(null)}
+            onReplay={() => setReplay(gameId)}
             onRejoin={(id) => {
               enter(id)
               setAttempt((n) => n + 1)
@@ -218,7 +226,12 @@ export default function App() {
         ) : settings ? (
           <Settings transport={transport} onBack={() => setSettings(false)} />
         ) : (
-          <Home transport={transport} onEnter={enter} onSettings={() => setSettings(true)} />
+          <Home
+            transport={transport}
+            onEnter={enter}
+            onSettings={() => setSettings(true)}
+            onReplay={(id) => setReplay(id)}
+          />
         )}
         <p className="muted small app-version">{buildLabel()}</p>
       </main>

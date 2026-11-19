@@ -25,6 +25,14 @@ export interface MapOverlay {
   remaining?: FeatureCollection
   /** A question tool: radar circle, thermometer line (seeker red; features with side 'hider' blue). */
   tool?: FeatureCollection
+  /** Replay: each player's path so far, in team colour. */
+  paths?: MapPath[]
+}
+
+export interface MapPath {
+  id: string
+  team: 'hiders' | 'seekers'
+  coords: [number, number][]
 }
 
 export interface MapDot {
@@ -314,6 +322,21 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
   const ruled = overlay?.ruled
   const remaining = overlay?.remaining
   const tool = overlay?.tool
+  const paths = overlay?.paths
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !loaded) return
+    ;(map.getSource('paths') as GeoJSONSource | undefined)?.setData({
+      type: 'FeatureCollection',
+      features: (paths ?? [])
+        .filter((p) => p.coords.length > 1)
+        .map((p) => ({
+          type: 'Feature',
+          properties: { id: p.id, color: TEAM_COLOR[p.team] },
+          geometry: { type: 'LineString', coordinates: p.coords },
+        })),
+    })
+  }, [paths, loaded])
   useEffect(() => {
     const map = mapRef.current
     if (!map || !loaded) return

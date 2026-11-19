@@ -132,6 +132,7 @@ export function mapStyle(pack: CityPack, opts: { glyphs?: string } = {}): StyleS
       area: { type: 'geojson', data: EMPTY },
       zone: { type: 'geojson', data: EMPTY },
       bars: { type: 'geojson', data: EMPTY },
+      paths: { type: 'geojson', data: EMPTY },
       dots: { type: 'geojson', data: EMPTY },
       // tolerance 0: simplification at some zooms made thin hatch pieces self-intersect,
       // and earcut then filled the hole they wrap (hatch spilling into the remaining area).
@@ -299,6 +300,14 @@ export function mapStyle(pack: CityPack, opts: { glyphs?: string } = {}): StyleS
           'circle-stroke-color': ['case', ['boolean', ['get', 'selected'], false], MAP_COLORS.text, MAP_COLORS.bg],
           'circle-stroke-width': ['case', ['boolean', ['get', 'selected'], false], 2.5, 1],
         },
+      },
+      {
+        // Replay: where each player went, in team colour.
+        id: 'paths',
+        type: 'line',
+        source: 'paths',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': ['get', 'color'], 'line-width': 3, 'line-opacity': 0.8 },
       },
       {
         // People: you (white centre) and teammates, in team colour.
