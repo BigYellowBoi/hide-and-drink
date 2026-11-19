@@ -29,6 +29,7 @@ import {
   cardOf,
   deriveCards,
   evidenceFor,
+  setupFor,
   liveEffects,
   lockedUntil,
   powerupAction,
@@ -521,7 +522,14 @@ function HiderView({
       {cards.effects
         .filter((e) => e.status === 'clear_requested')
         .map((e) => (
-          <ConfirmClear key={e.id} sync={sync} effect={e} canAct={canAct} proofPath={evidenceFor(cards, e.id)?.path ?? null} />
+          <ConfirmClear
+            key={e.id}
+            sync={sync}
+            effect={e}
+            canAct={canAct}
+            proofPath={evidenceFor(cards, e.id)?.path ?? null}
+            setupPath={setupFor(cards, e.id)?.path ?? null}
+          />
         ))}
       {tab !== 'hand' && <TriviaPrompt effects={triviaWaiting(cards, 'hiders')} team="hiders" onOpen={goHand} />}
       {cards.draws.length > 0 && tab !== 'hand' && (
@@ -701,8 +709,8 @@ function SeekerView({
   return (
     <>
       <DrinkProofs sync={sync} cards={cards} team="seekers" canAct={canAct} />
-      {blocked.length > 0 && tab !== 'effects' && <BlockedBanner effects={blocked} team="seekers" />}
-      {tab !== 'effects' && <OtherBlockedBanners cards={cards} team="seekers" />}
+      {blocked.length > 0 && tab !== 'effects' && <BlockedBanner effects={blocked} team="seekers" onOpen={goEffects} />}
+      {tab !== 'effects' && <OtherBlockedBanners cards={cards} team="seekers" onOpen={goEffects} />}
       {tab !== 'effects' && <LockBanner cards={cards} team="seekers" now={now} />}
       {cards.moving && tab !== 'effects' && (
         <div className="blocked-banner" role="status">

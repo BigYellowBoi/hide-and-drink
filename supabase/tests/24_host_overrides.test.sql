@@ -341,7 +341,7 @@ select pg_temp.host();
 select lives_ok(format($$ select pg_temp.ov('clear_effect', '{"effect_id":"%s"}') $$, current_setting('test.effect')), 'clear_effect');
 reset role;
 select is((select status from public.card_effects where id = current_setting('test.effect')::uuid), 'cleared', 'force-cleared');
-select is((select resolution from public.drink_proofs where effect_id = current_setting('test.effect')::uuid), 'waived',
+select is((select resolution from public.drink_proofs where effect_id = current_setting('test.effect')::uuid and kind = 'evidence'), 'waived',
   'and its evidence proof is waived');
 set local role authenticated;
 select pg_temp.host();

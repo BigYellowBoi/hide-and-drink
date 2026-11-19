@@ -94,6 +94,9 @@ export function mapStyle(pack: CityPack, opts: { glyphs?: string } = {}): StyleS
     'text-size': 13,
     'text-optional': true,
   }
+  // Question tools are seeker red; the hider's side of one (hiderTool, side: 'hider') is hider blue.
+  const sideColour = (seeker: string = MAP_COLORS.seeker) =>
+    ['case', ['==', ['get', 'side'], 'hider'], MAP_COLORS.hider, seeker] as unknown as string
   const labelPaint = { 'text-color': MAP_COLORS.text, 'text-halo-color': MAP_COLORS.bg, 'text-halo-width': 2 }
   // Distances on question tools ("0.4 km") and candidate names, from feature.properties.label.
   const toolLabels: StyleSpecification['layers'] = opts.glyphs
@@ -205,7 +208,7 @@ export function mapStyle(pack: CityPack, opts: { glyphs?: string } = {}): StyleS
         type: 'fill',
         source: 'tool',
         filter: ['==', ['geometry-type'], 'Polygon'],
-        paint: { 'fill-color': MAP_COLORS.seeker, 'fill-opacity': 0.12 },
+        paint: { 'fill-color': sideColour(), 'fill-opacity': 0.12 },
       },
       {
         id: 'tool-line',
@@ -213,7 +216,7 @@ export function mapStyle(pack: CityPack, opts: { glyphs?: string } = {}): StyleS
         source: 'tool',
         filter: ['!', ['has', 'role']],
         layout: { 'line-cap': 'round' },
-        paint: { 'line-color': MAP_COLORS.seeker, 'line-width': 2, 'line-dasharray': [2, 1.5] },
+        paint: { 'line-color': sideColour(), 'line-width': 2, 'line-dasharray': [2, 1.5] },
       },
       {
         // The nearest feature (a street, a park edge) and the line from the seeker to the nearest candidate.
@@ -223,7 +226,12 @@ export function mapStyle(pack: CityPack, opts: { glyphs?: string } = {}): StyleS
         filter: ['has', 'role'],
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
-          'line-color': ['case', ['==', ['get', 'role'], 'nearest-line'], MAP_COLORS.text, MAP_COLORS.seeker],
+          'line-color': [
+            'case',
+            ['==', ['get', 'side'], 'hider'], MAP_COLORS.hider,
+            ['==', ['get', 'role'], 'nearest-line'], MAP_COLORS.text,
+            MAP_COLORS.seeker,
+          ],
           'line-width': ['case', ['==', ['get', 'role'], 'nearest-line'], 2, 4],
         },
       },
@@ -235,10 +243,10 @@ export function mapStyle(pack: CityPack, opts: { glyphs?: string } = {}): StyleS
         paint: {
           // Candidates: hollow, the nearest one filled white.
           'circle-color': [
-            'match', ['get', 'role'], 'candidate', MAP_COLORS.bg, 'nearest', MAP_COLORS.text, MAP_COLORS.seeker,
+            'match', ['get', 'role'], 'candidate', MAP_COLORS.bg, 'nearest', MAP_COLORS.text, sideColour(),
           ],
           'circle-radius': ['match', ['get', 'role'], 'nearest', 7, 5],
-          'circle-stroke-color': ['match', ['get', 'role'], 'candidate', MAP_COLORS.seeker, 'nearest', MAP_COLORS.seeker, MAP_COLORS.bg],
+          'circle-stroke-color': ['match', ['get', 'role'], 'candidate', sideColour(), 'nearest', sideColour(), MAP_COLORS.bg],
           'circle-stroke-width': 2,
         },
       },

@@ -8,6 +8,7 @@ import { LazyGameMap } from './lazyMap'
 import { useLibrary } from '../library/useLibrary'
 import { CardLibrary } from './CardLibrary'
 import { PushToggle } from './PushToggle'
+import { buildLabel } from '../lib/version'
 
 const cityLabel = (c: string) => c.charAt(0).toUpperCase() + c.slice(1).replace(/_/g, ' ')
 
@@ -65,6 +66,12 @@ export function Settings({ transport, onBack }: { transport: SyncTransport; onBa
         <h1 className="settings-title">Settings</h1>
         <span />
       </header>
+
+      <section className="card">
+        <p className="muted small">
+          App version <strong>{buildLabel()}</strong>. If a teammate shows a higher number, close and reopen the app to update.
+        </p>
+      </section>
 
       <section className="card">
         <PushToggle transport={transport} />

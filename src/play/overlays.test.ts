@@ -65,6 +65,8 @@ describe("the hider's side of a question", () => {
     const extra = hiderTool(tq, [153.005, -27])
     expect(extra.map((f) => f.geometry.type)).toEqual(['Polygon', 'LineString'])
     expect(extra[1].properties?.label).toBe('0.00 km')
+    // Drawn hider blue next to the seekers' red circle.
+    expect(extra.every((f) => f.properties?.side === 'hider')).toBe(true)
     const d = candidateDistances(tq, [153.005, -27])
     expect(Math.round(d.get('a') ?? 0)).toBe(396)
     expect(hiderTool(tq, null)).toEqual([])

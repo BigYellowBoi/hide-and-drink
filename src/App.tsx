@@ -20,6 +20,7 @@ import { presenceOf } from './sync/presence'
 import { isDevMode } from './hiding/devPosition'
 import { PlaytestTools } from './components/PlaytestTools'
 import { effectiveEvents } from './overrides/state'
+import { buildLabel } from './lib/version'
 
 const transport = supabase ? supabaseTransport(supabase) : null
 const asset = (f: string) => `${import.meta.env.BASE_URL}${f}`
@@ -219,7 +220,7 @@ export default function App() {
         ) : (
           <Home transport={transport} onEnter={enter} onSettings={() => setSettings(true)} />
         )}
-        <p className="muted small">Build {import.meta.env.VITE_BUILD_SHA?.slice(0, 7) ?? 'local'}</p>
+        <p className="muted small app-version">{buildLabel()}</p>
       </main>
     </div>
   )

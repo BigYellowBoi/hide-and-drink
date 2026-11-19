@@ -3,6 +3,9 @@ import type { GameEvent } from '../sync/types'
 import {
   banKey,
   hiderProofKind,
+  hiderProofPrompt,
+  judgeOf,
+  proofPrompt,
   keepDiscardLabel,
   proofToastText,
   setupFor,
@@ -617,5 +620,42 @@ describe('playtest 2 follow-ups', () => {
     expect(proofToastText(base, 'hiders', name).title).toBe('The seekers drank: Veto')
     expect(proofToastText(base, 'seekers', name).title).toBe('Your team drank: Veto')
     expect(proofToastText({ ...base, path: null, resolution: 'waived' }, 'hiders', name).body).toMatch(/host fix/)
+  })
+})
+
+describe('judging a curse', () => {
+  const scull = card('sculling', 'until_cleared', {
+    blocks: 'transport',
+    proof: 'video',
+    hider_proof: 'video',
+    hider_proof_prompt: 'Film your team chugging.',
+    proof_prompt: 'Chug quicker.',
+    judge_question: 'Who drank quicker?',
+    judge_accept: 'Seekers',
+    judge_reject: 'Hiders',
+  })
+
+  it('reads the prompts and the judge labels, with defaults', () => {
+    const c = parseCard(scull)!
+    expect(hiderProofPrompt(c)).toBe('Film your team chugging.')
+    expect(proofPrompt(c)).toBe('Chug quicker.')
+    expect(judgeOf(c)).toEqual({ question: 'Who drank quicker?', accept: 'Seekers', reject: 'Hiders' })
+    const plain = parseCard(card('quan', 'until_cleared', { proof: 'photo', proof_prompt: '  ' }))!
+    expect(proofPrompt(plain)).toBeNull()
+    expect(judgeOf(plain)).toEqual({ question: null, accept: 'Confirm', reject: 'Not yet' })
+  })
+
+  it('logs the hider picking the hiders as a retry', () => {
+    const played = ev('card_played', {
+      round: 1,
+      instance_id: 'i1',
+      card: scull,
+      played_at: '2026-11-20T10:00:00Z',
+      effect_id: 'e1',
+      blocks_questions: false,
+    })
+    const s = deriveCards([started, played, ev('effect_clear_requested', { effect_id: 'e1' }), ev('effect_clear_rejected', { effect_id: 'e1' })])
+    expect(s.effects[0].status).toBe('active')
+    expect(s.log.at(-1)?.text).toBe('SCULLING: hider picked Hiders. Seekers try again')
   })
 })

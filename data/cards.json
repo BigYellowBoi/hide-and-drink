@@ -209,7 +209,8 @@
         "drinks": [
           "hiders",
           "seekers"
-        ]
+        ],
+        "proof": "photo"
       },
       "active": true
     },
@@ -222,7 +223,13 @@
       "text": "Find a restaurant within your zone that serves food from a specific foreign country. The seekers must visit a restaurant serving food from a country that is a greater distance away before asking their next question.",
       "params": {
         "blocks_questions": true,
-        "proof": "photo"
+        "proof": "photo",
+        "hider_proof": "photo",
+        "hider_proof_prompt": "Photo of your restaurant or its menu, showing which country the food is from.",
+        "proof_prompt": "Photo at a restaurant serving food from a country further away.",
+        "judge_question": "Is their country further away?",
+        "judge_accept": "Yes",
+        "judge_reject": "No"
       },
       "active": true,
       "cast_cost": "free",
@@ -239,7 +246,12 @@
         "blocks_questions": true,
         "proof": "photo",
         "radius_m": 150,
-        "hider_proof": "photo"
+        "hider_proof": "photo",
+        "hider_proof_prompt": "Unzoomed Street View screenshot from a street within 150 m of the seekers: level with the horizon, with a structure other than a road in it.",
+        "proof_prompt": "Photo of the same spot in real life.",
+        "judge_question": "Is it the same spot?",
+        "judge_accept": "Yes",
+        "judge_reject": "No"
       },
       "active": true,
       "cast_cost": "free",
@@ -256,7 +268,12 @@
         "blocks_questions": true,
         "proof": "video",
         "max_s": 300,
-        "hider_proof": "video"
+        "hider_proof": "video",
+        "hider_proof_prompt": "Film a bird in one take, up to 5 minutes. Stop when it leaves the frame.",
+        "proof_prompt": "Film a bird for at least as long as the hiders' video.",
+        "judge_question": "Did the seekers film their bird for as long or longer?",
+        "judge_accept": "Yes",
+        "judge_reject": "No, shorter"
       },
       "active": true,
       "cast_cost": "free",
@@ -272,7 +289,12 @@
       "params": {
         "blocks_questions": true,
         "proof": "photo",
-        "hider_proof": "photo"
+        "hider_proof": "photo",
+        "hider_proof_prompt": "Photo of a car.",
+        "proof_prompt": "Photo of a more expensive car.",
+        "judge_question": "Is the seekers' car more expensive?",
+        "judge_accept": "Yes",
+        "judge_reject": "No"
       },
       "active": true,
       "cast_cost": "free",
@@ -287,7 +309,8 @@
       "text": "The seekers must ask their next question from under a bridge.",
       "params": {
         "blocks_questions": true,
-        "proof": "photo"
+        "proof": "photo",
+        "proof_prompt": "Photo of you under a bridge."
       },
       "active": true,
       "cast_cost": "drink",
@@ -378,7 +401,12 @@
       "params": {
         "blocks_questions": true,
         "proof": "photo",
-        "hider_proof": "photo"
+        "hider_proof": "photo",
+        "hider_proof_prompt": "Photo of the drink on your bar's menu (any branded alcohol).",
+        "proof_prompt": "Photo of you drinking the same drink.",
+        "judge_question": "Is it the same drink?",
+        "judge_accept": "Yes",
+        "judge_reject": "No"
       },
       "active": true,
       "cast_cost": "free",
@@ -409,7 +437,8 @@
       "text": "Seekers cannot ask any more questions until successfully winning the pokies.",
       "params": {
         "blocks_questions": true,
-        "proof": "photo"
+        "proof": "photo",
+        "proof_prompt": "Photo of your pokies win."
       },
       "active": true,
       "cast_cost": "drink",
@@ -425,7 +454,8 @@
       "params": {
         "blocks_questions": false,
         "blocks": "transport",
-        "proof": "photo"
+        "proof": "photo",
+        "proof_prompt": "Screenshot of your win against the hiders."
       },
       "active": true,
       "cast_cost": "drink",
@@ -437,15 +467,20 @@
       "category": "curse",
       "behaviour": "until_cleared",
       "copies": 1,
-      "text": "Hiders get one chance to chug a schooner / pint and time it. Seekers can't use transport until they are able to chug a schooner / pint quicker.",
+      "text": "Hiders get one chance to chug a schooner / pint on video (that is the casting cost, no extra drink). Seekers can't use transport until they chug one quicker on video. The hiders watch both and pick who was quicker.",
       "params": {
         "blocks_questions": false,
         "blocks": "transport",
         "proof": "video",
-        "hider_proof": "video"
+        "hider_proof": "video",
+        "hider_proof_prompt": "Film your team chugging a schooner / pint in one take. This is the casting cost.",
+        "proof_prompt": "Film yourselves chugging a schooner / pint quicker than the hiders.",
+        "judge_question": "Who drank quicker?",
+        "judge_accept": "Seekers",
+        "judge_reject": "Hiders"
       },
       "active": true,
-      "cast_cost": "drink",
+      "cast_cost": "free",
       "can_veto": true
     },
     {
@@ -491,7 +526,8 @@
         "blocks_questions": true,
         "utility": "dice",
         "dice": 1,
-        "proof": "photo"
+        "proof": "photo",
+        "proof_prompt": "Photo of the shots you rolled."
       },
       "active": true,
       "cast_cost": "shot",
@@ -506,7 +542,8 @@
       "text": "Seekers must lose a game of pool before asking their next question.",
       "params": {
         "blocks_questions": true,
-        "proof": "photo"
+        "proof": "photo",
+        "proof_prompt": "Photo of the pool table after you lost."
       },
       "active": true,
       "cast_cost": "shot",
@@ -539,7 +576,8 @@
       "text": "Seekers must ask their next question from inside a Chinese restaurant, or from Chinatown in the Valley.",
       "params": {
         "blocks_questions": true,
-        "proof": "photo"
+        "proof": "photo",
+        "proof_prompt": "Photo inside the Chinese restaurant or in Chinatown."
       },
       "active": true,
       "cast_cost": "drink",
@@ -554,7 +592,8 @@
       "text": "Seekers must ask their next question from inside a KFC, or after eating something watermelon flavoured.",
       "params": {
         "blocks_questions": true,
-        "proof": "photo"
+        "proof": "photo",
+        "proof_prompt": "Photo inside KFC or of the watermelon-flavoured thing."
       },
       "active": true,
       "cast_cost": "shot",

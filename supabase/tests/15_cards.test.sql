@@ -290,6 +290,11 @@ select throws_ok(
   format($$ select public.confirm_clear(pg_temp.gid(), %L, true, pg_temp.uid(56), pg_temp.seq()) $$, current_setting('test.e1')),
   'P0001', 'clear_not_requested', 'the hider confirms only after the seekers ask'
 );
+-- Distant Cuisine's hiders' photo (params.hider_proof) is in: the seekers can clear.
+reset role;
+update public.drink_proofs set photo_path = 'x', proved_at = now()
+ where effect_id = current_setting('test.e1')::uuid and kind = 'setup';
+set local role authenticated;
 select pg_temp.as_user('33333333-3333-3333-3333-333333333333');
 select lives_ok(
   format($$ select public.clear_effect(pg_temp.gid(), %L, pg_temp.uid(57), pg_temp.seq()) $$, current_setting('test.e1')),
