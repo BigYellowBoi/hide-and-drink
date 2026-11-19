@@ -27,13 +27,15 @@ export type OverrideKind =
   | 'remove_card'
   | 'draw_cards'
   | 'reshuffle'
+  | 'adjust_score'
+  | 'redo_round'
   | 'undo'
 
 export interface OverrideOption {
   kind: OverrideKind
   label: string
   line: string
-  group: 'Penalties and drinks' | 'Timers' | 'Bar and freeze' | 'Questions' | 'Cards' | 'Players' | 'Undo'
+  group: 'Penalties and drinks' | 'Timers' | 'Bar and freeze' | 'Questions' | 'Cards' | 'Players' | 'Rounds and scores' | 'Undo'
   private: boolean
 }
 
@@ -62,8 +64,13 @@ export const OVERRIDES: readonly OverrideOption[] = [
   { kind: 'reshuffle', group: 'Cards', private: true, label: 'Reshuffle the deck', line: 'Discards go back into the draw pile, shuffled (for an empty deck).' },
   { kind: 'move_player', group: 'Players', private: false, label: 'Move a player', line: 'Swap someone to the other team mid-game (onto the hiders needs a hider to agree).' },
   { kind: 'set_host', group: 'Players', private: false, label: 'Make someone else host', line: 'Hand the host controls to another player.' },
+  { kind: 'adjust_score', group: 'Rounds and scores', private: false, label: 'Change a team\'s time', line: 'Add or take away hide time for a round already scored.' },
+  { kind: 'redo_round', group: 'Rounds and scores', private: false, label: 'Redo the round', line: 'This round (or the one just found) doesn\'t count: the same hiders play it again.' },
   { kind: 'undo', group: 'Undo', private: false, label: 'Undo a fix', line: 'Put things back as they were before a fix. Both teams have to agree.' },
 ]
+
+/** Host-only fixes handled by _override_round: they also work between rounds. */
+export const ROUND_KINDS: ReadonlySet<OverrideKind> = new Set(['adjust_score', 'redo_round'])
 
 export const optionOf = (kind: string) => OVERRIDES.find((o) => o.kind === kind) ?? null
 
@@ -71,7 +78,9 @@ export const optionOf = (kind: string) => OVERRIDES.find((o) => o.kind === kind)
  * What this phone may do: the host everything, other hiders the hider-only fixes, and anyone
  * on a team can ask for an undo (both teams must agree).
  */
-export function availableOverrides(isHost: boolean, isHider: boolean, onTeam = isHider): OverrideOption[] {
+export function availableOverrides(isHost: boolean, isHider: boolean, onTeam = isHider, betweenRounds = false): OverrideOption[] {
+  // Between rounds only the round fixes work (host only).
+  if (betweenRounds) return isHost ? OVERRIDES.filter((o) => ROUND_KINDS.has(o.kind)) : []
   if (isHost) return [...OVERRIDES]
   return OVERRIDES.filter((o) => (isHider && o.private) || (onTeam && o.kind === 'undo'))
 }

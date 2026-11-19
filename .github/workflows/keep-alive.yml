@@ -2,6 +2,8 @@ name: Keep Supabase awake
 
 # Supabase pauses free projects after about a week with no activity. This signs in
 # anonymously and runs two real queries every 3 days so the project never goes idle.
+# It also ends games with no events for 24 h (end_stale_games: no winner unless a round
+# finished), which frees their join codes.
 # Each run leaves one anonymous user behind (about 120 a year; harmless).
 #
 # Scheduled workflows run from the default branch only. GitHub disables them after
@@ -37,3 +39,5 @@ jobs:
           echo "Server time: $(curl -fsS --retry 3 -X POST "$url/rest/v1/rpc/server_time" "${auth[@]}" \
             -H "Content-Type: application/json" -d '{}')"
           echo "Cards: $(curl -fsS --retry 3 "$url/rest/v1/cards?select=id&limit=1" "${auth[@]}")"
+          echo "Stale games ended: $(curl -fsS --retry 3 -X POST "$url/rest/v1/rpc/end_stale_games" "${auth[@]}" \
+            -H "Content-Type: application/json" -d '{}')"

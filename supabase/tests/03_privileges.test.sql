@@ -29,10 +29,10 @@ select is(
   array[
     'add_venue', 'answer_question', 'answer_trivia', 'ask_question', 'can_join_topic', 'can_read_drink_photo', 'can_read_question_photo', 'can_see', 'can_see_seeker_position',
     'can_upload_drink_photo', 'can_upload_question_photo', 'can_use_presence',
-    'check_curse', 'choose_bar', 'clear_effect', 'confirm_clear', 'create_game', 'delete_deck_preset', 'delete_play_area', 'delete_push_subscription', 'dev_draw_cards', 'force_clear_trivia', 'get_city_pack', 'hiding_bars', 'host_override',
+    'check_curse', 'choose_bar', 'clear_effect', 'confirm_clear', 'create_game', 'delete_deck_preset', 'delete_play_area', 'delete_push_subscription', 'dev_draw_cards', 'end_game', 'end_stale_games', 'force_clear_trivia', 'found_hider', 'get_city_pack', 'hiding_bars', 'host_override',
     'is_player', 'join_game', 'keep_cards', 'leave_game', 'mark_trivia',
     'my_team', 'play_card', 'remove_player', 'report_picking', 'report_position', 'roll_dice', 'save_card', 'save_category', 'save_deck_preset', 'save_play_area', 'save_push_subscription', 'server_time',
-    'set_card_active', 'set_category_active', 'set_deck', 'set_play_area', 'set_question_shading', 'set_team', 'set_trivia', 'set_venue_hidden', 'settle_timers', 'skip_hiding', 'spin_wheel', 'start_followup', 'start_game', 'submit_drink_proof', 'topic_for',
+    'set_card_active', 'set_category_active', 'set_deck', 'set_play_area', 'set_question_shading', 'set_team', 'set_trivia', 'set_venue_hidden', 'settle_timers', 'skip_hiding', 'spin_wheel', 'start_followup', 'start_game', 'start_next_round', 'submit_drink_proof', 'topic_for',
     'update_config', 'veto_curse'
   ],
   'signed-in clients can call only the allow-listed functions'

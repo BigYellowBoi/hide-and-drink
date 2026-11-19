@@ -13,6 +13,8 @@ import { Home } from './components/Home'
 import { Settings } from './components/Settings'
 import { Lobby } from './components/Lobby'
 import { Round, TopbarClock, type FixState } from './components/Round'
+import { BetweenRounds } from './components/BetweenRounds'
+import { FinalScreen } from './components/FinalScreen'
 import { StaleBanner } from './components/StaleBanner'
 import { presenceOf } from './sync/presence'
 import { isDevMode } from './hiding/devPosition'
@@ -73,8 +75,12 @@ function GameScreen({
   const locked = !game.canAct && game.status !== 'idle' && game.status !== 'error'
   const myTeam = lobby.players.find((p) => p.userId === game.userId)?.team ?? null
   // Hider-only events: on seekers' phones the hand is always empty.
-  // Fix something: in a running game, for the host and anyone on a team.
-  const canFix = lobby.status !== 'lobby' && !!lobby.started && (myTeam !== null || (!!game.userId && game.userId === lobby.hostId))
+  // Fix something: in a running game, for the host and anyone on a team; between rounds, the
+  // host's score fixes; never once the game is over.
+  const isHost = !!game.userId && game.userId === lobby.hostId
+  const running = lobby.status === 'hiding' || lobby.status === 'seeking'
+  const canFix = !!lobby.started && ((running && (myTeam !== null || isHost)) || (lobby.status === 'round_over' && isHost))
+  const ended = lobby.status === 'ended'
   const bonusS = useMemo(() => handBonusS(deriveCards(events)), [events])
 
   return (
@@ -83,13 +89,15 @@ function GameScreen({
       <header className="topbar">
         <span className={`chip chip-${myTeam ?? 'none'}`}>{myTeam ? TEAM_CHIP[myTeam] : 'No team'}</span>
         <span className="topbar-centre">
-          {lobby.started && game.sync ? (
+          {running && lobby.started && game.sync ? (
             <TopbarClock sync={game.sync} started={lobby.started} bonusS={myTeam === 'hiders' ? bonusS : 0} />
           ) : (
-            <span className="topbar-label">{lobby.code ? 'Lobby' : ''}</span>
+            <span className="topbar-label">
+              {!lobby.code ? '' : ended ? 'Game over' : lobby.status === 'round_over' ? `Round ${lobby.started?.round ?? ''} over` : 'Lobby'}
+            </span>
           )}
-          {/* Always on show, so anyone who drops out can rejoin with it. */}
-          {lobby.code && <span className="topbar-code">Code {lobby.code}</span>}
+          {/* Always on show, so anyone who drops out can rejoin with it (an ended game can't be joined). */}
+          {lobby.code && !ended && <span className="topbar-code">Code {lobby.code}</span>}
         </span>
         <ConnectionStatus status={game.status} canAct={game.canAct} />
       </header>
@@ -122,6 +130,10 @@ function GameScreen({
           <p className="muted">Loading game…</p>
         ) : lobby.status === 'lobby' ? (
           <Lobby sync={game.sync} transport={transport} lobby={lobby} userId={game.userId} canAct={game.canAct} presence={presence} />
+        ) : ended ? (
+          <FinalScreen lobby={lobby} events={events} onHome={onLeave} />
+        ) : lobby.status === 'round_over' ? (
+          <BetweenRounds sync={game.sync} lobby={lobby} events={events} userId={game.userId} canAct={game.canAct} fix={fix} setFix={setFix} />
         ) : (
           <Round
             sync={game.sync}
@@ -138,7 +150,7 @@ function GameScreen({
         )}
       </div>
 
-      <div className={`row footer-actions${canFix ? ' footer-split' : ''}`}>
+      {!ended && <div className={`row footer-actions${canFix ? ' footer-split' : ''}`}>
         <button
           className={`secondary${confirmLeave ? ' danger' : ''}`}
           onClick={() => (confirmLeave ? void leave() : setConfirmLeave(true))}
@@ -151,7 +163,7 @@ function GameScreen({
             Fix something
           </button>
         )}
-      </div>
+      </div>}
 
       <details className="debug">
         <summary>Event log</summary>

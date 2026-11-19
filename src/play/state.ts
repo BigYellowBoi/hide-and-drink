@@ -257,6 +257,8 @@ export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
         seekingStarted: true,
         log: [...state.log, { seq: e.seq, kind: 'seeking', at: time(p.at, e.created_at), text: 'Seeking started' }],
       }
+    case 'round_ended':
+      return { ...state, log: [...state.log, { seq: e.seq, kind: 'seeking', at, text: `Found! Round ${num(p.round) ?? state.round} over`, by: str(e.actor_id) }] }
     case 'hiding_skipped':
       return { ...state, log: [...state.log, { seq: e.seq, kind: 'seeking', at, text: 'Hiding skipped (playtest)', by: str(e.actor_id) }] }
     case 'bar_chosen':

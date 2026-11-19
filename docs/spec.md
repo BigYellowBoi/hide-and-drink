@@ -10,13 +10,13 @@ Source of truth for building the app. The shared roadmap doc is a read-only over
 4. Players join with code + name and pick Hiders or Seekers. Host can move players.
 5. Host locks teams and starts. Polygon, config and deck are snapshotted; draw pile is shuffled server-side.
 6. Hiding period: hider travels and picks a bar from the in-app list (only valid venues). Seekers see only the countdown.
-7. Seeking: seekers ask questions, hider answers, cards are drawn and played, until found. Host swaps roles and repeats from step 5.
+7. Seeking: seekers ask questions, hider answers, cards are drawn and played, until found ("Found them", §9). The round is scored, teams swap, and everyone sees the result. Nothing starts by itself: the teams talk, then the new hiders (or the host) slide to start the next round (`start_next_round`: same config and play area, fresh deck). The host can move players between rounds.
 8. Host ends the game. The app decides the winner, everyone sees the final screen, and the game can no longer be joined.
 
 ### Ending a game
 
-- **Host ends it:** `end_game` action (host only) sets status `ended`, decides the winner from the round scores, and appends a `game_ended` event with the result. Every phone shows the final screen. Winner rules depend on scoring (see §11).
-- **Auto-end:** a game with no new events for 24 h is ended automatically (no winner if no round finished). Runs from the scheduled keep-alive job; no extra infrastructure.
+- **Host ends it:** `end_game` action (host only) sets status `ended`, decides the winner from the round scores, and appends a `game_ended` event with the result. Every phone shows the final screen. Winner: the player(s) with the highest total, where a round's score (credited to each of its hiders) is hide time (from the end of the hiding period to the find) plus time bonuses held in the hand plus any host fix (`adjust_score`). A redone round (`redo_round`) doesn't count; a round still running at the end doesn't either.
+- **Auto-end:** a game with no new events for 24 h is ended automatically (`end_stale_games`; no winner if no round finished). Runs from the scheduled keep-alive job (every 3 days, so 1 to 4 days after the last event) and whenever a game is created; no extra infrastructure.
 - **Join codes return to the pool:** a code only has to be unique among games that aren't ended (partial unique index), so ended games free their codes. Joining by code only finds games that aren't ended; old games keep their code for history.
 
 ## 2. Rules (AMB Hide & Drink 2026)
@@ -124,7 +124,7 @@ Latency harness (fail deploy if p95 > 1 s), leak test (seeker client never recei
 
 ## 11. Open questions
 
-- Rounds and scoring: official small-game values? (Hiding period default set to 1 hour.)
+- Rounds and scoring: decided as in §1 (hide time + bonuses per round, per player totals). Official small-game values? (Hiding period default set to 1 hour.)
 - Copies per curse (assumed 1 each).
 - Curse of Nathan: no text yet.
 - Who clears an until_cleared curse (default: seekers tap Done, hider confirms)?
