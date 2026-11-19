@@ -405,6 +405,13 @@ deno_version = 2
 [functions.send-push]
 verify_jwt = false
 
+# Media in R2 (docs/r2.md): called by the phones with their Supabase session.
+[functions.media-upload-url]
+verify_jwt = true
+
+[functions.media-read-url]
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

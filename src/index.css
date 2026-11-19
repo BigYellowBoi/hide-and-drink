@@ -3478,3 +3478,16 @@ button.pcard.type-card.type-card-spent {
   font-variant-numeric: tabular-nums;
   margin: 4px 0;
 }
+
+/* Upload progress under the media box. */
+.media-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.media-progress progress {
+  width: 100%;
+  height: 8px;
+  accent-color: var(--hider);
+}
