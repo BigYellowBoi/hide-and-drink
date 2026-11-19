@@ -51,6 +51,11 @@
           "id": "ferry",
           "label": "Ferry terminal",
           "source": "gtfs:ferry stops"
+        },
+        {
+          "id": "train_station",
+          "label": "Train station",
+          "source": "gtfs:train stations"
         }
       ]
     },
@@ -200,6 +205,12 @@
           "source": "gtfs:ferry stops"
         },
         {
+          "id": "train_stations",
+          "label": "Train stations",
+          "radius_m": 1000,
+          "source": "gtfs:train stations"
+        },
+        {
           "id": "strip_clubs",
           "label": "Strip clubs",
           "radius_m": 1000,
@@ -261,6 +272,10 @@
         {
           "id": "ferry_terminal",
           "label": "Ferry terminal"
+        },
+        {
+          "id": "train_station",
+          "label": "Train station"
         },
         {
           "id": "two_buildings",

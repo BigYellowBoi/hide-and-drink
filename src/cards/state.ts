@@ -506,7 +506,15 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
       }))
       const name = effectName(next, id)
       return log(
-        { kind: 'card', text: applies ? `Seekers confirmed ${name}: it starts now` : `Seekers say ${name} doesn't apply: dropped`, ...effectLink(next, id) },
+        {
+          kind: 'card',
+          text: applies
+            ? `Seekers confirmed ${name}: it starts now`
+            : p.not_applicable === true
+              ? `Seekers say ${name} doesn't apply: cancelled`
+              : `Seekers say ${name} doesn't apply: dropped`,
+          ...effectLink(next, id),
+        },
         next,
       )
     }
@@ -992,6 +1000,24 @@ export function proofKind(c: CardDef): 'photo' | 'video' | null {
   return c.params.proof === 'photo' || c.params.proof === 'video' ? c.params.proof : null
 }
 
+/**
+ * What the hiders attach before they cast a card, sent with play_card (p_choice.media):
+ * the photo of the drink they pay to cast it (when drink proofs are on), and their first
+ * step (params.hider_proof, e.g. Sculling's chug video). A curse that first asks the seekers
+ * whether it applies (params.seeker_confirm) opens its first step later, so not here.
+ */
+export function castMedia(c: CardDef, drinkProofs: boolean): { cost: boolean; setup: 'photo' | 'video' | null } {
+  const confirmFirst =
+    ['timed', 'until_cleared', 'trivia'].includes(c.behaviour) &&
+    typeof c.params.seeker_confirm === 'string' &&
+    c.params.seeker_confirm.trim() !== '' &&
+    c.params.seeker_confirm !== 'false'
+  return {
+    cost: drinkProofs && !!castCost(c) && costPayer(c) === 'hiders',
+    setup: confirmFirst ? null : hiderProofKind(c),
+  }
+}
+
 /** params.hider_proof: what the hiders send first when they cast it ('photo' or 'video'). */
 export function hiderProofKind(c: CardDef): 'photo' | 'video' | null {
   return c.params.hider_proof === 'photo' || c.params.hider_proof === 'video' ? c.params.hider_proof : null
@@ -1004,6 +1030,13 @@ const textParam = (c: CardDef, key: string): string | null => {
 
 /** What the hiders send first (params.hider_proof_prompt), e.g. "Film your team chugging". */
 export const hiderProofPrompt = (c: CardDef) => textParam(c, 'hider_proof_prompt')
+
+/** params.not_applicable: the curse starts at once and the seekers may cancel it (e.g. Escape: only in a bar). */
+export const notApplicable = (c: CardDef) => textParam(c, 'not_applicable')
+
+/** Seekers can still say a running curse doesn't apply (before any lock starts). */
+export const canSayNotApplicable = (e: Effect, now: number) =>
+  !!notApplicable(e.card) && e.status === 'active' && e.followupEndsAt === null && effectPhase(e, now) !== 'over'
 
 /** What the seekers send to clear it (params.proof_prompt). */
 export const proofPrompt = (c: CardDef) => textParam(c, 'proof_prompt')

@@ -7,6 +7,8 @@ import {
   castBlocker,
   castCost,
   castChoice,
+  castMedia,
+  hiderProofPrompt,
   costPayer,
   handBonusS,
   isPlayable,
@@ -22,6 +24,7 @@ import type { GameSync } from '../sync/engine'
 import { PrivateLabel } from './PrivateLabel'
 import { CardFace } from './CardFace'
 import { SlideToConfirm } from './SlideToConfirm'
+import { useMediaPick } from './useProofPhoto'
 
 interface Props {
   sync: GameSync
@@ -34,6 +37,8 @@ export interface CastContext {
   city: string
   pendingQuestion: boolean
   barChosen: boolean
+  /** Config photo_proof_for_drinks: the cast cost's drink needs a photo. */
+  drinkProofs: boolean
 }
 
 /** Hider's Hand tab: pending draws first, then the selected card large with Cast, hand strip below. */
@@ -62,7 +67,14 @@ function Hand({ sync, cards, canAct, ctx }: Props & { ctx: CastContext }) {
     ? castBlocker(def, { pendingQuestion: ctx.pendingQuestion, barChosen: ctx.barChosen, moving: cards.moving, handSize: hand.length })
     : null
   const need = choice.kind === 'target' ? 1 : choice.kind === 'discard' || choice.kind === 'bans' ? choice.count : 0
-  const ready = picks.length === need
+  // Media sent with the card: the drink photo for its cost, and the curse's first step.
+  const media = def && isPlayable(def) ? castMedia(def, ctx.drinkProofs) : { cost: false, setup: null }
+  const folder = current?.instanceId ?? 'none'
+  const costPick = useMediaPick(sync, folder, 'photo', !canAct || busy)
+  const setupPick = useMediaPick(sync, folder, media.setup ?? 'photo', !canAct || busy)
+  const mediaMissing = (media.cost && !costPick.photo) || (!!media.setup && !setupPick.photo)
+  const mediaBusy = costPick.busy ?? setupPick.busy
+  const ready = picks.length === need && !mediaMissing && !mediaBusy
 
   const select = (id: string) => {
     setSelected(id)
@@ -82,7 +94,11 @@ function Hand({ sync, cards, canAct, ctx }: Props & { ctx: CastContext }) {
             ? { bans: picks.map((k) => ({ type: k.split(':')[0], option_id: k.split(':').slice(1).join(':') })) }
             : null
     try {
-      await sync.action('play_card', { p_instance_id: c.instanceId, ...(p_choice ? { p_choice } : {}) })
+      const sent: Record<string, string> = {}
+      if (media.cost) sent.cost = await costPick.upload()
+      if (media.setup) sent.setup = await setupPick.upload()
+      const full = Object.keys(sent).length ? { ...(p_choice ?? {}), media: sent } : p_choice
+      await sync.action('play_card', { p_instance_id: c.instanceId, ...(full ? { p_choice: full } : {}) })
       setSelected(null)
       setPicks([])
     } catch (e) {
@@ -129,6 +145,25 @@ function Hand({ sync, cards, canAct, ctx }: Props & { ctx: CastContext }) {
               ) : choice.kind === 'bans' ? (
                 <BanPicker city={ctx.city} cards={cards} count={choice.count} distinctTypes={choice.distinctTypes} picks={picks} setPicks={setPicks} />
               ) : null}
+              {!blocker && media.setup && (
+                <div className="cast-choice">
+                  <p className="small">
+                    <strong>Your {media.setup}, sent with the curse.</strong>{' '}
+                    {hiderProofPrompt(def) ?? `The seekers see it when the curse lands.`}
+                  </p>
+                  {setupPick.box}
+                  {setupPick.err && <p className="bad small">{setupPick.err}</p>}
+                </div>
+              )}
+              {!blocker && media.cost && (
+                <div className="cast-choice">
+                  <p className="small">
+                    <strong>Photo of your {castCost(def)}</strong>: the cost of casting it, sent with the card.
+                  </p>
+                  {costPick.box}
+                  {costPick.err && <p className="bad small">{costPick.err}</p>}
+                </div>
+              )}
               {blocker ? (
                 <p className="muted small">{blocker}</p>
               ) : (
@@ -137,9 +172,13 @@ function Hand({ sync, cards, canAct, ctx }: Props & { ctx: CastContext }) {
                     key={`${current.instanceId}:${ready}`}
                     label={
                       busy
-                        ? 'Casting…'
-                        : !ready
+                        ? (mediaBusy ?? 'Casting…')
+                        : mediaBusy
+                          ? mediaBusy
+                          : picks.length < need
                           ? `Pick ${need - picks.length} more`
+                          : mediaMissing
+                          ? `Add your ${media.setup && !setupPick.photo ? media.setup : 'photo'} first`
                           : castCost(def)
                             ? costPayer(def) === 'seekers'
                               ? `Cast (seekers drink a ${castCost(def)})`

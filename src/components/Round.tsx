@@ -23,6 +23,7 @@ import { useQuestionTypes } from '../play/useQuestionTypes'
 import { shadingBounds, type LayerLookup } from '../play/features'
 import { useCityLayers } from '../play/useCityLayers'
 import { useSettleTimers } from '../play/useSettleTimers'
+import { useTimelineUnseen } from '../play/useTimelineUnseen'
 import {
   banKey,
   bannedSet,
@@ -62,6 +63,7 @@ import {
 } from './EffectsPanel'
 import { ProofToast } from './ProofToast'
 import { DrinkNotice } from './DrinkNotice'
+import { SeekerNotices, TeamNotices } from './Notices'
 import { HandPanel } from './HandPanel'
 import type { MapDot } from './GameMap'
 import { LazyGameMap } from './lazyMap'
@@ -146,6 +148,7 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
   const overrides = useMemo(() => deriveOverrides(events), [events])
   const [voteErr, setVoteErr] = useState<{ id: string; msg: string } | null>(null)
   const [tab, setTab] = useState<Tab>('map')
+  const logUnseen = useTimelineUnseen(sync.gameId, log, userId, tab === 'log')
   /** A past question shown on the map from the timeline (its tool, candidates and distances). */
   const [shownId, setShownId] = useState<string | null>(null)
   /** The answered question the seekers are shading by hand. */
@@ -264,6 +267,8 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
         )
       })}
       {team && <DrinkNotice gameId={sync.gameId} cards={cards} team={team} now={now} />}
+      {team && <TeamNotices gameId={sync.gameId} events={events} cards={cards} team={team} userId={userId} now={now} />}
+      {team === 'seekers' && <SeekerNotices sync={sync} play={play} cards={cards} now={now} canAct={canAct} />}
       <ProofToast cards={cards} team={team} now={now} nameOf={nameOf} />
       {fix && (
         <FixSomething
@@ -371,7 +376,9 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
         {tabs.map(([id, label]) => (
           <button key={id} className={tab === id ? 'on' : ''} aria-current={tab === id} onClick={() => setTab(id)}>
             {label}
-            {id === 'log' && team === 'hiders' && play.pending && <span className="tab-dot" aria-label="needs answer" />}
+            {id === 'log' && ((team === 'hiders' && play.pending) || logUnseen) && (
+              <span className="tab-dot" aria-label={team === 'hiders' && play.pending ? 'needs answer' : 'new in the timeline'} />
+            )}
             {id === 'hand' && (cards.draws.length > 0 || triviaWaiting(cards, 'hiders').length > 0) && (
               <span className="tab-dot" aria-label="cards to act on" />
             )}
@@ -551,7 +558,7 @@ function HiderView({
             sync={sync}
             cards={cards}
             canAct={canAct}
-            ctx={{ city: lobby.city, pendingQuestion: !!play.pending, barChosen: !!bar }}
+            ctx={{ city: lobby.city, pendingQuestion: !!play.pending, barChosen: !!bar, drinkProofs: lobby.config.photo_proof_for_drinks !== false }}
           />
           <EffectsPanel
             sync={sync}

@@ -493,7 +493,7 @@
       "params": {
         "duration_s": 180,
         "followup_s": 600,
-        "seeker_confirm": "Are you in a bar right now?"
+        "not_applicable": "Only if you are in a bar when it lands."
       },
       "active": true,
       "cast_cost": "drink",
