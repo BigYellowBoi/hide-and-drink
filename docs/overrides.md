@@ -2,7 +2,7 @@
 
 Rule: every decision the app makes automatically has a manual override, so a bug never stops a game.
 
-This is the audit of `supabase/migrations/` (up to `20261217090000_playtest2_fixes.sql`): every event the server writes on its own and every refusal an action can raise, with the fix for each.
+This is the audit of `supabase/migrations/` (up to `20261219090100_rounds_scoring.sql`): every event the server writes on its own and every refusal an action can raise, with the fix for each.
 
 ## How overrides work
 
@@ -58,6 +58,8 @@ This is the audit of `supabase/migrations/` (up to `20261217090000_playtest2_fix
 | `reshuffle` (hider-only) | none | Discards back into the pile, shuffled | `deck_reshuffled` (hiders) |
 | `move_player` | `user_id`, `team` | Mid-game team change. Onto the hiders is hider-only (needs a hider) | `team_changed` |
 | `set_host` | `user_id` | Reassigns the host | `host_changed` |
+| `adjust_score` | `round` (default: the latest scored), `seconds` (non-zero, ±86400) | Adds or takes away hide time for a scored round (`game_rounds.adjust_s`). Host only, public; also between rounds | `score_adjusted` |
+| `redo_round` | none | The round running (stopped now) or just found doesn't count (`voided`): back to between rounds with that round's teams, whose hiders start it again. Host only; also between rounds. Can't be undone (undo needs a round running): start it again or `adjust_score` | `team_changed`, `round_redone` |
 | `undo` | `override_id` | Asks to undo; runs once both teams agree (see above) | `override_requested`, `override_confirmed`, `override_undone` |
 
 ## Automatic events
@@ -81,6 +83,10 @@ This is the audit of `supabase/migrations/` (up to `20261217090000_playtest2_fix
 | Curse timer ending (`ends_at`, `followup_ends_at`) | time | `timer` effect/followup, `reinstate_effect`, `clear_effect` |
 | Veto lock length and chaining | `veto_curse` (`base_lock_s + step_s × vetoes`) | `timer` veto_lock, `cancel_veto` |
 | `hider_moved` | `choose_bar` after Move | `set_bar` (completes it), `cancel_move` |
+| Round score: hide time (found − seeking start), time bonuses held | `found_hider` | `adjust_score`; `redo_round` |
+| Role swap at round end (`team_changed`, no actor) | `found_hider` | `set_team` between rounds (host moves anyone); `redo_round` puts that round's teams back |
+| Winner (`game_ended`) | `end_game`, `end_stale_games` | none: final. Adjust scores before ending. An auto-ended game frees its code for a new one |
+| Auto-end after 24 h with no events (`game_ended` reason `inactive`, no actor) | `end_stale_games` (keep-alive job, every new game) | none: nothing happened for a day; start a new game |
 | `venues_revealed` | trigger when the round ends or changes | none needed: reveals only after the round |
 | `dice_rolled`, `wheel_spun` results | server random | not game state; roll again, or `add_penalty` / `clear_effect` as agreed |
 | `trivia_*` marks; a set short of `params.need_right` thrown out (`trivia_marked.reset`) | hider marks | `clear_effect` (Fix something), `reinstate_effect`; `force_clear_trivia` (host, no button any more) |
@@ -124,7 +130,10 @@ This is the audit of `supabase/migrations/` (up to `20261217090000_playtest2_fix
 | `invalid_shading`, `shading_too_detailed`, `question_not_answered` | `set_question_shading` | pick fewer areas; `set_answer` first |
 | `hiders_only`, `seekers_only` | team checks | `move_player` |
 | `host_only` | host actions | `set_host` |
-| `teams_locked` | `set_team` after start | `move_player` |
+| `teams_locked` | `set_team` during a round | `move_player`; between rounds `set_team` works |
+| `not_seeking_yet` | `found_hider` during hiding | `timer` hiding end |
+| `round_not_over` | `start_next_round` while a round runs | `redo_round` (or find them) |
+| `round_not_found` | `adjust_score`, `redo_round` | none needed: nothing scored to change |
 | `round_not_running` | in-round actions | none needed: there is no round to fix |
 | `stale_state` | every game action | none needed: the phone resyncs and retries |
 | `not_a_player` | every action | Rejoin with the saved code (existing) |

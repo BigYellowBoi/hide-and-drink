@@ -16,6 +16,8 @@ import { deriveOverrides, openRequests, type OverrideRequest } from '../override
 import { optionOf } from '../overrides/catalogue'
 import { describeError } from '../lobby/messages'
 import { FixSomething } from './FixSomething'
+import { FoundButton } from './FoundButton'
+import { deriveRounds } from '../rounds/state'
 import { derivePlay, questionLabel, shadable, shownEnd, type PlayState } from '../play/state'
 import { useQuestionTypes } from '../play/useQuestionTypes'
 import { shadingBounds, type LayerLookup } from '../play/features'
@@ -274,6 +276,7 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
           canAct={canAct}
           layer={layer}
           request={fix === true ? null : fix}
+          rounds={deriveRounds(events).rounds}
           onClose={() => setFix(false)}
         />
       )}
@@ -768,6 +771,8 @@ function SeekerView({
           </label>
         </section>
       )}
+
+      {tab === 'map' && clock.phase === 'seeking' && <FoundButton sync={sync} canAct={canAct} />}
 
       {tab === 'ask' && (
         <AskPanel

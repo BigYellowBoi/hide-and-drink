@@ -170,7 +170,10 @@ describe('catalogue', () => {
     const sql = readFileSync('supabase/migrations/20261213090000_host_overrides.sql', 'utf8')
     const list = sql.match(/if v_kind is null or v_kind not in \(([\s\S]*?)\) then/)![1]
     const kinds = [...list.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort()
-    expect(OVERRIDES.map((o) => o.kind).sort()).toEqual(kinds)
+    const round = readFileSync('supabase/migrations/20261219090100_rounds_scoring.sql', 'utf8')
+      .match(/elsif p_kind in \(([^)]*)\) then\n\s*return public._override_round/)![1]
+    const roundKinds = [...round.matchAll(/'([a-z_]+)'/g)].map((m) => m[1])
+    expect(OVERRIDES.map((o) => o.kind).sort()).toEqual([...kinds, ...roundKinds].sort())
   })
 
   it('a non-host hider sees hider-only fixes and undo; other seekers only undo; no team, nothing', () => {
@@ -178,6 +181,8 @@ describe('catalogue', () => {
     expect(availableOverrides(false, false, true).map((o) => o.kind)).toEqual(['undo'])
     expect(availableOverrides(false, false, false)).toEqual([])
     expect(availableOverrides(true, false, true)).toHaveLength(OVERRIDES.length)
+    expect(availableOverrides(true, true, true, true).map((o) => o.kind)).toEqual(['adjust_score', 'redo_round'])
+    expect(availableOverrides(false, true, true, true)).toEqual([])
   })
 
   it('an undo request waits for a yes from each team', () => {

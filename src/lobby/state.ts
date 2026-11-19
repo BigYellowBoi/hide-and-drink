@@ -21,7 +21,8 @@ export interface StartedRound {
   playArea: AreaCollection | null
 }
 
-export type GameStatus = 'lobby' | 'hiding' | 'seeking' | 'ended'
+/** round_over: between rounds (found, or redone), until the next round's hiders start it. */
+export type GameStatus = 'lobby' | 'hiding' | 'seeking' | 'round_over' | 'ended'
 
 export interface LobbyState {
   code: string | null
@@ -164,6 +165,11 @@ function applyCoreEvent(state: LobbyState, e: GameEvent): LobbyState {
       const hidingPeriodS = Math.max(0, Math.min(started.hidingPeriodS, Math.round((at - started.startedAt) / 1000)))
       return { ...state, status: 'seeking', started: { ...started, hidingPeriodS } }
     }
+    case 'round_ended':
+    case 'round_redone':
+      return state.status === 'ended' ? state : { ...state, status: 'round_over' }
+    case 'game_ended':
+      return { ...state, status: 'ended' }
     case 'host_changed': {
       const hostId = str(p.user_id)
       if (!hostId) return state

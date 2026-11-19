@@ -14,6 +14,7 @@ import { usePosition } from '../hiding/usePosition'
 import { isDevMode } from '../hiding/devPosition'
 import { availableOverrides, needsHiderApproval, optionOf, type OverrideOption } from '../overrides/catalogue'
 import type { OverrideRequest, OverridesState } from '../overrides/state'
+import { formatDuration, names, type RoundScore } from '../rounds/state'
 
 interface Props {
   sync: GameSync
@@ -27,6 +28,10 @@ interface Props {
   layer: LayerLookup | null
   /** A seeker host's request this hider is carrying out. */
   request?: OverrideRequest | null
+  /** Rounds played so far (for the score fixes). */
+  rounds?: RoundScore[]
+  /** Between rounds: only the round fixes. */
+  betweenRounds?: boolean
   onClose: () => void
 }
 
@@ -72,10 +77,10 @@ function Num({ label, value, onChange, min, max }: { label: string; value: numbe
  * short reason, through host_override. Hider-only fixes from a seeker host go to the hiders
  * as a request; a hider carrying one out opens this sheet with `request` set.
  */
-export function FixSomething({ sync, lobby, play, cards, overrides, userId, team, canAct, layer, request, onClose }: Props) {
+export function FixSomething({ sync, lobby, play, cards, overrides, userId, team, canAct, layer, request, rounds = [], betweenRounds = false, onClose }: Props) {
   const isHost = !!userId && userId === lobby.hostId
   const isHider = team === 'hiders'
-  const options = useMemo(() => availableOverrides(isHost, isHider, team !== null), [isHost, isHider, team])
+  const options = useMemo(() => availableOverrides(isHost, isHider, team !== null, betweenRounds), [isHost, isHider, team, betweenRounds])
   const [kind, setKind] = useState<string | null>(request?.kind ?? null)
   const [params, setParams] = useState<Params>(request?.params ?? {})
   const [reason, setReason] = useState('')
@@ -295,6 +300,28 @@ export function FixSomething({ sync, lobby, play, cards, overrides, userId, team
             <Num label="Keep" value={Number(params.pick ?? 1)} min={1} max={10} onChange={(v) => set('pick', v)} />
           </>
         )
+      case 'adjust_score':
+        return (
+          <>
+            <Pick
+              label="Round"
+              value={String(params.round ?? '')}
+              options={rounds
+                .filter((r) => !r.voided)
+                .map((r) => ({ value: String(r.round), label: `Round ${r.round}: ${names(r.hiders)} · ${formatDuration(r.totalS)}` }))}
+              onChange={(v) => set('round', v ? Number(v) : undefined)}
+            />
+            <Num label="Minutes (negative takes time away)" value={Number(params.seconds ?? 0) / 60} min={-600} max={600} onChange={(v) => set('seconds', Math.round(v * 60))} />
+          </>
+        )
+      case 'redo_round':
+        return (
+          <p className="muted small">
+            {betweenRounds
+              ? `Round ${round}'s score is thrown out and its teams go back as they were. Its hiders then start it again.`
+              : `Round ${round} stops now and doesn't count. The same hiders start it again when they're ready.`}
+          </p>
+        )
       case 'undo':
         return (
           <Pick
@@ -330,7 +357,7 @@ export function FixSomething({ sync, lobby, play, cards, overrides, userId, team
         ) : !option ? (
           <>
             <p className="muted small">For when the app got something wrong. Everyone sees what you changed and why.</p>
-            {(['Penalties and drinks', 'Timers', 'Bar and freeze', 'Questions', 'Cards', 'Players', 'Undo'] as const).map((g) => {
+            {(['Penalties and drinks', 'Timers', 'Bar and freeze', 'Questions', 'Cards', 'Players', 'Rounds and scores', 'Undo'] as const).map((g) => {
               const list = options.filter((o) => o.group === g)
               if (!list.length) return null
               return (

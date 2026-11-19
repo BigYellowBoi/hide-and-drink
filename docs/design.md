@@ -76,7 +76,7 @@ Question tools on the map are seeker red (`--seeker-on-dark`): radar circle, the
 
 ## Screens
 
-Flow: Home → Lobby → (host: setup) → Start round → each phone switches to its team view → hider found → back to Lobby with roles swapped.
+Flow: Home → Lobby → (host: setup) → Start round → each phone switches to its team view → hider found → Between rounds (roles swapped) → new hiders slide to start the next round → … → host ends the game → Final screen.
 
 | Screen | Who | Key content |
 | --- | --- | --- |
@@ -92,6 +92,9 @@ Flow: Home → Lobby → (host: setup) → Start round → each phone switches t
 | Ask | Seekers | 7 type tiles filled in the type colour with draw/keep, tool on the map (radar circle, candidates with the line to the nearest in km), option chips, Send |
 | Effects | Seekers | "Questions blocked" banner, curse cards with timer or We did it / Veto, vetoes used |
 | Timeline | Both (filtered) | The game's activity log, newest first. One card per question: type label and colour band, elapsed time, the full question, "Asked by", the answer (late in amber), answer photo, reward, and under a divider what followed from it (cards drawn and kept, hider-only with a lock; veto/randomize; missed deadline; manual shading). Buttons: Show on map, Shade by hand (seekers). Everything else as a row: coloured dot by kind, elapsed time, text, photo proof thumbnails, penalties in amber, curses played and cleared |
+| Found them | Seekers | Seeker map, once seeking: "Found them" → "Are you sure?" → slide to end the round |
+| Between rounds | Everyone | Round result (hiders, where they were, hide time + bonuses + host fix = total), standings, next round's teams (already swapped; host taps to move), "Slide to start round N" for the new hiders (seekers see who they're waiting for), host: End game (tap twice). Top bar: "Round N over" |
+| Final screen | Everyone | "Game over", winner(s) and time (or "No winner"), totals per team with the winner outlined in green, every round (redone ones dimmed), Back to home. No join code: an ended game can't be joined |
 | Shade by hand | Seekers | Full-screen map: Keep only / Rule out / Nothing, then Pick (tap a suburb or council area, or "Use the question's circle") or Draw (Terra Draw polygon). Red preview, Save shading, Back to the app's shading. Shared with every phone |
 
 ## Not decided yet
