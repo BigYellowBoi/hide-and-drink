@@ -31,7 +31,7 @@ Full spec: `docs/spec.md`. Design (colours, fonts, logos, screens): `docs/design
 - Events table is append-only. Game state is derived from it or updated in the same transaction.
 - Channels: `game:{id}` (everyone), `game:{id}:seekers`, `game:{id}:hiders`; `library` (any signed-in user: library and preset changes).
 - Units: metres and seconds in data; display km/min.
-- PR descriptions start with the version the app will show once merged: `**Version: v<N>**`, N = `git rev-list --count origin/main` + 1 (one commit per merge; recheck if another PR merges first).
+- PR descriptions start with the version the app will show once merged: `**Version: v<N>**`, N = `git rev-list --count origin/main` + 1, counted on full history (`git fetch --unshallow` first: cloud sessions clone shallow). With one squashed commit per PR this is the PR number − 1; recheck if another PR merges first.
 - Keep this file short. Update it when a decision changes.
 
 ## Commands
