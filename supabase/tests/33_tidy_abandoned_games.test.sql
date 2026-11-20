@@ -7,7 +7,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(14);
+select plan(16);
 
 insert into auth.users (id) values
   ('11111111-1111-1111-1111-111111111111'),
@@ -65,11 +65,21 @@ insert into public.media_objects (name, game_id, bucket, content_type, bytes, qu
 values (current_setting('test.media') || '/' || pg_temp.uid(90) || '/cost.jpg', current_setting('test.media')::uuid,
         'drink-photos', 'image/jpeg', 1234, 'original', '22222222-2222-2222-2222-222222222222', now());
 
--- The ended game is listed for a day only if something happened in it: it isn't.
+-- A playtest game that ends is listed, tagged, until it is deleted.
+set local role authenticated;
+select set_config('test.devended', pg_temp.started(100, '{"hiding_period_s":1800,"dev_mode":true}')::text, true);
+select public.end_game(current_setting('test.devended')::uuid, pg_temp.uid(110), pg_temp.seq(current_setting('test.devended')::uuid));
+reset role;
+
+-- The ended real game where nothing happened isn't listed; the playtest one is, for now.
 set local role authenticated;
 select pg_temp.as_user('11111111-1111-1111-1111-111111111111');
-select is((select count(*)::int from jsonb_array_elements(public.list_past_games())), 0,
-  'past games leave out a game where nothing happened');
+select is((select array_agg(e ->> 'id') from jsonb_array_elements(public.list_past_games()) e),
+  array[current_setting('test.devended')],
+  'past games leave out a game where nothing happened but list a fresh playtest game');
+select is((select array[e ->> 'playtest', (e ->> 'expires_at' is not null)::text]
+             from jsonb_array_elements(public.list_past_games()) e),
+  array['true', 'true'], 'tagged as a playtest with when it goes');
 reset role;
 
 -- Everything but "fresh" goes a day without events.
@@ -83,7 +93,7 @@ select set_config('test.pushes', (select count(*)::text from public.push_outbox
 
 set local role authenticated;
 select pg_temp.as_user('11111111-1111-1111-1111-111111111111');
-select is(public.end_stale_games(), 5, 'four stale running games and the ended one are handled');
+select is(public.end_stale_games(), 6, 'four stale running games and the two ended ones are handled');
 reset role;
 
 create function pg_temp.exists_(p text) returns boolean language sql as $$
@@ -107,6 +117,7 @@ select is(pg_temp.exists_('test.dev'), false, 'a dev-mode game is deleted even w
 select is(pg_temp.status('test.media'), 'ended', 'a game with media is ended, not deleted');
 select is(pg_temp.status('test.fresh'), 'hiding', 'a game with recent events keeps going');
 select is(pg_temp.exists_('test.ended'), false, 'an ended game where nothing happened is deleted a day later');
+select is(pg_temp.exists_('test.devended'), false, 'so is an ended playtest game');
 
 set local role authenticated;
 select pg_temp.as_user('11111111-1111-1111-1111-111111111111');

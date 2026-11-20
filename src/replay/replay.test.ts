@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '../sync/types'
 import { buildReplay, roundAt, stepAt, trackAt } from './state'
 import { gameSummary, zipMediaPath } from './summary'
-import { gameTeams, gameWinner, storageLabel } from './pastGames'
+import { gameTeams, gameWinner, playtestLabel, storageLabel } from './pastGames'
 import { eventsJson, zipName } from './download'
 import type { PastGame, ReplayData, TrackPoint } from './api'
 
@@ -117,13 +117,18 @@ describe('past games', () => {
     id: 'g', city: 'brisbane', started_at: iso(0), ended_at: iso(75), play_area: 'CBD',
     players: [{ ...A, team: 'seekers' }, { ...S, team: 'hiders' }],
     rounds: [{ round: 1, hiders: [A], seekers: [S], bar_name: 'The Bar', total_s: 2400, voided: false }],
-    winners: ['a'], totals: [{ ...A, total_s: 2400, rounds: 1 }, { ...S, total_s: 0, rounds: 0 }], mine: true, can_delete: false,
+    winners: ['a'], totals: [{ ...A, total_s: 2400, rounds: 1 }, { ...S, total_s: 0, rounds: 0 }], mine: true, can_delete: false, playtest: false, expires_at: null,
   }
   it('shows the first round\'s teams and the winner', () => {
     expect(gameTeams(g)).toEqual({ hiders: 'Amy', seekers: 'Sam' })
     expect(gameTeams({ ...g, rounds: [] })).toEqual({ hiders: 'Sam', seekers: 'Amy' })
     expect(gameWinner(g)).toEqual({ names: 'Amy', totalS: 2400 })
     expect(gameWinner({ ...g, winners: [] })).toBeNull()
+  })
+  it('tags playtest games and when they go', () => {
+    expect(playtestLabel(g)).toBeNull()
+    expect(playtestLabel({ ...g, playtest: true })).toBe('Playtest')
+    expect(playtestLabel({ ...g, playtest: true, expires_at: iso(60) })).toMatch(/^Playtest · deleted \w{3} \d{1,2}:\d{2}\s?[ap]m$/i)
   })
   it('shows storage used out of the free tier', () => {
     expect(storageLabel(1_234_000_000, 10_000_000_000)).toBe('1.2 GB of 10 GB free tier used (12%)')

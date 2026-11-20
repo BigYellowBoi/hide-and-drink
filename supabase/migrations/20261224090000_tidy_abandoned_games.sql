@@ -7,7 +7,9 @@
 -- * _end_stale_games: a running game idle for 24 h is deleted when it isn't worth keeping
 --   (otherwise ended as before, reason inactive). Ended games that aren't worth keeping are
 --   deleted 24 h after their last event, so the final screen still works right after.
--- * list_past_games leaves out games that aren't worth keeping.
+-- * list_past_games leaves out games that aren't worth keeping, except playtest (dev-mode)
+--   games until they are deleted, so their replay can be tested: 'playtest' and 'expires_at'
+--   (24 h after the last event; the next sweep after that deletes it).
 -- * _push_for_event: no "Game over" push when a game is ended for inactivity.
 
 create function public._game_worth_keeping(p_game public.games)
@@ -55,7 +57,8 @@ begin
 end;
 $$;
 
--- As in 20261223090000_replay_admin.sql, minus games that aren't worth keeping.
+-- As in 20261223090000_replay_admin.sql, minus games that aren't worth keeping (playtest games
+-- stay until they expire).
 create or replace function public.list_past_games()
 returns jsonb
 language sql
@@ -67,7 +70,11 @@ as $$
     select (select auth.uid()) as uid, public._is_admin((select auth.uid())) as admin
   ),
   g as (
-    select g.*, ge.payload as result, ge.created_at as ended_at
+    select g.*, ge.payload as result, ge.created_at as ended_at,
+           coalesce((g.config ->> 'dev_mode')::boolean, false) as playtest,
+           public._game_worth_keeping(g) as worth,
+           coalesce((select e.created_at from public.events e where e.game_id = g.id and e.seq = g.last_seq),
+                    g.updated_at) + interval '24 hours' as expires_at
       from public.games g
       cross join me
       left join lateral (
@@ -78,7 +85,10 @@ as $$
        and me.uid is not null
        and (me.admin or exists (select 1 from public.players p where p.game_id = g.id and p.user_id = me.uid))
        and exists (select 1 from public.events e where e.game_id = g.id and e.type = 'game_started')
-       and public._game_worth_keeping(g)
+       and ((coalesce((g.config ->> 'dev_mode')::boolean, false)
+             and coalesce((select e.created_at from public.events e where e.game_id = g.id and e.seq = g.last_seq),
+                          g.updated_at) > now() - interval '24 hours')
+            or public._game_worth_keeping(g))
   )
   select coalesce(jsonb_agg(jsonb_build_object(
       'id', g.id,
@@ -97,7 +107,9 @@ as $$
       'winners', coalesce(g.result -> 'winners', '[]'::jsonb),
       'totals', coalesce(g.result -> 'players', '[]'::jsonb),
       'mine', exists (select 1 from public.players p, me where p.game_id = g.id and p.user_id = me.uid),
-      'can_delete', g.host_id = me.uid or me.admin)
+      'can_delete', g.host_id = me.uid or me.admin,
+      'playtest', g.playtest,
+      'expires_at', case when g.playtest and not g.worth then public._iso(g.expires_at) end)
     order by coalesce(g.ended_at, g.updated_at) desc), '[]'::jsonb)
   from g cross join me;
 $$;

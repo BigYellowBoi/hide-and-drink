@@ -62,6 +62,10 @@ export interface PastGame {
   /** This user played in it (admins also see games they didn't). */
   mine: boolean
   can_delete: boolean
+  /** Played in dev/playtest mode. */
+  playtest: boolean
+  /** A playtest game that will be deleted: listed until then (24 h after its last event). */
+  expires_at: string | null
 }
 
 async function rpc<T>(client: SupabaseClient, fn: string, args?: Record<string, unknown>): Promise<T> {
