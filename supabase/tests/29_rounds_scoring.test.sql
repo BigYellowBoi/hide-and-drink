@@ -245,9 +245,9 @@ alter table public.events enable trigger events_append_only;
 set local role authenticated;
 select is(public.end_stale_games(), 1, 'a day without events ends it');
 reset role;
-select is((select array[payload ->> 'reason', payload -> 'winners' ->> 0, (actor_id is null)::text]
-             from pg_temp.last_event('game_ended')),
-  array['inactive', null, 'true'], 'no winner when no round finished, no actor');
+-- Nothing happened in it, so it is deleted rather than ended (20261224090000_tidy_abandoned_games.sql).
+select is((select count(*)::int from public.games where id = pg_temp.gid()), 0,
+  'a game where nothing happened is deleted, not kept as a past game');
 
 select * from finish();
 rollback;

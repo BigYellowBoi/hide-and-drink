@@ -20,6 +20,14 @@ export function gameWinner(g: PastGame): { names: string; totalS: number } | nul
   return { names: won.map((t) => t.name).join(' and '), totalS: won[0].total_s }
 }
 
+/** "Playtest · deleted Fri 3:15 pm", "Playtest" (kept: it has media), or null for a real game. */
+export function playtestLabel(g: PastGame): string | null {
+  if (!g.playtest) return null
+  if (!g.expires_at) return 'Playtest'
+  const at = new Date(g.expires_at).toLocaleString('en-AU', { weekday: 'short', hour: 'numeric', minute: '2-digit' })
+  return `Playtest · deleted ${at}`
+}
+
 const gb = (b: number) => b / 1e9
 
 /** "1.2 GB of 10 GB used (12%)" */

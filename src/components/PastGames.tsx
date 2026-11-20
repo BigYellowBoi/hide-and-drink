@@ -5,7 +5,7 @@ import { describeError } from '../lobby/messages'
 import { formatDuration } from '../rounds/state'
 import { deleteGame, fetchMediaUsage, fetchReplay, listPastGames, type PastGame, type ReplayData } from '../replay/api'
 import type { DownloadProgress } from '../replay/download'
-import { gameTeams, gameWinner, storageLabel } from '../replay/pastGames'
+import { gameTeams, gameWinner, playtestLabel, storageLabel } from '../replay/pastGames'
 
 /** Download one game as a zip (events, summary, every photo and video). */
 export function DownloadButton({ gameId, data, small = false }: { gameId: string; data?: ReplayData; small?: boolean }) {
@@ -122,6 +122,7 @@ export function PastGames({ transport, onOpen }: { transport: SyncTransport; onO
                   {teams.hiders} <span className="past-vs">vs</span> {teams.seekers}
                 </span>
                 <span className="small">{winner ? `Winner: ${winner.names} · ${formatDuration(winner.totalS)}` : 'No winner'}</span>
+                {playtestLabel(g) && <span className="muted small">{playtestLabel(g)}</span>}
               </button>
               <div className="row past-actions">
                 <DownloadButton gameId={g.id} small />

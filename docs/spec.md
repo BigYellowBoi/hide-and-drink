@@ -16,7 +16,7 @@ Source of truth for building the app. The shared roadmap doc is a read-only over
 ### Ending a game
 
 - **Host ends it:** `end_game` action (host only) sets status `ended`, decides the winner from the round scores, and appends a `game_ended` event with the result. Every phone shows the final screen. Winner: the player(s) with the highest total, where a round's score (credited to each of its hiders) is hide time (from the end of the hiding period to the find) plus time bonuses held in the hand plus any host fix (`adjust_score`). A redone round (`redo_round`) doesn't count; a round still running at the end doesn't either.
-- **Auto-end:** a game with no new events for 24 h is ended automatically (`end_stale_games`; no winner if no round finished). Runs from the scheduled keep-alive job (every 3 days, so 1 to 4 days after the last event) and whenever a game is created; no extra infrastructure.
+- **Auto-end:** a game with no new events for 24 h is ended automatically (`end_stale_games`; no winner if no round finished; no push). Games where nothing happened (no scored round or answered question) and dev-mode games are deleted instead, unless they have media, and are left out of Past games (playtest games stay listed, tagged, until they go, so their replay can be tested). Runs from the scheduled keep-alive job (every 3 days, so 1 to 4 days after the last event) and whenever a game is created; no extra infrastructure.
 - **Join codes return to the pool:** a code only has to be unique among games that aren't ended (partial unique index), so ended games free their codes. Joining by code only finds games that aren't ended; old games keep their code for history.
 
 ## 2. Rules (AMB Hide & Drink 2026)

@@ -35,6 +35,9 @@ update public.games set created_at = now() - interval '25 hours'
 update public.events set created_at = now() - interval '25 hours'
   where game_id in (current_setting('test.stale')::uuid, current_setting('test.started')::uuid);
 update public.games set status = 'hiding' where id = current_setting('test.started')::uuid;
+-- A round was played in it (games where nothing happened are deleted: 33_tidy_abandoned_games).
+insert into public.game_rounds (game_id, round, hiders, seekers)
+values (current_setting('test.started')::uuid, 1, '[]', '[]');
 -- The recent game is old but had activity an hour ago.
 update public.games set created_at = now() - interval '3 days' where id = current_setting('test.recent')::uuid;
 update public.events set created_at = now() - interval '1 hour' where game_id = current_setting('test.recent')::uuid;
@@ -56,7 +59,7 @@ select is((select count(*) from public.processed_actions where game_id = current
 select is((select count(*) from public.games where id = current_setting('test.recent')::uuid), 1::bigint,
   'a lobby with recent activity is kept');
 select is((select count(*) from public.games where id = current_setting('test.started')::uuid), 1::bigint,
-  'a started game is kept however old');
+  'a started game where a round was played is kept however old');
 select is((select count(*) from public.games where id = current_setting('test.fresh')::uuid), 1::bigint,
   'the new game is created');
 
