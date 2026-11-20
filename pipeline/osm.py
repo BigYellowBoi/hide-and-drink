@@ -28,6 +28,8 @@ def _value_matches(value: str | None, allowed) -> bool:
         return False
     if allowed == "*":
         return True
+    if isinstance(allowed, dict):  # {"match": "regex"}: case-insensitive search in the whole value
+        return re.search(allowed["match"], value, re.IGNORECASE) is not None
     items = {v.strip() for v in value.split(";")}
     return any(a in items for a in allowed)
 
@@ -48,11 +50,14 @@ def layer_matches(tags: dict, layer: dict) -> bool:
 
 
 def rule_keys(layers: list[dict]) -> set[str]:
-    """First key of each rule's `all`: enough to pre-filter elements cheaply."""
+    """Keys of each rule's `all`: enough to pre-filter elements cheaply. Pattern keys are left out when
+    the rule has another key (a name pattern alone would let every named element through)."""
     keys = set()
     for layer in layers:
         for r in layer["rules"]:
-            keys.update(r.get("all", {}).keys())
+            cond = r.get("all", {})
+            plain = {k for k, v in cond.items() if not isinstance(v, dict)}
+            keys.update(plain or cond.keys())
     return keys
 
 
@@ -68,6 +73,8 @@ def overpass_query(layers: list[dict], area, include: frozenset[str] = frozenset
             for k, v in r.get("all", {}).items():
                 if v == "*":
                     sel += f'["{k}"]'
+                elif isinstance(v, dict):
+                    sel += f'["{k}"~"{v["match"]}",i]'
                 else:
                     vals = "|".join(re.escape(x) for x in v)
                     sel += f'["{k}"~"(^|;)({vals})(;|$)"]'
@@ -291,42 +298,66 @@ def build_polygon_layer(layer: dict, elements: list[dict], area, prepared, proje
     return features
 
 
-def edit_ids(entries) -> frozenset[str]:
-    """Ids from a venue edit list: plain strings or {"id": ..., "note": ...}."""
-    return frozenset(e["id"] if isinstance(e, dict) else str(e) for e in entries or [])
+def edit_ids(entries, layer: str = "venues") -> frozenset[str]:
+    """Ids from an edit list: plain strings or {"id": ..., "note": ..., "layer": ...}. Entries without a
+    layer are venue edits."""
+    out = set()
+    for e in entries or []:
+        e_layer = e.get("layer", "venues") if isinstance(e, dict) else "venues"
+        if e_layer == layer:
+            out.add(e["id"] if isinstance(e, dict) else str(e))
+    return frozenset(out)
 
 
-def apply_venue_edits(features: list[dict], edits: dict, area, prepared) -> list[dict]:
-    excluded = edit_ids(edits.get("exclude"))
-    clash = excluded & edit_ids(edits.get("include"))
+def edit_layers(edits: dict) -> set[str]:
+    """Every layer an edit names."""
+    return {e.get("layer", "venues") if isinstance(e, dict) else "venues"
+            for k in ("add", "include", "exclude") for e in edits.get(k) or []}
+
+
+def apply_venue_edits(features: list[dict], edits: dict, area, prepared, layer: str = "venues") -> list[dict]:
+    """Edits for one point layer: drop `exclude` ids, append `add` entries (manual points)."""
+    excluded = edit_ids(edits.get("exclude"), layer)
+    clash = excluded & edit_ids(edits.get("include"), layer)
     if clash:
-        raise ValueError(f"venue ids both included and excluded: {sorted(clash)}")
+        raise ValueError(f"{layer} ids both included and excluded: {sorted(clash)}")
     out = [f for f in features if f["id"] not in excluded]
     for add in edits.get("add", []):
+        if add.get("layer", "venues") != layer:
+            continue
         if not str(add["id"]).startswith("manual:"):
-            raise ValueError(f"manual venue ids must start with 'manual:': {add['id']}")
+            raise ValueError(f"manual ids must start with 'manual:': {add['id']}")
         point = clip(Point(add["lon"], add["lat"]), area, prepared)
         if point is None:
             continue
+        props = {"manual": True}
+        if layer == "venues":
+            props["kind"] = add.get("kind", "restaurant")
+        if add.get("address"):
+            props["address"] = add["address"]
         out.append({
             "id": add["id"],
-            "layer": "venues",
+            "layer": layer,
             "name": add["name"],
             "geometry": shapely.set_precision(point, 1e-6),
-            "props": {"kind": add.get("kind", "restaurant"), "manual": True},
+            "props": props,
         })
     return out
 
 
-def unmatched_edits(features: list[dict], edits: dict) -> dict[str, list[str]]:
+def unmatched_edits(features: list[dict], edits: dict, layer: str = "venues") -> dict[str, list[str]]:
     """Include/exclude ids that matched nothing in this build: gone from OSM, or outside the pack."""
     seen = {f["id"] for f in features}
-    return {k: sorted(edit_ids(edits.get(k)) - seen) for k in ("include", "exclude")
-            if edit_ids(edits.get(k)) - seen}
+    return {k: sorted(edit_ids(edits.get(k), layer) - seen) for k in ("include", "exclude")
+            if edit_ids(edits.get(k), layer) - seen}
 
 
 def build_layers(layers: list[dict], elements: list[dict], area, prepared, projector, simplify_m, venue_edits,
                  log=print):
+    point_ids = {la["id"] for la in layers if la["geometry"] == "point"}
+    unknown = edit_layers(venue_edits) - point_ids
+    if unknown:
+        raise ValueError(f"edits name layers that are not point layers: {sorted(unknown)}")
     out = []
     for layer in layers:
         if layer["geometry"] == "line":
@@ -334,11 +365,11 @@ def build_layers(layers: list[dict], elements: list[dict], area, prepared, proje
         elif layer["geometry"] == "polygon":
             feats = build_polygon_layer(layer, elements, area, prepared, projector, simplify_m)
         else:
-            include = edit_ids(venue_edits.get("include")) if layer["id"] == "venues" else frozenset()
+            include = edit_ids(venue_edits.get("include"), layer["id"])
             feats = build_point_layer(layer, elements, area, prepared, projector, include)
-        if layer["id"] == "venues":
-            for k, ids in unmatched_edits(feats, venue_edits).items():
-                log(f"warning: venue {k} ids not in this build (gone from OSM, or outside the pack): {', '.join(ids)}")
-            feats = apply_venue_edits(feats, venue_edits, area, prepared)
+            for k, ids in unmatched_edits(feats, venue_edits, layer["id"]).items():
+                log(f"warning: {layer['id']} {k} ids not in this build (gone from OSM, or outside the pack): "
+                    f"{', '.join(ids)}")
+            feats = apply_venue_edits(feats, venue_edits, area, prepared, layer["id"])
         out.extend(feats)
     return out

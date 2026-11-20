@@ -24,7 +24,7 @@ Everything is data; the code only knows the source types.
 | --- | --- |
 | `data/cities/<city>.json` | Play areas to cover, buffer, `coverage` circles (`{centre, radius_m}`: extra ground hosts can draw new areas in), CRS, simplification, source URLs and licences |
 | `data/map-layers.json` | Layers: OSM tag rules, GTFS modes, ABS datasets. A layer id equals the `source` string used by question options in `data/questions.json` |
-| `data/venues/<city>.json` | Hand edits on top of OSM: venues OSM lacks to `add`, OSM ids to `include` whatever their tags, OSM ids to `exclude` (closed, moved). Entries are an id or `{id, note}`; the build warns about ids it no longer finds |
+| `data/venues/<city>.json` | Hand edits on top of OSM: places OSM lacks to `add` (`{id: "manual:...", name, lon, lat, address, note}`), OSM ids to `include` whatever their tags, OSM ids to `exclude` (closed, moved). Edits go to the venues layer unless they name another point layer in `layer` (e.g. `osm:cuisine=kebab`). Entries are an id or `{id, note, layer}`; the build warns about ids it no longer finds |
 | `data/play-areas/*.geojson` | Play areas; the pack covers their union grown by `buffer_m` |
 
 Sources for Brisbane:
@@ -38,7 +38,10 @@ Sources for Brisbane:
   strip clubs, breweries/wineries/distilleries, plus restaurants, cafes, clubs and hotels tagged
   with `bar=yes`, `alcohol=*` or `drink:*`. Shops are excluded. Each venue carries `kind` and
   address tags. Hosts curate per game in the lobby.
-- **Categories**: OSM layers for matching and tentacles (parks, museums, cinemas, ...), as points;
+- **Categories**: OSM layers for matching and tentacles (parks, museums, cinemas, ...), as points. Rules may match names
+  (`{"match": "regex"}`) as OSM tagging is patchy: kebab shops are `cuisine=kebab`/`doner`/..., fast food named
+  kebab/yiros/shawarma/HSP, or Turkish/Lebanese/Greek fast food; strip clubs are `amenity=stripclub` or a nightclub/bar
+  named like one. Places OSM still lacks are hand-added in `data/venues/<city>.json`;
   named streets as lines merged by name. `osm:water` (rivers, lakes) as polygons, for the base map.
 - **Boundaries**: ABS suburbs and localities (ASGS 2021) and LGAs (ASGS 2025), from the ABS
   ArcGIS services. Names drop ABS disambiguation (`Albion (Brisbane - Qld)` becomes `Albion`).

@@ -1,8 +1,159 @@
 {
   "schema_version": 1,
-  "comment": "Hand edits applied on top of OSM when building the Brisbane pack. `add`: licensed restaurants or other venues OSM misses ({id, name, lon, lat, kind}); ids start with 'manual:'. `include`: OSM ids kept as venues even when their tags don't say they serve alcohol. `exclude`: OSM ids to drop (closed, moved, not really a bar). Include/exclude entries are an id string or {id, note}. The build warns about ids it no longer finds. Per-game curation happens in the lobby.",
-  "add": [],
-  "include": [],
+  "comment": "Hand edits applied on top of OSM when building the Brisbane pack. `add`: places OSM misses ({id, name, lon, lat, kind, address, note}); ids start with 'manual:'. `include`: OSM ids kept even when their tags don't match the layer's rules. `exclude`: OSM ids to drop (closed, moved, wrong). Every entry goes to the venues layer unless it names another point layer in `layer` (e.g. \"osm:cuisine=kebab\"); `kind` is for venues only. Include/exclude entries are an id string or {id, note, layer}. The build warns about ids it no longer finds. Per-game curation happens in the lobby.",
+  "add": [
+    {
+      "id": "manual:kebab/valley-kebab-shop",
+      "layer": "osm:cuisine=kebab",
+      "name": "Valley Kebab Shop",
+      "lon": 153.033332,
+      "lat": -27.458121,
+      "address": "173 Wickham St, Fortitude Valley",
+      "note": "address from delivery/review listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:kebab/aussie-kebabs",
+      "layer": "osm:cuisine=kebab",
+      "name": "Aussie Kebabs",
+      "lon": 153.03489,
+      "lat": -27.458163,
+      "address": "328 Brunswick St, Fortitude Valley",
+      "note": "address from delivery/review listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:kebab/kebab-station",
+      "layer": "osm:cuisine=kebab",
+      "name": "Kebab Station",
+      "lon": 153.024858,
+      "lat": -27.470268,
+      "address": "Shop 30, Myer Centre, 91 Queen St, Brisbane City",
+      "note": "address from delivery/review listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:kebab/ispa-kebabs-queen-street",
+      "layer": "osm:cuisine=kebab",
+      "name": "Ispa Kebabs Queen Street",
+      "lon": 153.0265,
+      "lat": -27.469329,
+      "address": "171a Queen St, Brisbane City",
+      "note": "address from delivery/review listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:kebab/kebab-guys",
+      "layer": "osm:cuisine=kebab",
+      "name": "Kebab Guys",
+      "lon": 153.028451,
+      "lat": -27.470195,
+      "address": "120 Edward St, Brisbane City",
+      "note": "address from delivery/review listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:kebab/sf-kebabs-pizza",
+      "layer": "osm:cuisine=kebab",
+      "name": "SF Kebabs & Pizza",
+      "lon": 153.024973,
+      "lat": -27.471948,
+      "address": "151 George St, Brisbane City",
+      "note": "address from delivery/review listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:kebab/rock-n-roll-kebabs-pizza",
+      "layer": "osm:cuisine=kebab",
+      "name": "Rock 'n' Roll Kebabs & Pizza",
+      "lon": 153.024122,
+      "lat": -27.471371,
+      "address": "187 George St, Brisbane City",
+      "note": "address from delivery/review listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:kebab/olympia-yiros",
+      "layer": "osm:cuisine=kebab",
+      "name": "Olympia Yiros",
+      "lon": 153.020447,
+      "lat": -27.468359,
+      "address": "414 George St, Brisbane City",
+      "note": "address from delivery/review listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:kebab/spanian-s-kebabs",
+      "layer": "osm:cuisine=kebab",
+      "name": "Spanian's Kebabs",
+      "lon": 153.041156,
+      "lat": -27.438636,
+      "address": "157 Abbotsford Rd, Bowen Hills",
+      "note": "address from delivery/review listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:kebab/sinbad-s-kebabs",
+      "layer": "osm:cuisine=kebab",
+      "name": "Sinbad's Kebabs",
+      "lon": 152.992775,
+      "lat": -27.485274,
+      "address": "Shop G28, Toowong Village, 9 Sherwood Rd, Toowong",
+      "note": "address from delivery/review listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:kebab/stones-corner-kebab",
+      "layer": "osm:cuisine=kebab",
+      "name": "Stones Corner Kebab",
+      "lon": 153.045332,
+      "lat": -27.499716,
+      "address": "3/380 Logan Rd, Greenslopes",
+      "note": "address from delivery/review listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:kebab/a-a-kebab-and-fish-n-chips",
+      "layer": "osm:cuisine=kebab",
+      "name": "A&A Kebab and Fish n Chips",
+      "lon": 153.035676,
+      "lat": -27.491025,
+      "address": "Shop 3/80 Ipswich Rd, Woolloongabba",
+      "note": "address from delivery/review listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:kebab/taj-kebabs",
+      "layer": "osm:cuisine=kebab",
+      "name": "Taj Kebabs",
+      "lon": 152.979653,
+      "lat": -27.409186,
+      "address": "Shop 63, 159 Osborne Rd, Mitchelton",
+      "note": "address from delivery/review listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:stripclub/k-klub",
+      "layer": "osm:amenity=stripclub",
+      "name": "K Klub",
+      "lon": 153.032327,
+      "lat": -27.457444,
+      "address": "239 Brunswick St, Fortitude Valley",
+      "note": "address from delivery/review listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:stripclub/the-grosvenor-the-valley",
+      "layer": "osm:amenity=stripclub",
+      "name": "The Grosvenor The Valley",
+      "lon": 153.032896,
+      "lat": -27.457484,
+      "address": "206 Wickham St, Fortitude Valley (pub with strip shows)",
+      "note": "address from delivery/review listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:stripclub/honey-b-s",
+      "layer": "osm:amenity=stripclub",
+      "name": "Honey B's",
+      "lon": 153.012367,
+      "lat": -27.463945,
+      "address": "55 Caxton St, Petrie Terrace",
+      "note": "address from delivery/review listings (Nov 2026), geocoded to the OSM address point"
+    }
+  ],
+  "include": [
+    {
+      "id": "osm:node/7365606523",
+      "layer": "osm:cuisine=kebab",
+      "note": "Wrapture, 71 Russell St, West End: kebab wraps, tagged cuisine=wrap"
+    }
+  ],
   "exclude": [
     {
       "id": "osm:node/4821933306",
