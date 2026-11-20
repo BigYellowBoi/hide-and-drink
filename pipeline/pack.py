@@ -103,7 +103,8 @@ def build(city: City, *, osm_source: str = "auto", offline: bool = False, log=pr
 
 def _osm_elements(city, layers, area, cache, source, offline, log):
     cfg = city.config["osm"]
-    include = osm.edit_ids(city.venue_edits.get("include"))
+    include = frozenset().union(*(osm.edit_ids(city.venue_edits.get("include"), la)
+                                   for la in osm.edit_layers(city.venue_edits) | {"venues"}))
     if source in ("auto", "overpass") and cfg.get("overpass_urls"):
         try:
             log("osm: querying Overpass")

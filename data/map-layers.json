@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "comment": "Map layers the pipeline builds into each city pack. A layer id equals the `source` string that question options in data/questions.json use, so questions find their layer by id. OSM rules: a feature matches a rule when every key in `all` matches and, if `any` is given, at least one key in `any` matches. Values are lists of allowed values, or \"*\" for any value; semicolon lists (cuisine=burger;kebab) match per item. `none` rules exclude.",
+  "comment": "Map layers the pipeline builds into each city pack. A layer id equals the `source` string that question options in data/questions.json use, so questions find their layer by id. OSM rules: a feature matches a rule when every key in `all` matches and, if `any` is given, at least one key in `any` matches. Values are lists of allowed values, or \"*\" for any value, or {\"match\": \"regex\"} for a case-insensitive pattern anywhere in the value (only beside another key, so the pre-filter stays cheap); semicolon lists (cuisine=burger;kebab) match per item. `none` rules exclude. Point layers with `merge_same_name_within_m` keep one of several same-named points that close (the earliest rule wins: a 7-Eleven shop over its fuel station).",
   "layers": [
     {
       "id": "venues",
@@ -115,12 +115,82 @@
       ]
     },
     { "id": "osm:leisure=park", "label": "Parks", "from": "osm", "geometry": "point", "require_name": true, "rules": [{ "all": { "leisure": ["park"] } }] },
-    { "id": "osm:tourism=museum", "label": "Museums", "from": "osm", "geometry": "point", "require_name": true, "rules": [{ "all": { "tourism": ["museum"] } }] },
+    {
+      "id": "osm:tourism=museum",
+      "label": "Museums",
+      "comment": "Museums, plus public art galleries (state and university) added by id in data/venues/<city>.json; commercial galleries stay out.",
+      "from": "osm",
+      "geometry": "point",
+      "require_name": true,
+      "rules": [{ "all": { "tourism": ["museum"] } }]
+    },
     { "id": "osm:amenity=cinema", "label": "Cinemas", "from": "osm", "geometry": "point", "require_name": true, "rules": [{ "all": { "amenity": ["cinema"] } }] },
-    { "id": "osm:amenity=library", "label": "Libraries", "from": "osm", "geometry": "point", "require_name": true, "rules": [{ "all": { "amenity": ["library"] } }] },
-    { "id": "osm:amenity=hospital", "label": "Hospitals", "from": "osm", "geometry": "point", "require_name": true, "rules": [{ "all": { "amenity": ["hospital"] } }] },
-    { "id": "osm:amenity=stripclub", "label": "Strip clubs", "from": "osm", "geometry": "point", "require_name": true, "rules": [{ "all": { "amenity": ["stripclub"] } }] },
-    { "id": "osm:cuisine=kebab", "label": "Kebab shops", "from": "osm", "geometry": "point", "require_name": true, "rules": [{ "all": { "cuisine": ["kebab"] } }] },
-    { "id": "osm:shop=convenience", "label": "Convenience stores", "from": "osm", "geometry": "point", "require_name": true, "rules": [{ "all": { "shop": ["convenience"] } }] }
+    {
+      "id": "osm:amenity=library",
+      "label": "Libraries",
+      "comment": "Public libraries plus one main library per university campus; branch and specialist libraries are excluded by id in data/venues/<city>.json.",
+      "from": "osm",
+      "geometry": "point",
+      "require_name": true,
+      "rules": [{ "all": { "amenity": ["library"] } }],
+      "none": [{ "all": { "access": ["private", "no"] } }, { "all": { "building": ["school"] } }]
+    },
+    {
+      "id": "osm:amenity=hospital",
+      "label": "Hospitals",
+      "comment": "Hospitals with beds, including day hospitals that call themselves hospitals; clinics and health centres tagged as hospitals are excluded by id in data/venues/<city>.json.",
+      "from": "osm",
+      "geometry": "point",
+      "require_name": true,
+      "rules": [{ "all": { "amenity": ["hospital"] } }, { "all": { "healthcare": ["hospital"] } }]
+    },
+    {
+      "id": "osm:amenity=stripclub",
+      "label": "Strip clubs",
+      "from": "osm",
+      "geometry": "point",
+      "require_name": true,
+      "rules": [
+        { "all": { "amenity": ["stripclub"] } },
+        { "all": { "nightclub": ["stripclub", "strip_club"] } },
+        {
+          "all": {
+            "amenity": ["nightclub", "bar", "pub"],
+            "name": { "match": "strip ?club|stripper|gentlem[ae]n|showgirl|burlesque|exotic danc|men'?s club|lap danc" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "osm:cuisine=kebab",
+      "label": "Kebab shops",
+      "from": "osm",
+      "geometry": "point",
+      "require_name": true,
+      "rules": [
+        { "all": { "cuisine": ["kebab", "doner", "doner_kebab", "shawarma", "gyros", "yiros", "souvlaki"] } },
+        {
+          "all": {
+            "amenity": ["fast_food", "restaurant", "cafe", "food_court"],
+            "name": { "match": "keba[bp]|yiros|yeros|gyros|souvla|shawarma|shwarma|d[oö]ner|g[oö]zleme|halal snack|\\bhsp\\b" }
+          }
+        },
+        { "all": { "amenity": ["fast_food"], "cuisine": ["turkish", "lebanese", "greek", "middle_eastern", "arab", "afghan"] } }
+      ],
+      "none": [{ "all": { "disused:amenity": "*" } }]
+    },
+    {
+      "id": "osm:shop=convenience",
+      "label": "Convenience stores",
+      "from": "osm",
+      "geometry": "point",
+      "require_name": true,
+      "merge_same_name_within_m": 100,
+      "rules": [
+        { "all": { "shop": ["convenience"] } },
+        { "all": { "amenity": ["fuel"], "brand": ["7-Eleven"] } },
+        { "all": { "amenity": ["fuel"], "name": { "match": "7[ -]?eleven" } } }
+      ]
+    }
   ]
 }

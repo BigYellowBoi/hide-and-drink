@@ -252,3 +252,82 @@ def test_migration_sql_uses_safe_dollar_quote():
             "pack": {"city": "x", "built_at": "now", "layers": [{"id": "venues", "count": 1}]}}
     sql = to_sql.migration_sql(pack, "data/city-packs/x.geojson")
     assert "$pack_$" in sql and sql.count("$pack_$") == 2
+
+
+# --- category rules ------------------------------------------------------------
+
+KEBAB = LAYERS["osm:cuisine=kebab"]
+STRIP = LAYERS["osm:amenity=stripclub"]
+
+
+@pytest.mark.parametrize("tags,want", [
+    ({"amenity": "fast_food", "name": "Kebab Corner", "cuisine": "kebab"}, True),
+    ({"amenity": "fast_food", "name": "Slice Pizza and Kebab", "cuisine": "pizza"}, True),
+    ({"amenity": "fast_food", "name": "Lily & Lala Kebab"}, True),
+    ({"amenity": "fast_food", "name": "Ozi Yiros", "cuisine": "greek"}, True),
+    ({"amenity": "fast_food", "name": "Gabba Kebab", "cuisine": "turkish"}, True),
+    ({"amenity": "fast_food", "name": "Sunshine", "cuisine": "doner"}, True),
+    ({"amenity": "restaurant", "name": "Hellenika", "cuisine": "greek"}, False),
+    ({"highway": "bus_stop", "name": "Rokeby Tce near Moggill Rd"}, False),
+    ({"amenity": "fast_food", "name": "Old Kebabs", "cuisine": "kebab", "disused:amenity": "fast_food"}, False),
+])
+def test_kebab_rules(tags, want):
+    assert osm.layer_matches(tags, KEBAB) is want
+
+
+@pytest.mark.parametrize("tags,want", [
+    ({"amenity": "stripclub", "name": "Showgirls"}, True),
+    ({"amenity": "nightclub", "name": "Eye Candy Strip Club"}, True),
+    ({"amenity": "nightclub", "name": "Gentlemen's Lounge"}, True),
+    ({"amenity": "nightclub", "name": "The Met"}, False),
+    ({"amenity": "pub", "name": "Stripes Hotel"}, False),
+])
+def test_strip_club_rules(tags, want):
+    assert osm.layer_matches(tags, STRIP) is want
+
+
+def test_pattern_keys_stay_out_of_the_prefilter():
+    assert "name" not in osm.rule_keys([KEBAB, STRIP])
+    q = osm.overpass_query([KEBAB], SQUARE)
+    assert '["name"~"keba[bp]' in q and '",i]' in q
+
+
+def test_edits_for_other_layers():
+    feats = [{"id": "osm:node/1", "layer": KEBAB["id"], "name": "Gone", "geometry": Point(153.02, -27.47), "props": {}}]
+    edits = {"exclude": [{"id": "osm:node/1", "layer": KEBAB["id"]}],
+             "add": [{"id": "manual:kebab/x", "layer": KEBAB["id"], "name": "X Kebabs", "lon": 153.02, "lat": -27.47,
+                      "address": "1 A St"},
+                     {"id": "manual:bar", "name": "Bar", "lon": 153.02, "lat": -27.47}]}
+    out = osm.apply_venue_edits(feats, edits, SQUARE, prep(SQUARE), KEBAB["id"])
+    assert [(f["id"], f["layer"], f["props"]) for f in out] == [
+        ("manual:kebab/x", KEBAB["id"], {"manual": True, "address": "1 A St"})]
+    venues = osm.apply_venue_edits(feats, edits, SQUARE, prep(SQUARE))
+    assert [f["id"] for f in venues] == ["osm:node/1", "manual:bar"]  # the kebab exclude doesn't touch venues
+    with pytest.raises(ValueError):
+        osm.build_layers([KEBAB], [], SQUARE, prep(SQUARE), PROJ, 0, {"add": [{"id": "manual:y", "layer": "nope",
+                                                                              "name": "y", "lon": 0, "lat": 0}]})
+
+
+def test_same_brand_points_merge_and_shop_beats_fuel():
+    conv = LAYERS["osm:shop=convenience"]
+    els = [{"id": "node/2", "kind": "node", "tags": {"amenity": "fuel", "brand": "7-Eleven", "name": "7-Eleven Newmarket"},
+            "geom": Point(153.0200, -27.47)},
+           {"id": "node/1", "kind": "node", "tags": {"shop": "convenience", "brand": "7-Eleven", "name": "7-Eleven"},
+            "geom": Point(153.0201, -27.47)},
+           {"id": "node/3", "kind": "node", "tags": {"shop": "convenience", "brand": "7-Eleven", "name": "7-Eleven"},
+            "geom": Point(153.0300, -27.47)},
+           {"id": "node/4", "kind": "node", "tags": {"amenity": "fuel", "brand": "BP", "name": "BP"},
+            "geom": Point(153.0400, -27.47)}]
+    feats = osm.build_point_layer(conv, els, SQUARE, prep(SQUARE), PROJ)
+    assert sorted(f["id"] for f in feats) == ["osm:node/1", "osm:node/3"]
+    assert all(not k.startswith("_") for f in feats for k in f)
+
+
+@pytest.mark.parametrize("layer,tags,want", [
+    ("osm:amenity=library", {"amenity": "library", "name": "H/Library", "building": "school"}, False),
+    ("osm:amenity=library", {"amenity": "library", "name": "Resource Centre", "access": "private"}, False),
+    ("osm:amenity=library", {"amenity": "library", "name": "New Farm Library"}, True),
+    ("osm:amenity=hospital", {"healthcare": "hospital", "name": "Some Hospital"}, True),
+])
+def test_library_and_hospital_rules(layer, tags, want):
+    assert osm.layer_matches(tags, LAYERS[layer]) is want
