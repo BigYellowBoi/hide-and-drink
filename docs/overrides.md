@@ -86,7 +86,8 @@ This is the audit of `supabase/migrations/` (up to `20261219090100_rounds_scorin
 | Round score: hide time (found − seeking start), time bonuses held | `found_hider` | `adjust_score`; `redo_round` |
 | Role swap at round end (`team_changed`, no actor) | `found_hider` | `set_team` between rounds (host moves anyone); `redo_round` puts that round's teams back |
 | Winner (`game_ended`) | `end_game`, `end_stale_games` | none: final. Adjust scores before ending. An auto-ended game frees its code for a new one |
-| Auto-end after 24 h with no events (`game_ended` reason `inactive`, no actor) | `end_stale_games` (keep-alive job, every new game) | none: nothing happened for a day; start a new game |
+| Auto-end after 24 h with no events (`game_ended` reason `inactive`, no actor, no push) | `end_stale_games` (keep-alive job, every new game) | none: nothing happened for a day; start a new game |
+| Abandoned or test game deleted (no scored round or answered question, or `dev_mode`; never one with media) when idle 24 h, running or ended; left out of Past games | `end_stale_games` (`_game_worth_keeping`) | none: nothing worth keeping happened in it |
 | `venues_revealed` | trigger when the round ends or changes | none needed: reveals only after the round |
 | `dice_rolled`, `wheel_spun` results | server random | not game state; roll again, or `add_penalty` / `clear_effect` as agreed |
 | `trivia_*` marks; a set short of `params.need_right` thrown out (`trivia_marked.reset`) | hider marks | `clear_effect` (Fix something), `reinstate_effect`; `force_clear_trivia` (host, no button any more) |
