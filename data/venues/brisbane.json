@@ -145,6 +145,78 @@
       "lat": -27.463945,
       "address": "55 Caxton St, Petrie Terrace",
       "note": "address from delivery/review listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:convenience/nightowl-fortitude-valley",
+      "layer": "osm:shop=convenience",
+      "name": "NightOwl Fortitude Valley",
+      "lon": 153.034095,
+      "lat": -27.458079,
+      "address": "Ground floor, 301 Brunswick St, Fortitude Valley",
+      "note": "address from the venue or directory listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:museum/miegunyah-house-museum",
+      "layer": "osm:tourism=museum",
+      "name": "Miegunyah House Museum",
+      "lon": 153.041354,
+      "lat": -27.445584,
+      "address": "35 Jordan Tce, Bowen Hills",
+      "note": "address from the venue or directory listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:museum/queensland-police-museum",
+      "layer": "osm:tourism=museum",
+      "name": "Queensland Police Museum",
+      "lon": 153.018098,
+      "lat": -27.466666,
+      "address": "Police Headquarters, 200 Roma St, Brisbane City",
+      "note": "address from the venue or directory listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:museum/mercy-heritage-centre",
+      "layer": "osm:tourism=museum",
+      "name": "Mercy Heritage Centre",
+      "lon": 153.033632,
+      "lat": -27.461161,
+      "address": "All Hallows', 547 Ann St, Fortitude Valley",
+      "note": "address from the venue or directory listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:hospital/montserrat-day-hospital-indooroopilly",
+      "layer": "osm:amenity=hospital",
+      "name": "Montserrat Day Hospital Indooroopilly",
+      "lon": 152.974501,
+      "lat": -27.50282,
+      "address": "12 Riverview Tce, Indooroopilly",
+      "note": "address from the venue or directory listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:hospital/montserrat-day-hospital-brisbane",
+      "layer": "osm:amenity=hospital",
+      "name": "Montserrat Day Hospital Brisbane",
+      "lon": 153.024847,
+      "lat": -27.468992,
+      "address": "Level 1, 245 Albert St, Brisbane City",
+      "note": "address from the venue or directory listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:hospital/spring-hill-specialist-day-hospital",
+      "layer": "osm:amenity=hospital",
+      "name": "Spring Hill Specialist Day Hospital",
+      "lon": 153.02207,
+      "lat": -27.461129,
+      "address": "Level 1, St Andrews Place, 33 North St, Spring Hill",
+      "note": "address from the venue or directory listings (Nov 2026), geocoded to the OSM address point"
+    },
+    {
+      "id": "manual:library/qut-kelvin-grove-library",
+      "layer": "osm:amenity=library",
+      "name": "QUT Kelvin Grove Library",
+      "lon": 153.014954,
+      "lat": -27.453515,
+      "address": "R Block, 149 Victoria Park Rd, Kelvin Grove",
+      "note": "address from the venue or directory listings (Nov 2026), geocoded to the OSM address point"
     }
   ],
   "include": [
@@ -152,12 +224,137 @@
       "id": "osm:node/7365606523",
       "layer": "osm:cuisine=kebab",
       "note": "Wrapture, 71 Russell St, West End: kebab wraps, tagged cuisine=wrap"
+    },
+    {
+      "id": "osm:relation/7698202",
+      "layer": "osm:tourism=museum",
+      "note": "Queensland Art Gallery (public gallery)"
+    },
+    {
+      "id": "osm:way/24228971",
+      "layer": "osm:tourism=museum",
+      "note": "Gallery of Modern Art (public gallery)"
+    },
+    {
+      "id": "osm:node/8377599046",
+      "layer": "osm:tourism=museum",
+      "note": "Institute of Modern Art (public gallery)"
+    },
+    {
+      "id": "osm:node/6071971170",
+      "layer": "osm:tourism=museum",
+      "note": "QUT Art Museum"
+    },
+    {
+      "id": "osm:node/2394634000",
+      "layer": "osm:tourism=museum",
+      "note": "UQ Art Museum"
+    },
+    {
+      "id": "osm:way/819659094",
+      "layer": "osm:tourism=museum",
+      "note": "Newstead House (house museum; OSM tags it only as a historic building)"
+    },
+    {
+      "id": "osm:way/361550693",
+      "layer": "osm:tourism=museum",
+      "note": "Old Government House (museum at QUT Gardens Point; OSM tags it only as a university building)"
+    },
+    {
+      "id": "osm:way/38656909",
+      "layer": "osm:tourism=museum",
+      "note": "Museum of Nursing History, Herston"
+    },
+    {
+      "id": "osm:way/707972098",
+      "layer": "osm:amenity=hospital",
+      "note": "Mater Mothers' Hospital (separate hospital in the Mater precinct)"
+    },
+    {
+      "id": "osm:way/1202108298",
+      "layer": "osm:amenity=hospital",
+      "note": "Samford Road Day Hospital (Montserrat, Gaythorne; OSM tags it as a clinic)"
     }
   ],
   "exclude": [
     {
       "id": "osm:node/4821933306",
       "note": "Blind Tiger Bar, 1b/204 Oxford St, Bulimba: the 2016 address. Blind Tiger is now at 34/1000 Waterworks Rd, The Gap (osm:node/409529625)."
+    },
+    {
+      "id": "osm:node/1986291107",
+      "layer": "osm:amenity=library",
+      "note": "Dorothy Hill Engineering and Sciences Library: UQ St Lucia branch (UQ Central Library kept)"
+    },
+    {
+      "id": "osm:node/1986291132",
+      "layer": "osm:amenity=library",
+      "note": "Biological Sciences Library: UQ St Lucia branch"
+    },
+    {
+      "id": "osm:node/1986291377",
+      "layer": "osm:amenity=library",
+      "note": "Walter Harrison Law Library: UQ St Lucia branch"
+    },
+    {
+      "id": "osm:node/2394633294",
+      "layer": "osm:amenity=library",
+      "note": "Fryer Library: UQ St Lucia special collections"
+    },
+    {
+      "id": "osm:node/8874167742",
+      "layer": "osm:amenity=library",
+      "note": "Architecture and Music Library: UQ St Lucia branch"
+    },
+    {
+      "id": "osm:node/5001081624",
+      "layer": "osm:amenity=library",
+      "note": "QUT Law Library: Gardens Point branch (QUT Gardens Point Main Library kept)"
+    },
+    {
+      "id": "osm:node/6394987608",
+      "layer": "osm:amenity=library",
+      "note": "UQ/Mater McAuley Library: hospital clinical library"
+    },
+    {
+      "id": "osm:node/613353478",
+      "layer": "osm:amenity=library",
+      "note": "National Archives of Australia: archive, not a library"
+    },
+    {
+      "id": "osm:way/108059821",
+      "layer": "osm:amenity=library",
+      "note": "Roscoe Library: theological college library"
+    },
+    {
+      "id": "osm:node/12360207381",
+      "layer": "osm:amenity=library",
+      "note": "CPL Resource & Toy Library: toy library"
+    },
+    {
+      "id": "osm:way/37965197",
+      "layer": "osm:amenity=library",
+      "note": "Braille House: specialist library"
+    },
+    {
+      "id": "osm:way/34200092",
+      "layer": "osm:amenity=library",
+      "note": "The Edge: part of the State Library (kept)"
+    },
+    {
+      "id": "osm:node/11150416770",
+      "layer": "osm:amenity=hospital",
+      "note": "Evolve Therapeutic Services: mental health service, not a hospital"
+    },
+    {
+      "id": "osm:node/6255283296",
+      "layer": "osm:amenity=hospital",
+      "note": "Alderley Child Health: child health clinic"
+    },
+    {
+      "id": "osm:way/33347995",
+      "layer": "osm:amenity=hospital",
+      "note": "Nundah Community Health Centre: health centre"
     }
   ]
 }

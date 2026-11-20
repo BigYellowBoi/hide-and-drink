@@ -306,3 +306,28 @@ def test_edits_for_other_layers():
     with pytest.raises(ValueError):
         osm.build_layers([KEBAB], [], SQUARE, prep(SQUARE), PROJ, 0, {"add": [{"id": "manual:y", "layer": "nope",
                                                                               "name": "y", "lon": 0, "lat": 0}]})
+
+
+def test_same_brand_points_merge_and_shop_beats_fuel():
+    conv = LAYERS["osm:shop=convenience"]
+    els = [{"id": "node/2", "kind": "node", "tags": {"amenity": "fuel", "brand": "7-Eleven", "name": "7-Eleven Newmarket"},
+            "geom": Point(153.0200, -27.47)},
+           {"id": "node/1", "kind": "node", "tags": {"shop": "convenience", "brand": "7-Eleven", "name": "7-Eleven"},
+            "geom": Point(153.0201, -27.47)},
+           {"id": "node/3", "kind": "node", "tags": {"shop": "convenience", "brand": "7-Eleven", "name": "7-Eleven"},
+            "geom": Point(153.0300, -27.47)},
+           {"id": "node/4", "kind": "node", "tags": {"amenity": "fuel", "brand": "BP", "name": "BP"},
+            "geom": Point(153.0400, -27.47)}]
+    feats = osm.build_point_layer(conv, els, SQUARE, prep(SQUARE), PROJ)
+    assert sorted(f["id"] for f in feats) == ["osm:node/1", "osm:node/3"]
+    assert all(not k.startswith("_") for f in feats for k in f)
+
+
+@pytest.mark.parametrize("layer,tags,want", [
+    ("osm:amenity=library", {"amenity": "library", "name": "H/Library", "building": "school"}, False),
+    ("osm:amenity=library", {"amenity": "library", "name": "Resource Centre", "access": "private"}, False),
+    ("osm:amenity=library", {"amenity": "library", "name": "New Farm Library"}, True),
+    ("osm:amenity=hospital", {"healthcare": "hospital", "name": "Some Hospital"}, True),
+])
+def test_library_and_hospital_rules(layer, tags, want):
+    assert osm.layer_matches(tags, LAYERS[layer]) is want

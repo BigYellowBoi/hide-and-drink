@@ -41,12 +41,30 @@ def rule_matches(tags: dict, rule: dict) -> bool:
     return not anyof or any(_value_matches(tags.get(k), v) for k, v in anyof.items())
 
 
-def layer_matches(tags: dict, layer: dict) -> bool:
+def matching_rule(tags: dict, layer: dict) -> int | None:
+    """Index of the first rule the tags match, or None (no match, or excluded)."""
     if layer.get("require_name") and not tags.get("name"):
-        return False
+        return None
     if any(rule_matches(tags, r) for r in layer.get("none", [])):
-        return False
-    return any(rule_matches(tags, r) for r in layer["rules"])
+        return None
+    return next((i for i, r in enumerate(layer["rules"]) if rule_matches(tags, r)), None)
+
+
+def layer_matches(tags: dict, layer: dict) -> bool:
+    return matching_rule(tags, layer) is not None
+
+
+def _merge_same_name(features: list[dict], radius_m: float, projector: Projector) -> list[dict]:
+    """Drop a feature when one with the same brand (else name; case-insensitive) and an earlier rule, or the
+    same rule and a smaller id, lies within radius_m: e.g. a 7-Eleven tagged both as its shop and as its fuel
+    station."""
+    kept: list[tuple[dict, object]] = []
+    for f in sorted(features, key=lambda f: (f["_rule"], f["id"])):
+        p = Point(*projector.to_m.transform(f["geometry"].x, f["geometry"].y))
+        if any(k["_key"] == f["_key"] and p.distance(kp) <= radius_m for k, kp in kept):
+            continue
+        kept.append((f, p))
+    return [f for f, _ in kept]
 
 
 def rule_keys(layers: list[dict]) -> set[str]:
@@ -222,7 +240,8 @@ def build_point_layer(layer: dict, elements: list[dict], area, prepared, project
         if el["kind"] == "way":
             continue
         forced = f"osm:{el['id']}" in include
-        if not forced and not layer_matches(el["tags"], layer):
+        rule = -1 if forced else matching_rule(el["tags"], layer)
+        if rule is None:
             continue
         if not el["tags"].get("name"):
             continue
@@ -242,8 +261,15 @@ def build_point_layer(layer: dict, elements: list[dict], area, prepared, project
             "name": el["tags"]["name"],
             "geometry": tidy(point, projector, 0),
             "props": props,
+            "_rule": rule,
+            "_key": (el["tags"].get("brand") or el["tags"]["name"]).casefold(),
         }
-    return list(features.values())
+    out = list(features.values())
+    if layer.get("merge_same_name_within_m"):
+        out = _merge_same_name(out, layer["merge_same_name_within_m"], projector)
+    for f in out:
+        del f["_rule"], f["_key"]
+    return out
 
 
 def build_line_layer(layer: dict, elements: list[dict], area, prepared, projector: Projector, simplify_m: float):

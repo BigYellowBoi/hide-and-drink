@@ -41,7 +41,10 @@ Sources for Brisbane:
 - **Categories**: OSM layers for matching and tentacles (parks, museums, cinemas, ...), as points. Rules may match names
   (`{"match": "regex"}`) as OSM tagging is patchy: kebab shops are `cuisine=kebab`/`doner`/..., fast food named
   kebab/yiros/shawarma/HSP, or Turkish/Lebanese/Greek fast food; strip clubs are `amenity=stripclub` or a nightclub/bar
-  named like one. Places OSM still lacks are hand-added in `data/venues/<city>.json`;
+  named like one; convenience stores include every 7-Eleven (some are tagged only as fuel stations), and
+  `merge_same_name_within_m` keeps one point per brand within 100 m. Libraries are public ones plus one per
+  university campus, hospitals are ones with beds, museums include public art galleries: the rest is curated
+  by id. Places OSM still lacks are hand-added in `data/venues/<city>.json`;
   named streets as lines merged by name. `osm:water` (rivers, lakes) as polygons, for the base map.
 - **Boundaries**: ABS suburbs and localities (ASGS 2021) and LGAs (ASGS 2025), from the ABS
   ArcGIS services. Names drop ABS disambiguation (`Albion (Brisbane - Qld)` becomes `Albion`).
