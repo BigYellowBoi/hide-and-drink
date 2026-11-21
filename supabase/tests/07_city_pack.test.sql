@@ -4,7 +4,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(16);
+select plan(19);
 
 select is((select count(*)::int from public.city_packs where city = 'brisbane'), 1, 'Brisbane pack is loaded');
 select ok((select count(*) from public.map_features where city = 'brisbane' and layer = 'venues') > 100,
@@ -72,6 +72,10 @@ select public._load_city_pack(jsonb_build_object(
   'features', '[]'::jsonb));
 select is((select count(*)::int from public.map_features where city = 'testville'), 0,
   'reloading a pack replaces its features');
+select is((select jsonb_array_length(geojson -> 'features') from public.city_packs where city = 'testville'), 0,
+  'reloading a pack refreshes its cached GeoJSON');
+select ok((select geojson = public._build_city_pack_json('brisbane') from public.city_packs where city = 'brisbane'),
+  'the cached Brisbane GeoJSON matches the tables');
 
 insert into auth.users (id, email) values ('77777777-7777-7777-7777-777777777777', 'map@test.local');
 select set_config('request.jwt.claims', '{"sub":"77777777-7777-7777-7777-777777777777","role":"authenticated"}', true);
@@ -81,6 +85,11 @@ select is(
   (select jsonb_array_length(public.get_city_pack('brisbane', array['stations']) -> 'features')),
   (select count(*)::int from public.map_features where city = 'brisbane' and layer = 'stations'),
   'players can fetch a layer of the pack as GeoJSON'
+);
+select is(
+  (select jsonb_array_length(public.get_city_pack('brisbane') -> 'features')),
+  (select count(*)::int from public.map_features where city = 'brisbane'),
+  'players can fetch the whole pack'
 );
 select throws_ok(
   $$ delete from public.map_features where city = 'brisbane' $$,

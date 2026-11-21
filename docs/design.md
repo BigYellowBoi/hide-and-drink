@@ -4,7 +4,7 @@ Visual source of truth for the app. Decided 17 Nov 2026. Clickable mockups of ev
 
 ## Principles
 
-1. **Glanceable, one-handed, in a dark bar.** Dark theme only. Big targets, few words.
+1. **Glanceable, one-handed, in a dark bar.** Dark theme only (the map alone has a light option for sunlight). Big targets, few words.
 2. **One thing needs you at a time.** Anything that needs action (incoming question, freeze, curse to clear) sits at the top of the screen until handled.
 3. **Your team colour is always visible** in the top bar. Hider-only screens show a lock and "Only you see this" ("Only your team sees this" with more than one hider).
 4. **Never act on stale state.** Anything but a green status dot disables actions and says why.
@@ -44,7 +44,7 @@ Card categories: curse `#EC353A`, powerup `#9B8CF5`, time bonus `#4FC88A`, drink
 
 Question types, as in the original game (data: `colour` in `data/questions.json`, `question_types.extra.colour`): Matching `#2F6FD6` (blue), Measuring `#3BA55C` (green), Radar `#F08A24` (orange), Thermometer `#F2C744` (yellow), Photos `#35BFD8` (cyan), Tentacles `#9B5BD4` (purple), Bonus `#A9B4BF` (grey, not in the original). Ask tiles are filled in the type colour (text `#17222E` or white, whichever contrasts more; selected tile gets a white ring); timeline cards carry it as a left band and type label.
 
-Map: ground `#1C2A37`, streets `#2A3B4C`, river `#24506E`. Street names from zoom 14.5 in `--text-muted` with a ground-coloured halo, in Inter SemiBold (SDF glyphs built from the bundled font by `scripts/glyphs/build.py` into `public/glyphs/`, no font server). Ruled-out area is a grey 45° hatch (`#2C3E50` with `#5C6B7A` lines) so streets stay visible underneath.
+Map: ground `#1C2A37`, streets `#2A3B4C`, river `#24506E`. A sun/moon button under the zoom buttons switches every map on that phone to the light palette for daylight (ground `#EEEAE2`, streets `#B3AB9D`, river `#8EC1E6`, dark text, deeper team colours; `MAP_PALETTES` in `src/map/style.ts`), remembered per phone. Street names from zoom 14.5 in `--text-muted` with a ground-coloured halo, in Inter SemiBold (SDF glyphs built from the bundled font by `scripts/glyphs/build.py` into `public/glyphs/`, no font server). Ruled-out area is a grey 45° hatch (`#2C3E50` with `#5C6B7A` lines) so streets stay visible underneath.
 
 Question tools on the map are seeker red (`--seeker-on-dark`): radar circle, thermometer line, measuring circle. Questions that use app data also show their candidates: hollow red dots for the other candidates, a white dot for the nearest (or the server's pick), a white line from the seeker to it labelled with the distance in km ("0.42 km"), and for streets and suburbs the nearest one outlined in red. Tentacles shows the 1 km circle around the seeker and every candidate labelled "Name · 0.42 km". Shown while the question is open (both teams; in the Ask preview before sending) or when "Show on map" is tapped in the timeline (chip "Showing … · Hide" over the map). On the hider's answer sheet the hider's side of a comparison (tentacles circle around the hider, matching line to the hider's own nearest street or suburb) is hider blue (`--hider`), so it never reads as the seekers' red.
 
@@ -85,7 +85,7 @@ Flow: Home → Lobby → (host: setup) → Start round → each phone switches t
 | Lobby | Everyone | Big join code + QR. Hiders and Seekers as full-width lists, one above the other (not side-by-side columns: names get cut off on phones). Tap your name to switch team; the host can tap anyone's. "Join" button under the team you're not in; unassigned players listed below. Host setup checklist, slide to start |
 | Deck builder | Host | Presets, category tabs with live totals, -/count/+ per card (0 greys out), "+ New card" |
 | Pick a bar | Hider | Hiding countdown, map + list of valid bars by distance, 100 m circle preview, slide to lock in. Other hiders show live as "[name] is picking…" with their selected bar; first to lock in wins |
-| Hider map | Hider | Own bar circle and position, seekers' name-tagged dots (tap for distance), freeze banner, "New question" card with deadline |
+| Hider map | Hider | Own bar circle and position, seekers' name-tagged dots (tap for distance), no shading (what the seekers have ruled out is theirs alone), freeze banner, "New question" card with deadline |
 | Answer sheet | Hider | Question type + asker, deadline ring, mini map, suggested answer (flag if it differs across the circle), big answer buttons, reward reminder |
 | Hand | Hider | Selected card large, Cast / Discard, hand grid below (one slot per hand-limit card, no scrolling), lock label |
 | Seeker map | Seekers | Hatched shading with the remaining area outlined in white (no bar dots or bar list: those are hider-only), teammates' name-tagged dots, active curse strip, Ask button |
@@ -99,5 +99,5 @@ Flow: Home → Lobby → (host: setup) → Start round → each phone switches t
 
 ## Not decided yet
 
-- Light mode: not planned.
+- Light mode: map only (see Map above); the rest of the app stays dark.
 - Curses stay `--brand-red` even though seekers are red too; switch curses to purple if it reads badly in testing.

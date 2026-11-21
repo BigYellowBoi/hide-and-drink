@@ -3,7 +3,7 @@ import pack from '../../data/city-packs/brisbane.geojson?raw'
 import layers from '../../data/map-layers.json'
 import type { CityPack } from './cityPack'
 import { existsSync } from 'node:fs'
-import { LABEL_FONT, MAP_COLORS, PACK_SOURCES, glyphsUrl, mapStyle } from './style'
+import { LABEL_FONT, MAP_COLORS, MAP_PALETTES, PACK_SOURCES, glyphsUrl, mapStyle } from './style'
 
 const brisbane = JSON.parse(pack) as CityPack
 
@@ -42,5 +42,13 @@ describe('map style', () => {
     expect(style.layers[0]).toMatchObject({ type: 'background', paint: { 'background-color': MAP_COLORS.ground } })
     expect(Object.values(style.sources).every((s) => s.type === 'geojson')).toBe(true)
     expect((style.sources.water as { attribution?: string }).attribution).toContain('© OpenStreetMap contributors')
+  })
+
+  it('has a light theme with the same layers and only colours changed', () => {
+    const dark = mapStyle(brisbane)
+    const light = mapStyle(brisbane, { theme: 'light' })
+    expect(light.layers.map((l) => l.id)).toEqual(dark.layers.map((l) => l.id))
+    expect(light.layers[0]).toMatchObject({ paint: { 'background-color': MAP_PALETTES.light.ground } })
+    expect(JSON.stringify(light.layers)).not.toContain(MAP_PALETTES.dark.ground)
   })
 })

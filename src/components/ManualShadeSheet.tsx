@@ -8,7 +8,8 @@ import { TerraDraw, TerraDrawPolygonMode, TerraDrawRenderMode } from 'terra-draw
 import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter'
 import type { GameSync } from '../sync/engine'
 import type { AreaCollection } from '../map/playArea'
-import { MAP_COLORS } from '../map/style'
+import { MAP_PALETTES, type MapColors } from '../map/style'
+import { getMapTheme } from '../map/theme'
 import { resetGestures } from '../map/gestures'
 import { describeError } from '../lobby/messages'
 import { questionTool } from '../play/overlays'
@@ -32,16 +33,16 @@ interface Props {
 type Mode = 'keep' | 'cut' | 'none'
 type Tool = 'pick' | 'draw'
 
-const DRAW_STYLE = {
-  fillColor: MAP_COLORS.seeker,
+const drawStyle = (c: MapColors) => ({
+  fillColor: c.seeker,
   fillOpacity: 0.15,
-  outlineColor: MAP_COLORS.seeker,
+  outlineColor: c.seeker,
   outlineWidth: 2,
-  closingPointColor: MAP_COLORS.text,
+  closingPointColor: c.text,
   closingPointWidth: 7,
-  closingPointOutlineColor: MAP_COLORS.bg,
+  closingPointOutlineColor: c.bg,
   closingPointOutlineWidth: 2,
-} as const
+})
 
 type Picked = { id: string; name: string; area: Area }
 
@@ -117,9 +118,10 @@ export function ManualShadeSheet({ sync, question: q, city, playArea, ruled, lay
 
   const onMapReady = useCallback((map: MapLibreMap) => {
     mapRef.current = map
+    const colors = MAP_PALETTES[getMapTheme()]
     const draw = new TerraDraw({
       adapter: new TerraDrawMapLibreGLAdapter({ map }),
-      modes: [new TerraDrawPolygonMode({ styles: DRAW_STYLE, pointerDistance: 30 }), new TerraDrawRenderMode({ modeName: 'static', styles: {} })],
+      modes: [new TerraDrawPolygonMode({ styles: drawStyle(colors), pointerDistance: 30 }), new TerraDrawRenderMode({ modeName: 'static', styles: {} })],
     })
     draw.start()
     draw.setMode('static')

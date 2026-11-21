@@ -6,7 +6,8 @@ import { TerraDraw, TerraDrawPolygonMode, TerraDrawRenderMode, TerraDrawSelectMo
 import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter'
 import { importMapLink, MapLinkError } from '../map/mapLink'
 import { areaKm2, boundsOf, collectionOf, formatKm2, polygonsOf, type AreaCollection } from '../map/playArea'
-import { MAP_COLORS } from '../map/style'
+import { MAP_PALETTES, type MapColors } from '../map/style'
+import { getMapTheme } from '../map/theme'
 import { resetGestures } from '../map/gestures'
 import { GameMap } from './GameMap'
 
@@ -33,16 +34,16 @@ interface Props {
 
 type Tool = 'draw' | 'edit'
 
-const DRAW_STYLE = {
-  fillColor: MAP_COLORS.text,
+const drawStyle = (c: MapColors) => ({
+  fillColor: c.text,
   fillOpacity: 0.08,
-  outlineColor: MAP_COLORS.text,
+  outlineColor: c.text,
   outlineWidth: 2,
-  closingPointColor: MAP_COLORS.text,
+  closingPointColor: c.text,
   closingPointWidth: 7,
-  closingPointOutlineColor: MAP_COLORS.bg,
+  closingPointOutlineColor: c.bg,
   closingPointOutlineWidth: 2,
-} as const
+})
 
 const toDrawFeature = (p: Polygon): GeoJSONStoreFeatures => ({
   id: crypto.randomUUID(),
@@ -96,10 +97,11 @@ export function PlayAreaEditor({ city, initial, initialName, ownedId, busy, canA
   const onMapReady = useCallback(
     (map: MapLibreMap) => {
       mapRef.current = map
+      const colors = MAP_PALETTES[getMapTheme()]
       const draw = new TerraDraw({
         adapter: new TerraDrawMapLibreGLAdapter({ map }),
         modes: [
-          new TerraDrawPolygonMode({ styles: DRAW_STYLE, pointerDistance: 30 }),
+          new TerraDrawPolygonMode({ styles: drawStyle(colors), pointerDistance: 30 }),
           new TerraDrawSelectMode({
             pointerDistance: 30,
             flags: {
@@ -111,15 +113,15 @@ export function PlayAreaEditor({ city, initial, initialName, ownedId, busy, canA
               },
             },
             styles: {
-              selectedPolygonColor: MAP_COLORS.text,
+              selectedPolygonColor: colors.text,
               selectedPolygonFillOpacity: 0.12,
               selectedPolygonOutlineColor: '#4FC88A',
               selectedPolygonOutlineWidth: 3,
-              selectionPointColor: MAP_COLORS.text,
+              selectionPointColor: colors.text,
               selectionPointWidth: 9,
-              selectionPointOutlineColor: MAP_COLORS.bg,
+              selectionPointOutlineColor: colors.bg,
               selectionPointOutlineWidth: 2,
-              midPointColor: MAP_COLORS.muted,
+              midPointColor: colors.muted,
               midPointWidth: 6,
             },
           }),
