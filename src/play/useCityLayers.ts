@@ -8,10 +8,11 @@ import { layerLookup, type LayerLookup } from './features'
  * City pack features by layer (cached per session), for matching, tentacles and count rules.
  * The game's venue edits apply: hidden venues drop out, custom ones count like any other.
  */
-export function useCityLayers(city: string, venues: VenueEdits = noVenueEdits): LayerLookup | null {
-  const [pack, setPack] = useState<CityPack | null>(null)
+export function useCityLayers(city: string, venues: VenueEdits = noVenueEdits, given: CityPack | null = null): LayerLookup | null {
+  const [loaded, setPack] = useState<CityPack | null>(null)
+  const pack = given ?? loaded
   useEffect(() => {
-    if (!supabase) return
+    if (!supabase || given) return
     let live = true
     loadCityPack(supabase, city)
       .then((p) => live && setPack(p))
@@ -21,6 +22,6 @@ export function useCityLayers(city: string, venues: VenueEdits = noVenueEdits): 
     return () => {
       live = false
     }
-  }, [city])
+  }, [city, given])
   return useMemo(() => (pack ? layerLookup(withVenueEdits(pack.features, venues)) : null), [pack, venues])
 }

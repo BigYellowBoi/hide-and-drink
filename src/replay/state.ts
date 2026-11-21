@@ -1,6 +1,6 @@
 import type { GameEvent, Team } from '../sync/types'
 import { deriveLobby, type StartedRound } from '../lobby/state'
-import { derivePlay } from '../play/state'
+import { derivePlay, shadable, type Question } from '../play/state'
 import { deriveCards, type CardsState } from '../cards/state'
 import { buildTimeline, type TimelineItem } from '../play/timeline'
 import { deriveHiding, type ChosenBar } from '../hiding/state'
@@ -150,4 +150,12 @@ export function trackAt(
     dots.push({ id, lng, lat, team: u.team, name: nameOf(id), stale: u.stale })
   }
   return { paths, dots }
+}
+
+/**
+ * The round's questions the map shades as of a step (seq): answered by then, since the hider's
+ * last move, with any manual shading set by then. Shading builds up as the replay goes.
+ */
+export function shadableAt(round: ReplayRound, seq: number): Question[] {
+  return shadable(derivePlay(round.events.filter((e) => e.seq <= seq)))
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '../sync/types'
-import { buildReplay, roundAt, stepAt, trackAt } from './state'
+import { buildReplay, roundAt, shadableAt, stepAt, trackAt } from './state'
 import { gameSummary, zipMediaPath } from './summary'
 import { gameTeams, gameWinner, playtestLabel, storageLabel } from './pastGames'
 import { eventsJson, zipName } from './download'
@@ -53,6 +53,13 @@ const data = (events: GameEvent[], track: TrackPoint[] = []): ReplayData => ({
 })
 
 describe('replay', () => {
+  it('shades only the questions answered by the step shown', () => {
+    const r = buildReplay(game())
+    const round = r.rounds[0]
+    expect(shadableAt(round, 7)).toEqual([])
+    expect(shadableAt(round, 8).map((q) => q.answer)).toEqual(['no'])
+  })
+
   it('steps through every round in order, hider-only events included', () => {
     const r = buildReplay(game())
     expect(r.rounds).toHaveLength(1)
