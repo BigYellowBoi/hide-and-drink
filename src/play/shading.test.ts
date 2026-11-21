@@ -75,6 +75,58 @@ describe('geo', () => {
 })
 
 describe('shade', () => {
+  it('hatch rings never run back along themselves (no slivers for MapLibre to mis-fill)', () => {
+    // Random radar and thermometer answers on the real Brisbane area. Before the answers were
+    // applied past the play area, ~5% of cases left a zero-width sliver along the area's edge
+    // where the remaining area met it, and the map hatched a triangle of the remaining area.
+    const real = JSON.parse(brisbaneInner) as AreaCollection
+    const coords = real.features.flatMap((f) => (f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates)).flat(2)
+    const [w, s0, e, n] = [
+      Math.min(...coords.map((c) => c[0])), Math.min(...coords.map((c) => c[1])),
+      Math.max(...coords.map((c) => c[0])), Math.max(...coords.map((c) => c[1])),
+    ]
+    const P = projector([(w + e) / 2, (s0 + n) / 2])
+    let seed = 1
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+    const pt = (): LngLat => [w + rnd() * (e - w), s0 + rnd() * (n - s0)]
+    const segDist = (x: number, y: number, a: number[], b: number[]) => {
+      const [dx, dy] = [b[0] - a[0], b[1] - a[1]]
+      const l2 = dx * dx + dy * dy
+      const t = l2 ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / l2)) : 0
+      return Math.hypot(x - (a[0] + t * dx), y - (a[1] + t * dy))
+    }
+    const bad: number[] = []
+    for (let c = 0; c < 120; c++) {
+      const qs: Question[] = []
+      for (let i = 0, k = 1 + Math.floor(rnd() * 4); i < k; i++) {
+        if (rnd() < 0.5) {
+          qs.push({ ...q('radar', { center: pt(), distance_m: 500 + rnd() * 3000 }, rnd() < 0.6 ? 'yes' : 'no'), id: `r${i}` })
+        } else {
+          const a = pt()
+          const ang = rnd() * 2 * Math.PI
+          const end = projector(a).toLngLat([Math.cos(ang) * 800, Math.sin(ang) * 800])
+          qs.push({ ...q('thermometer', { start: a, end }, rnd() < 0.5 ? 'hotter' : 'colder'), id: `t${i}` })
+        }
+      }
+      const rings = shade(real, qs).ruledOut.features.flatMap((f) => (f.geometry as GeoJSON.Polygon).coordinates)
+      const sliver = rings.some((ring) => {
+        const xy = ring.slice(0, -1).map((v) => P.toXY(v as LngLat))
+        const L = xy.length
+        return xy.some((a, i) => {
+          const b = xy[(i + 1) % L]
+          if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 1) return false
+          const [mx, my] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+          return xy.some((_, j) => {
+            const gap = Math.min(Math.abs(j - i), L - Math.abs(j - i))
+            return gap > 1 && segDist(mx, my, xy[j], xy[(j + 1) % L]) < 0.01
+          })
+        })
+      })
+      if (sliver) bad.push(c)
+    }
+    expect(bad).toEqual([])
+  })
+
   it('nothing ruled out without answers', () => {
     const s = shade(square, [])
     expect(km2(s.remaining)).toBeCloseTo(16, 0)

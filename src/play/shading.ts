@@ -121,6 +121,17 @@ export interface Shading {
 
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] }
 
+/** The area's bounding box, padded about 5 km. */
+function paddedBox(a: Area): Area {
+  const pad = 0.05
+  let [w, s, e, n] = [Infinity, Infinity, -Infinity, -Infinity]
+  const polys = a.geometry.type === 'Polygon' ? [a.geometry.coordinates] : a.geometry.coordinates
+  for (const rings of polys)
+    for (const [x, y] of rings[0]) [w, s, e, n] = [Math.min(w, x), Math.min(s, y), Math.max(e, x), Math.max(n, y)]
+  ;[w, s, e, n] = [w - pad, s - pad, e + pad, n + pad]
+  return { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] } }
+}
+
 const constraintCache = new Map<string, Constraint | null>()
 
 /** The seekers' own shading for a question, which replaces the app's. */
@@ -152,11 +163,20 @@ export function shade(playArea: AreaCollection, answered: readonly Question[], c
   const area = areaFeature(playArea)
   const constraints = answered.map((q) => cachedConstraint(q, ctx)).filter((c): c is Constraint => c !== null)
   if (!constraints.length) return { remaining: area, ruledOut: EMPTY }
-  // Every step is clipped to the play area polygon (lon/lat, turf), so neither the hatch
-  // nor the remaining outline can leave it.
-  const remaining = clipTo(area, applyConstraints(area, constraints))
-  if (!remaining) return { remaining: null, ruledOut: { type: 'FeatureCollection', features: holeFree(area) } }
-  const out = clipTo(area, cutOut(area, remaining))
+  // Answers are applied to a box well past the play area, so where they reach its edge they
+  // cross it instead of running along it. Cutting the play area by the result then leaves no
+  // zero-width sliver along that edge: one such sliver joined two hatch pieces, and MapLibre
+  // filled a wrong triangle of the remaining area once it snapped the sliver to tile pixels.
+  const wide = applyConstraints(paddedBox(area), constraints)
+  // Both are clipped to the play area polygon, so neither the hatch nor the outline leaves it.
+  const remaining = clipTo(area, wide)
+  if (!remaining || !wide) return { remaining: null, ruledOut: { type: 'FeatureCollection', features: holeFree(area) } }
+  let out: Area | null
+  try {
+    out = clipTo(area, cutOut(area, wide))
+  } catch {
+    out = clipTo(area, cutOut(area, remaining))
+  }
   return { remaining, ruledOut: { type: 'FeatureCollection', features: holeFree(out) } }
 }
 
