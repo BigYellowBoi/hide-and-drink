@@ -1129,6 +1129,16 @@ details.card > summary h2 {
   background: #1c2a37;
 }
 
+.game-map-light {
+  background: #eeeae2;
+}
+
+.map-theme-toggle {
+  display: grid;
+  place-items: center;
+  color: var(--text);
+}
+
 .game-map-canvas {
   /* MapLibre makes its container position: relative, so size it rather than inset it. */
   width: 100%;
@@ -1187,12 +1197,12 @@ details.card > summary h2 {
   display: none;
 }
 
-.maplibregl-ctrl-group {
+.game-map .maplibregl-ctrl-group {
   background: var(--surface);
   border-radius: var(--r-input);
 }
 
-.maplibregl-ctrl-group button {
+.game-map .maplibregl-ctrl-group button {
   width: 44px;
   height: 44px;
   padding: 0;
@@ -1200,11 +1210,11 @@ details.card > summary h2 {
   background: transparent;
 }
 
-.maplibregl-ctrl-group button + button {
+.game-map .maplibregl-ctrl-group button + button {
   border-top: 1px solid var(--line);
 }
 
-.maplibregl-ctrl-group .maplibregl-ctrl-icon {
+.game-map .maplibregl-ctrl-group .maplibregl-ctrl-icon {
   filter: invert(1);
 }
 

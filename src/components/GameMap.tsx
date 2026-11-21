@@ -8,7 +8,8 @@ import { layerCollection, loadCityPack, type CityPack } from '../map/cityPack'
 import { circlePolygon, distanceM, formatDistance } from '../map/geo'
 import { boundsOf, outsideMask, type AreaCollection } from '../map/playArea'
 import { resetGestures } from '../map/gestures'
-import { glyphsUrl, hatchImage, MAP_COLORS, mapStyle, PACK_SOURCES, TAPPABLE_LAYERS } from '../map/style'
+import { glyphsUrl, hatchImage, MAP_PALETTES, mapStyle, PACK_SOURCES, TAPPABLE_LAYERS } from '../map/style'
+import { getMapTheme, setMapTheme, useMapTheme, type MapTheme } from '../map/theme'
 import { googleMapsUrl } from '../map/googleMaps'
 import { packWithVenues, type VenueEdits } from '../venues/state'
 
@@ -56,7 +57,43 @@ function describeDot(dots: readonly MapDot[], id: unknown): string {
   return me ? `${name} · ${formatDistance(distanceM([me.lng, me.lat], [dot.lng, dot.lat]))} away` : name
 }
 
-const TEAM_COLOR = { hiders: MAP_COLORS.hider, seekers: MAP_COLORS.seeker } as const
+const teamColors = (theme: MapTheme) => ({ hiders: MAP_PALETTES[theme].hider, seekers: MAP_PALETTES[theme].seeker })
+
+const SUN =
+  '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>'
+const MOON =
+  '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>'
+
+/** Map control: switch this phone's maps between dark and light (for sunlight). */
+class ThemeControl {
+  private box: HTMLDivElement | null = null
+  private button: HTMLButtonElement | null = null
+  onAdd() {
+    const box = document.createElement('div')
+    box.className = 'maplibregl-ctrl maplibregl-ctrl-group'
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'map-theme-toggle'
+    button.addEventListener('click', () => setMapTheme(getMapTheme() === 'dark' ? 'light' : 'dark'))
+    box.append(button)
+    this.box = box
+    this.button = button
+    this.show(getMapTheme())
+    return box
+  }
+  onRemove() {
+    this.box?.remove()
+    this.box = null
+    this.button = null
+  }
+  show(theme: MapTheme) {
+    if (!this.button) return
+    const label = theme === 'dark' ? 'Light map' : 'Dark map'
+    this.button.innerHTML = theme === 'dark' ? SUN : MOON
+    this.button.title = label
+    this.button.setAttribute('aria-label', label)
+  }
+}
 const EMPTY = { type: 'FeatureCollection' as const, features: [] }
 
 interface Props {
@@ -148,6 +185,10 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
   const pack = cityPack ?? loadedPack
   const [error, setError] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
+  const theme = useMapTheme()
+  const themeControl = useRef<ThemeControl | null>(null)
+  /** The theme the map's layers are painted in. */
+  const appliedTheme = useRef<MapTheme | null>(null)
   const onReadyRef = useRef(onReady)
   const onBarTapRef = useRef(onBarTap)
   const onTapRef = useRef(onTap)
@@ -178,7 +219,7 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
     const extent = boundsOf({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: pack.pack.extent }] })
     const map = new MapLibre({
       container: container.current,
-      style: mapStyle(pack, { glyphs: GLYPHS }),
+      style: mapStyle(pack, { glyphs: GLYPHS, theme: getMapTheme() }),
       bounds: extent as LngLatBoundsLike,
       fitBoundsOptions: { padding: 16 },
       maxBounds: [extent[0] - 0.2, extent[1] - 0.2, extent[2] + 0.2, extent[3] + 0.2],
@@ -190,6 +231,9 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
     })
     map.touchZoomRotate.disableRotation()
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right')
+    const toggle = new ThemeControl()
+    map.addControl(toggle, 'top-right')
+    themeControl.current = toggle
     mapRef.current = map
 
     // Long press: a timer started on a one-finger touch or mouse down, cancelled by a pan, a
@@ -279,7 +323,8 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
     }
     map.once('load', () => {
       // Hatch for the ruled-out area. Its source stays empty until after load, so this is in time.
-      if (!map.hasImage('hatch')) map.addImage('hatch', hatchImage())
+      if (!map.hasImage('hatch')) map.addImage('hatch', hatchImage(16, getMapTheme()))
+      appliedTheme.current = getMapTheme()
       // Start the compact attribution collapsed: it covers half a phone-sized map otherwise.
       map.getContainer().querySelector('.maplibregl-compact-show')?.classList.remove('maplibregl-compact-show')
       setLoaded(true)
@@ -297,10 +342,24 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
       tags.clear()
       map.remove()
       mapRef.current = null
+      themeControl.current = null
       fittedArea.current = null
       setLoaded(false)
     }
   }, [pack, tapNames])
+
+  // Theme switched while the map is open: repaint every layer in place (sources keep their data).
+  useEffect(() => {
+    const map = mapRef.current
+    themeControl.current?.show(theme)
+    if (!map || !loaded || !pack || appliedTheme.current === theme) return
+    appliedTheme.current = theme
+    for (const layer of mapStyle(pack, { glyphs: GLYPHS, theme }).layers) {
+      if (!map.getLayer(layer.id) || !('paint' in layer) || !layer.paint) continue
+      for (const [k, v] of Object.entries(layer.paint)) map.setPaintProperty(layer.id, k as never, v as never)
+    }
+    map.updateImage('hatch', hatchImage(16, theme))
+  }, [theme, loaded, pack])
 
   // Play area: outline, dim outside, fit to it when its shape changes (not on every re-render
   // that rebuilds an equal object, which would undo the player's pan and zoom).
@@ -329,6 +388,7 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
   useEffect(() => {
     const map = mapRef.current
     if (!map || !loaded) return
+    const TEAM_COLOR = teamColors(theme)
     ;(map.getSource('paths') as GeoJSONSource | undefined)?.setData({
       type: 'FeatureCollection',
       features: (paths ?? [])
@@ -339,7 +399,7 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
           geometry: { type: 'LineString', coordinates: p.coords },
         })),
     })
-  }, [paths, loaded])
+  }, [paths, loaded, theme])
   useEffect(() => {
     const map = mapRef.current
     if (!map || !loaded) return
@@ -390,6 +450,7 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
   useEffect(() => {
     const map = mapRef.current
     if (!map || !loaded) return
+    const TEAM_COLOR = teamColors(theme)
     const set = (id: string, data: FeatureCollection) => (map.getSource(id) as GeoJSONSource | undefined)?.setData(data)
     set(
       'zone',
@@ -416,7 +477,7 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
         geometry: { type: 'Point', coordinates: [d.lng, d.lat] },
       })),
     })
-  }, [zone, bars, selectedBar, dots, loaded])
+  }, [zone, bars, selectedBar, dots, loaded, theme])
 
   useEffect(() => {
     const map = mapRef.current
@@ -440,7 +501,7 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
   }, [focusLng, focusLat, loaded])
 
   return (
-    <div className={`game-map ${className ?? ''}`}>
+    <div className={`game-map game-map-${theme} ${className ?? ''}`}>
       <div ref={container} className="game-map-canvas" />
       {!loaded && <p className="game-map-status muted">{error ?? (supabase || pack ? 'Loading map…' : 'Map needs the backend.')}</p>}
     </div>

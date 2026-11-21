@@ -113,9 +113,6 @@ export type FixState = false | true | OverrideRequest
 interface Shared {
   play: PlayState
   cards: CardsState
-  ruled: FeatureCollection
-  /** Outline of where the hider can still be, once anything is ruled out. */
-  remaining: FeatureCollection | undefined
   /** Every seeker but this phone, with name tags (both teams see them). */
   seekerDots: MapDot[]
   goMap: () => void
@@ -163,7 +160,12 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
     () => (layer && playArea ? { layer, bounds: shadingBounds(playArea), barRadiusM: zone.barRadiusM } : undefined),
     [layer, playArea, zone.barRadiusM],
   )
-  const shading = useMemo(() => (playArea ? shade(playArea, answered, ctx) : null), [playArea, answered, ctx])
+  const team = lobby.players.find((p) => p.userId === userId)?.team ?? null
+  // Seekers only: the hiders never see what the seekers have narrowed down.
+  const shading = useMemo(
+    () => (playArea && team === 'seekers' ? shade(playArea, answered, ctx) : null),
+    [playArea, answered, ctx, team],
+  )
   // While a question is open, or one picked from the timeline: otherwise the white outline of
   // what's left says it all.
   const shownQ = play.pending ?? play.questions.find((q) => q.id === shownId) ?? null
@@ -194,14 +196,11 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
   if (!started) return null
   const hiderCount = lobby.players.filter((p) => p.team === 'hiders').length
   const clock = roundClock(started.startedAt, hidingPeriodAt(started, now), now)
-  const team = lobby.players.find((p) => p.userId === userId)?.team ?? null
   const tabs = team ? TABS[team] : TABS.seekers
   const nameOf = (id: string | null) => lobby.players.find((p) => p.userId === id)?.name ?? 'a seeker'
   const shared: Shared = {
     play,
     cards,
-    ruled: shading?.ruledOut ?? EMPTY,
-    remaining,
     seekerDots,
     goMap: () => setTab('map'),
     goHand: () => setTab('hand'),
@@ -289,7 +288,17 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
       {team === 'hiders' ? (
         <HiderView sync={sync} lobby={lobby} started={started} zone={zone} canAct={canAct} events={events} clock={clock} {...shared} />
       ) : team === 'seekers' ? (
-        <SeekerView sync={sync} lobby={lobby} started={started} zone={zone} canAct={canAct} clock={clock} {...shared} />
+        <SeekerView
+          sync={sync}
+          lobby={lobby}
+          started={started}
+          zone={zone}
+          canAct={canAct}
+          clock={clock}
+          ruled={shading?.ruledOut ?? EMPTY}
+          remaining={remaining}
+          {...shared}
+        />
       ) : (
         <section className="card">
           <p className="muted">You are not on a team this round.</p>
@@ -441,8 +450,6 @@ function HiderView({
   clock,
   play,
   cards,
-  ruled,
-  remaining,
   seekerDots,
   goMap,
   goHand,
@@ -475,11 +482,9 @@ function HiderView({
     () => ({
       zone: bar ? { lng: bar.lng, lat: bar.lat, radiusM: bar.radiusM, team: 'hiders' as const } : null,
       dots: [...seekerDots, ...(fix ? [{ id: 'me', lng: fix.lng, lat: fix.lat, team: 'hiders' as const, me: true }] : [])],
-      ruled,
-      remaining,
       tool,
     }),
-    [bar, fix, seekerDots, ruled, remaining, tool],
+    [bar, fix, seekerDots, tool],
   )
   const focus = useMemo(() => (bar ? { lng: bar.lng, lat: bar.lat } : null), [bar])
   // For suggested answers. Computed here, never sent anywhere.
@@ -519,7 +524,6 @@ function HiderView({
           city={lobby.city}
           playArea={started.playArea}
           zone={answerZone}
-          ruled={ruled}
           seekers={seekerDots}
           canAct={canAct}
           now={now}
@@ -647,8 +651,7 @@ function HiderView({
                 />
               </Suspense>
               <p className="muted small">
-                {seekerDots.length ? 'Tap a seeker for their distance. ' : 'No seeker positions yet. '}
-                Hatched: ruled out by answers.
+                {seekerDots.length ? 'Tap a seeker for their distance.' : 'No seeker positions yet.'}
               </p>
             </section>
           </>
@@ -666,6 +669,9 @@ interface SeekerProps extends Shared {
   zone: HidingZoneConfig
   canAct: boolean
   clock: Clock
+  ruled: FeatureCollection
+  /** Outline of where the hider can still be, once anything is ruled out. */
+  remaining: FeatureCollection | undefined
 }
 
 function SeekerView({

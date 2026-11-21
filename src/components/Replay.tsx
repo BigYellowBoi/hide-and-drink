@@ -8,7 +8,7 @@ import { useQuestionTypes } from '../play/useQuestionTypes'
 import type { Question } from '../play/state'
 import { deriveRounds, formatDuration, names } from '../rounds/state'
 import { fetchReplay, type ReplayData } from '../replay/api'
-import { buildReplay, roundAt, stepAt, trackAt, type Replay as ReplayModel, type ReplayRound, type ReplayStep } from '../replay/state'
+import { buildReplay, roundAt, shadableAt, stepAt, trackAt, type Replay as ReplayModel, type ReplayRound, type ReplayStep } from '../replay/state'
 import { LazyGameMap } from './lazyMap'
 import { TimelineItemView } from './Timeline'
 import { PrivateWordContext } from './hiderCount'
@@ -17,6 +17,12 @@ import type { SavedGame } from '../replay/saved'
 import { MediaSourceContext, zipMediaSource } from '../replay/mediaSource'
 import type { CityPack } from '../map/cityPack'
 import type { QuestionType } from '../play/questionTypes'
+import type { FeatureCollection } from 'geojson'
+import { deriveLobby } from '../lobby/state'
+import { hidingZone } from '../hiding/state'
+import { shadingBounds } from '../play/features'
+import { shade } from '../play/shading'
+import { useCityLayers } from '../play/useCityLayers'
 
 const PLAY_EVERY_MS = 2500
 
@@ -119,15 +125,33 @@ function ReplayView({
   const city = data.game.city
   const serverTypes = useQuestionTypes(city)
   const types = savedTypes ?? serverTypes
+  // The seekers' shading as it stood at this point of the round.
+  const lobbyNow = useMemo(() => (round ? deriveLobby(round.events) : null), [round])
+  const layer = useCityLayers(city, lobbyNow?.venues, cityPack)
+  const playArea = round?.started.playArea ?? null
+  const barRadiusM = lobbyNow ? hidingZone(lobbyNow.config).barRadiusM : 0
+  // Everything before the next reveal: a question's step shows its answer's shading too.
+  const cutSeq = idx >= 0 ? (steps[idx + 1]?.seq ?? Infinity) - 1 : (round?.fromSeq ?? 0)
+  const answered = useMemo(() => (round ? shadableAt(round, cutSeq) : []), [round, cutSeq])
+  const shading = useMemo(() => {
+    if (!playArea || !answered.length) return null
+    const ctx = layer ? { layer, bounds: shadingBounds(playArea), barRadiusM } : undefined
+    return shade(playArea, answered, ctx)
+  }, [playArea, answered, layer, barRadiusM])
   const track = useMemo(() => (round ? trackAt(data.track, round.round, t, nameOf) : { paths: [], dots: [] }), [data.track, round, t, nameOf])
   const overlay = useMemo(
     () => ({
       paths: track.paths,
       dots: track.dots,
       zone: round?.bar ? { lng: round.bar.lng, lat: round.bar.lat, radiusM: round.bar.radiusM, team: 'hiders' as const } : null,
-      tool: shown ? questionTool(shown) : undefined,
+      tool: shown ? questionTool(shown, layer ?? undefined) : undefined,
+      ruled: shading?.ruledOut,
+      remaining:
+        shading?.remaining && shading.ruledOut.features.length
+          ? ({ type: 'FeatureCollection', features: [shading.remaining] } as FeatureCollection)
+          : undefined,
     }),
-    [track, round, shown],
+    [track, round, shown, shading, layer],
   )
   const current = idx >= 0 ? steps[idx] : null
   const earlier = steps.slice(0, Math.max(0, idx)).reverse()

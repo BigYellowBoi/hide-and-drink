@@ -1,5 +1,4 @@
 import { Suspense, useMemo, useState } from 'react'
-import type { FeatureCollection } from 'geojson'
 import type { GameSync } from '../sync/engine'
 import type { AreaCollection } from '../map/playArea'
 import { describeError } from '../lobby/messages'
@@ -24,7 +23,6 @@ interface Props {
   city: string
   playArea: AreaCollection | null
   zone: HiderZone
-  ruled: FeatureCollection
   /** Seekers' positions, with name tags. */
   seekers: readonly MapDot[]
   canAct: boolean
@@ -50,7 +48,6 @@ export function AnswerSheet({
   city,
   playArea,
   zone,
-  ruled,
   seekers,
   canAct,
   now,
@@ -99,14 +96,13 @@ export function AnswerSheet({
         const t = questionTool(q, layer)
         return { ...t, features: [...t.features, ...hiderTool(q, hiderAt, layer)] }
       })(),
-      ruled,
       zone: zone.bar ? { lng: zone.bar.point[0], lat: zone.bar.point[1], radiusM: zone.bar.radiusM, team: 'hiders' as const } : null,
       dots: [
         ...seekers,
         ...(zone.gps ? [{ id: 'me', lng: zone.gps.point[0], lat: zone.gps.point[1], team: 'hiders' as const, me: true }] : []),
       ],
     }),
-    [q, layer, ruled, zone, seekers, hiderAt],
+    [q, layer, zone, seekers, hiderAt],
   )
 
   const send = async () => {
