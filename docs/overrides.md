@@ -85,6 +85,13 @@ This is the audit of `supabase/migrations/` (up to `20261219090100_rounds_scorin
 | `hider_moved` | `choose_bar` after a Move with no period; `_settle_timers` when a Move period (`params.duration_s`) ends (`period_over`, no actor) | `set_bar` (completes it now), `cancel_move` (ends it now, hiders stay at the bar they hold) |
 | Move period: `move_started` (old bar to everyone), seekers frozen (`hider_moving`), hide timer paused (`_move_paused_s`) | `play_card` move with `params.duration_s` | `cancel_move` or `set_bar` (end it early); `adjust_score` (pause length) |
 | `hand_discarded` (hider-only, Move with `params.discard_hand`) | `play_card` move | `give_card` (put cards back) |
+| Hider count's amount (`card_count_set`: floor(count / `per`) drinks, or Beer Bonus's extra cards on the next draw) | `set_card_count` | `add_penalty` / `cancel_drink` (drinks), `draw_cards` / `remove_card` (cards), `clear_effect` |
+| Minefield goes off: the mined question closed as a veto, the curse blocks questions (`mine_triggered`) | `ask_question` | `reopen_question` (back to pending), `set_blocking` or `clear_effect`, `ask_question` override |
+| Happy Hour's drink per question (`drink_due`) | `ask_question` while a `params.drink_per_question` curse runs | `cancel_drink`, `waive_proof`; `timer` effect end, `clear_effect` |
+| Plagued World spots (`plague_spot`, from `here`/`center`/`end` or the last reported position) | `ask_question` while a `params.plague_radius_m` curse runs | `timer` effect end or `clear_effect` (all spots go), `ask_question` override |
+| Prosperous Home zone growth (bar circle and freeze radius × `params.zone_radius_multiplier`) | `play_card`, `_update_freeze` | `freeze` (forced value wins until set back to automatic) |
+| Time Bank: time bonuses discarded (hider-only `bonuses_banked`), seekers' drinks (`card_count_set`, `drink_due`) | `play_card` with `p_choice.bonuses` | `give_card` (bonuses back), `cancel_drink` |
+| Self-cleared curse (`params.self_clear`, `effect_cleared.self_cleared`) | `clear_effect` | `reinstate_effect` |
 | Round score: hide time (found − seeking start), time bonuses held | `found_hider` | `adjust_score`; `redo_round` |
 | Role swap at round end (`team_changed`, no actor) | `found_hider` | `set_team` between rounds (host moves anyone); `redo_round` puts that round's teams back |
 | Winner (`game_ended`) | `end_game`, `end_stale_games` | none: final. Adjust scores before ending. An auto-ended game frees its code for a new one |
@@ -126,6 +133,9 @@ This is the audit of `supabase/migrations/` (up to `20261219090100_rounds_scorin
 | `card_not_playable`, `card_not_configured`, `card_behaviour_not_supported`, `invalid_choice` | `play_card` | play it by hand, then `give_card`/`remove_card`, `add_penalty`, `timer` |
 | `effect_not_active`, `effect_not_found`, `clear_not_requested` | `clear_effect`, `confirm_clear` | `clear_effect`, `reinstate_effect` |
 | `proof_needed` | `clear_effect` | `waive_proof`, `clear_effect` |
+| `count_needed`, `mine_not_triggered` | `clear_effect` | `clear_effect` (Fix something) |
+| `count_already_set`, `count_not_needed`, `invalid_count` | `set_card_count` | `add_penalty` / `cancel_drink` for a wrong count; `clear_effect` |
+| `plague_zone` | `ask_question` | `timer` effect end, `clear_effect`, `ask_question` override |
 | `proof_not_pending` | `submit_drink_proof` | `waive_proof` / `cancel_drink` (already closed is fine) |
 | `no_followup`, `followup_already_started`, `timer_still_running` | `start_followup` | `timer` effect end, then `start_followup`; `timer` followup |
 | `cannot_veto`, `already_vetoed`, `curse_over`, `card_not_found` | `veto_curse` | `clear_effect` (= veto without the lock), `add_penalty`; `cancel_veto` |

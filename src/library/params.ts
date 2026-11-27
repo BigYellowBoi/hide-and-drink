@@ -40,9 +40,27 @@ const BY_BEHAVIOUR: Record<string, ParamField[]> = {
     { key: 'followup_s', label: 'Then a lock of', kind: 'minutes', hint: 'Optional follow-on timer if the task is missed' },
     { key: 'seeker_confirm', label: 'Ask the seekers first', kind: 'text', hint: "Only starts if they say yes, e.g. Are you in the hiders' bar?" },
     { key: 'not_applicable', label: "Seekers can say it doesn't apply", kind: 'text', hint: 'Starts at once with a Not applicable button that cancels it, e.g. Only if you are in a bar' },
+    {
+      key: 'drink_per_question',
+      label: 'Each question costs the seekers',
+      kind: 'select',
+      options: [
+        { value: 'drink', label: 'A drink' },
+        { value: 'shot', label: 'A shot' },
+      ],
+      hint: 'While it runs, the app asks for a drink photo with every question (Happy Hour)',
+    },
+    { key: 'plague_radius_m', label: 'No questions within (m) of one asked', kind: 'int', hint: 'While it runs, each question leaves a circle the seekers must leave first (Plagued World)' },
   ],
   until_cleared: [
     { key: 'blocks_questions', label: 'Blocks questions until done', kind: 'bool' },
+    { key: 'self_clear', label: 'Seekers clear it themselves', kind: 'bool', hint: 'Okay, done ends it with no hider confirm (Rewind)' },
+    {
+      key: 'mine',
+      label: 'Mines a question',
+      kind: 'bool',
+      hint: 'The hiders pick one in secret. Asking it vetoes it and blocks questions until the seekers drink (Minefield)',
+    },
     { key: 'seeker_confirm', label: 'Ask the seekers first', kind: 'text', hint: "Only starts if they say yes, e.g. Are you in the hiders' bar?" },
     { key: 'not_applicable', label: "Seekers can say it doesn't apply", kind: 'text', hint: 'Starts at once with a Not applicable button that cancels it, e.g. Only if you are in a bar' },
   ],
@@ -133,6 +151,19 @@ export const COMMON_FIELDS: ParamField[] = [
       { value: 'video', label: 'Video' },
     ],
     hint: "The hiders send this when they cast it (e.g. a Street View screenshot); the seekers can't clear it before it arrives",
+  },
+  {
+    key: 'hider_proof_optional',
+    label: 'Hiders may skip it',
+    kind: 'bool',
+    when: (p) => !!p.hider_proof,
+    hint: 'Sent with their count if they want; nothing waits for it',
+  },
+  {
+    key: 'zone_radius_multiplier',
+    label: 'Grows the hiding zone ×',
+    kind: 'number',
+    hint: 'The bar circle and freeze radius for the rest of the round, e.g. 1.5 (Prosperous Home)',
   },
   {
     key: 'hider_proof_prompt',

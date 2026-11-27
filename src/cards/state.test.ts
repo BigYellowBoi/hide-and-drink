@@ -616,6 +616,7 @@ describe('playtest 2 follow-ups', () => {
       effectId: null,
       instanceId: null,
       resolution: null,
+      optional: false,
       doneAt: 1,
       by: 's1',
     }

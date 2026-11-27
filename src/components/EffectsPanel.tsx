@@ -18,9 +18,15 @@ import {
   otherBlocks,
   questionsBlockedBy,
   triviaTodo,
+  countText,
+  countsOwed,
+  hiderCount,
+  isMine,
+  selfClear,
   type CardsState,
   type DrinkProof,
   type Effect,
+  type PlayedCard,
 } from '../cards/state'
 import { formatClock } from '../hiding/state'
 import { timerTone } from '../lib/timers'
@@ -87,6 +93,7 @@ export function EffectsPanel(props: Props) {
                 <span>
                   <strong>{p.card.name}</strong>
                   {p.card.text ? `: ${p.card.text}` : ''}
+                  <CountLine cards={cards} played={p} team={team} now={now} />
                   {cards.vetoes.some((v) => v.instanceId === p.instanceId) && <span className="penalty"> · vetoed</span>}
                   <CardUtility sync={sync} cards={cards} instanceId={p.instanceId} card={p.card} canAct={canAct} nameOf={nameOf} />
                   {team === 'seekers' && <VetoButton sync={sync} cards={cards} played={p} config={config} canAct={canAct} now={now} />}
@@ -172,6 +179,16 @@ function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf 
           <span className="muted small">Waiting for the seekers to say if it applies: “{e.seekerConfirm}”</span>
         ))}
       {timer && <EffectBar endsAt={timer[0]} totalS={timer[1]} now={now} label={phase === 'followup' ? 'Locked' : 'Left'} />}
+      {played && <CountLine cards={cards} played={played} team={team} now={now} />}
+      {isMine(e.card) && phase !== 'over' && (
+        <span className={e.mineTriggered ? 'flag small' : 'muted small'}>
+          {e.mineTriggered
+            ? `Mine went off on ${e.mineTriggered}: vetoed. Every seeker drinks before the next question.`
+            : team === 'hiders'
+              ? `Mined: ${e.mineLabel ?? 'your question'}. The seekers don't know which.`
+              : 'One question is mined. Ask it and it is vetoed, and every seeker drinks.'}
+        </span>
+      )}
       {team === 'seekers' && canSayNotApplicable(e, now) && <NotApplicable sync={sync} effect={e} canAct={canAct} />}
       {phase === 'followup_available' && (
         <span className="effect-actions">
@@ -210,12 +227,14 @@ function EffectCard({ sync, cards, effect: e, team, canAct, now, config, nameOf 
             />
           ) : (
             <button className="small" disabled={busy || !canAct} onClick={() => void act('clear_effect', {})}>
-              We did it
+              {selfClear(e.card) ? 'Okay, done' : 'We did it'}
             </button>
           )
         ) : (
           <span className="muted small">
-            Waiting for the seekers to do it{evidence ? ` and send a ${proofKind(e.card) ?? 'photo'}` : ''}.
+            {selfClear(e.card)
+              ? 'The seekers tap Okay, done when they have.'
+              : `Waiting for the seekers to do it${evidence ? ` and send a ${proofKind(e.card) ?? 'photo'}` : ''}.`}
           </span>
         ))}
       {e.behaviour === 'trivia' && <TriviaBox sync={sync} effect={e} team={team} canAct={canAct} nameOf={nameOf} />}
@@ -275,6 +294,7 @@ export function SetupProofs({ sync, cards, canAct }: { sync: GameSync; cards: Ca
   const open = cards.proofs.filter(
     (p) =>
       p.kind === 'setup' &&
+      !p.optional &&
       !proofDone(p) &&
       cards.effects.some((e) => e.id === p.effectId && (e.status === 'active' || e.status === 'clear_requested')),
   )
@@ -520,5 +540,143 @@ export function ConfirmClear({
       </div>
       {err && <p className="bad">{err}</p>}
     </section>
+  )
+}
+
+/** Where a card's hider count is at (params.hider_count), for both teams. */
+function CountLine({ cards, played, team, now }: { cards: CardsState; played: PlayedCard; team: Team; now: number }) {
+  const spec = hiderCount(played.card)
+  const done = cards.counts[played.instanceId]
+  if (done) return <span className={done.reward ? 'ok small' : 'flag small'}> {countText(done)}.</span>
+  if (!spec) return null
+  const left = spec.timeS ? played.playedAt + spec.timeS * 1000 - now : 0
+  if (left > 0) {
+    return (
+      <span className="muted small">
+        {' '}
+        {team === 'hiders' ? 'Drink' : 'The hiders are drinking'}: {formatClock(left)} left, then {team === 'hiders' ? 'you send' : 'they send'} the count.
+      </span>
+    )
+  }
+  return <span className="muted small"> {team === 'hiders' ? 'Send your count (pinned on top).' : "Waiting for the hiders' count."}</span>
+}
+
+/**
+ * Hiders: cards waiting for their number (params.hider_count: Brothel's people in the call,
+ * Equivalent Exchange's standard drinks, Beer Bonus's drinks), pinned until sent. A
+ * countdown first when the card gives them time to drink; an optional photo where the curse
+ * takes one (params.hider_proof_optional).
+ */
+export function CountPrompts({ sync, cards, canAct, now }: { sync: GameSync; cards: CardsState; canAct: boolean; now: number }) {
+  return (
+    <>
+      {countsOwed(cards).map((p) => (
+        <CountPrompt key={p.instanceId} sync={sync} cards={cards} played={p} canAct={canAct} now={now} />
+      ))}
+    </>
+  )
+}
+
+function CountPrompt({ sync, cards, played, canAct, now }: { sync: GameSync; cards: CardsState; played: PlayedCard; canAct: boolean; now: number }) {
+  const spec = hiderCount(played.card)!
+  const [value, setValue] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const optional = played.effectId ? cards.proofs.find((x) => x.kind === 'setup' && x.optional && x.effectId === played.effectId && !proofDone(x)) : null
+  const media = hiderProofKind(played.card) ?? 'photo'
+  const left = spec.timeS ? played.playedAt + spec.timeS * 1000 - now : 0
+  const n = /^\d{1,4}$/.test(value.trim()) ? Number(value.trim()) : null
+  const amount = n === null ? null : Math.floor(n / spec.per)
+  const preview =
+    amount === null
+      ? null
+      : spec.reward === 'extra_draw'
+        ? `${amount} extra card${amount === 1 ? '' : 's'} on your next reward.`
+        : amount > 0
+          ? `The seekers drink ${amount} ${spec.unit}${amount === 1 ? '' : 's'}.`
+          : 'The seekers drink nothing.'
+
+  const send = async (photo: (() => Promise<boolean>) | null) => {
+    if (n === null) return
+    setBusy(true)
+    setErr(null)
+    try {
+      if (photo && !(await photo())) return
+      await sync.action('set_card_count', { p_instance_id: played.instanceId, p_count: n })
+    } catch (x) {
+      setErr(describeError(x))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="card drink-proof" role="alert">
+      <p className="eyebrow">{left > 0 ? 'Drink up' : 'Send your count'}</p>
+      <h2>{played.card.name}</h2>
+      {spec.timeS && (
+        <EffectBar endsAt={played.playedAt + spec.timeS * 1000} totalS={spec.timeS} now={now} label="Left" />
+      )}
+      <label className="field">
+        <span>{spec.prompt}</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={1000}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          disabled={!canAct || busy}
+        />
+      </label>
+      {preview && <p className="small">{preview}</p>}
+      {optional ? (
+        <OptionalPhoto
+          sync={sync}
+          proof={optional}
+          media={media}
+          prompt={hiderProofPrompt(played.card)}
+          boxDisabled={!canAct || busy}
+          disabled={!canAct || busy || n === null}
+          onSend={send}
+        />
+      ) : (
+        <button className="wide" disabled={!canAct || busy || n === null} onClick={() => void send(null)}>
+          {busy ? 'Sending…' : 'Send to the seekers'}
+        </button>
+      )}
+      {err && <p className="bad">{err}</p>}
+    </section>
+  )
+}
+
+/** The count's optional photo (params.hider_proof_optional), sent first when one is picked. */
+function OptionalPhoto({
+  sync,
+  proof,
+  media,
+  prompt,
+  boxDisabled,
+  disabled,
+  onSend,
+}: {
+  sync: GameSync
+  proof: DrinkProof
+  media: 'photo' | 'video'
+  prompt: string | null
+  boxDisabled: boolean
+  disabled: boolean
+  onSend: (photo: (() => Promise<boolean>) | null) => Promise<void>
+}) {
+  const { box, photo, busy, err, send } = useProofPhoto(sync, proof.id, media, boxDisabled)
+  return (
+    <>
+      <p className="muted small">{prompt ?? `Add a ${media} if you like.`}</p>
+      {box}
+      <button className="wide" disabled={disabled || !!busy} onClick={() => void onSend(photo ? send : null)}>
+        {busy ?? (photo ? `Send the count and ${media}` : 'Send the count')}
+      </button>
+      {err && <p className="bad">{err}</p>}
+    </>
   )
 }

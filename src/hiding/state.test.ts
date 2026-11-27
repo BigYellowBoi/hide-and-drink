@@ -18,7 +18,7 @@ const bar = (round: number, name = 'The Pub') =>
 
 describe('deriveHiding', () => {
   it('starts with no bar and no freeze', () => {
-    expect(deriveHiding([], 1)).toEqual({ bar: null, frozen: false, moving: false })
+    expect(deriveHiding([], 1)).toEqual({ bar: null, frozen: false, moving: false, zoneMultiplier: 1 })
   })
 
   it('reads the chosen bar and follows freeze changes', () => {

@@ -12,6 +12,9 @@ import {
   costPayer,
   handBonusS,
   isPlayable,
+  bankParams,
+  bankDrinks,
+  plural,
   type CardRef,
   type CardsState,
   type PendingDraw,
@@ -43,6 +46,8 @@ export interface CastContext {
   frozen?: boolean
   /** Config photo_proof_for_drinks: the cast cost's drink needs a photo. */
   drinkProofs: boolean
+  /** Questions asked this run (banKey), which Minefield can't mine. */
+  used?: ReadonlySet<string>
 }
 
 /** Hider's Hand tab: pending draws first, then the selected card large with Cast, hand strip below. */
@@ -77,7 +82,16 @@ function Hand({ sync, cards, canAct, ctx }: Props & { ctx: CastContext }) {
         frozen: ctx.frozen,
       })
     : null
-  const need = choice.kind === 'target' ? 1 : choice.kind === 'discard' || choice.kind === 'bans' ? choice.count : 0
+  const need =
+    choice.kind === 'target' || choice.kind === 'mine' ? 1 : choice.kind === 'discard' || choice.kind === 'bans' ? choice.count : 0
+  // Time Bank: any number of time bonuses, so nothing is required.
+  const bank = def ? bankParams(def) : null
+  const bankMinutes = picks.reduce((m, id) => {
+    const c = hand.find((h) => h.instanceId === id)
+    const v = c ? cardOf(cards, c.cardId).params.minutes : null
+    return m + (typeof v === 'number' ? v : 0)
+  }, 0)
+  const bankOwed = bank ? bankDrinks(bankMinutes, bank.minutesPer) : 0
   // Media sent with the card: the drink photo for its cost, and the curse's first step.
   const media = def && isPlayable(def) ? castMedia(def, ctx.drinkProofs) : { cost: false, setup: null }
   const folder = current?.instanceId ?? 'none'
@@ -85,7 +99,7 @@ function Hand({ sync, cards, canAct, ctx }: Props & { ctx: CastContext }) {
   const setupPick = useMediaPick(sync, folder, media.setup ?? 'photo', !canAct || busy)
   const mediaMissing = (media.cost && !costPick.photo) || (!!media.setup && !setupPick.photo)
   const mediaBusy = costPick.busy ?? setupPick.busy
-  const ready = picks.length === need && !mediaMissing && !mediaBusy
+  const ready = (choice.kind === 'bonuses' || picks.length === need) && !mediaMissing && !mediaBusy
 
   const select = (id: string) => {
     setSelected(id)
@@ -103,7 +117,11 @@ function Hand({ sync, cards, canAct, ctx }: Props & { ctx: CastContext }) {
           ? { discard: picks }
           : choice.kind === 'bans'
             ? { bans: picks.map((k) => ({ type: k.split(':')[0], option_id: k.split(':').slice(1).join(':') })) }
-            : null
+            : choice.kind === 'mine' && picks[0]
+              ? { mine: { type: picks[0].split(':')[0], option_id: picks[0].split(':').slice(1).join(':') } }
+              : choice.kind === 'bonuses'
+                ? { bonuses: picks }
+                : null
     try {
       const sent: Record<string, string> = {}
       if (media.cost) sent.cost = await costPick.upload()
@@ -155,6 +173,30 @@ function Hand({ sync, cards, canAct, ctx }: Props & { ctx: CastContext }) {
                 />
               ) : choice.kind === 'bans' ? (
                 <BanPicker city={ctx.city} cards={cards} count={choice.count} distinctTypes={choice.distinctTypes} picks={picks} setPicks={setPicks} />
+              ) : choice.kind === 'mine' ? (
+                <BanPicker
+                  city={ctx.city}
+                  cards={cards}
+                  count={1}
+                  distinctTypes={false}
+                  picks={picks}
+                  setPicks={setPicks}
+                  used={ctx.used}
+                  title="Pick the question to mine. The seekers aren't told which: if they ask it, it's vetoed and every seeker drinks."
+                />
+              ) : choice.kind === 'bonuses' ? (
+                <HandPicker
+                  cards={cards}
+                  exclude={current.instanceId}
+                  max={hand.length}
+                  picks={picks}
+                  setPicks={setPicks}
+                  only={(c) => cardOf(cards, c.cardId).behaviour === 'time_bonus'}
+                  title={`Pick the time bonuses to give up: 1 ${bank?.unit ?? 'drink'} for the seekers per ${bank?.minutesPer ?? 4} min (rounded down). ${
+                    picks.length ? `${bankMinutes} min = ${plural(bankOwed, bank?.unit ?? 'drink')}.` : 'None picked.'
+                  }`}
+                  empty="No time bonuses in your hand."
+                />
               ) : null}
               {!blocker && media.setup && (
                 <div className="cast-choice">
@@ -186,8 +228,8 @@ function Hand({ sync, cards, canAct, ctx }: Props & { ctx: CastContext }) {
                         ? (mediaBusy ?? 'Casting…')
                         : mediaBusy
                           ? mediaBusy
-                          : picks.length < need
-                          ? `Pick ${need - picks.length} more`
+                          : choice.kind !== 'bonuses' && picks.length < need
+                          ? `Pick ${need - picks.length} ${choice.kind === 'mine' ? 'question' : 'more'}`
                           : mediaMissing
                           ? `Add your ${media.setup && !setupPick.photo ? media.setup : 'photo'} first`
                           : castCost(def)
@@ -251,6 +293,8 @@ function HandPicker({
   picks,
   setPicks,
   title,
+  only,
+  empty,
 }: {
   cards: CardsState
   exclude: string
@@ -258,13 +302,17 @@ function HandPicker({
   picks: string[]
   setPicks: (p: string[]) => void
   title: string
+  /** Only these hand cards can be picked (Time Bank: time bonuses). */
+  only?: (c: CardRef) => boolean
+  empty?: string
 }) {
+  const choices = cards.hand.filter((c) => c.instanceId !== exclude && (!only || only(c)))
   return (
     <div className="cast-choice">
       <p className="small">{title}</p>
+      {!choices.length && empty && <p className="muted small">{empty}</p>}
       <div className="draw-grid">
-        {cards.hand
-          .filter((c) => c.instanceId !== exclude)
+        {choices
           .map((c) => (
             <CardFace
               key={c.instanceId}
@@ -287,6 +335,8 @@ function BanPicker({
   distinctTypes,
   picks,
   setPicks,
+  used,
+  title,
 }: {
   city: string
   cards: CardsState
@@ -294,6 +344,9 @@ function BanPicker({
   distinctTypes: boolean
   picks: string[]
   setPicks: (p: string[]) => void
+  /** Questions already asked: greyed out (Minefield). */
+  used?: ReadonlySet<string>
+  title?: string
 }) {
   const [types, setTypes] = useState<QuestionType[] | null>(null)
   useEffect(() => {
@@ -307,8 +360,12 @@ function BanPicker({
   return (
     <div className="cast-choice">
       <p className="small">
-        Pick {count} question{count > 1 ? 's' : ''}
-        {distinctTypes ? ', each of a different type' : ''}. Seekers can't ask them for the rest of the run.
+        {title ?? (
+          <>
+            Pick {count} question{count > 1 ? 's' : ''}
+            {distinctTypes ? ', each of a different type' : ''}. Seekers can't ask them for the rest of the run.
+          </>
+        )}
       </p>
       {!types && <p className="muted small">Loading questions…</p>}
       {types
@@ -320,7 +377,8 @@ function BanPicker({
               {t.options.map((o) => {
                 const key = banKey(t.type, o.id)
                 const on = picks.includes(key)
-                const off = banned.has(key) || (!on && distinctTypes && pickedTypes.has(t.type))
+                const off =
+                  banned.has(key) || (!on && distinctTypes && pickedTypes.has(t.type)) || (!!used?.has(key) && o.reusable !== true)
                 return (
                   <button
                     key={o.id}

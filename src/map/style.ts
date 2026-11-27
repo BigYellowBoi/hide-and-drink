@@ -161,6 +161,7 @@ export function mapStyle(pack: CityPack, opts: { glyphs?: string; theme?: MapThe
       mask: { type: 'geojson', data: EMPTY },
       area: { type: 'geojson', data: EMPTY },
       zone: { type: 'geojson', data: EMPTY },
+      plague: { type: 'geojson', data: EMPTY },
       bars: { type: 'geojson', data: EMPTY },
       paths: { type: 'geojson', data: EMPTY },
       dots: { type: 'geojson', data: EMPTY },
@@ -280,6 +281,19 @@ export function mapStyle(pack: CityPack, opts: { glyphs?: string; theme?: MapThe
           'circle-stroke-color': ['match', ['get', 'role'], 'candidate', sideColour(), 'nearest', sideColour(), C.bg],
           'circle-stroke-width': 2,
         },
+      },
+      // Plagued World: no questions inside these circles while the curse runs (alert yellow, dashed).
+      {
+        id: 'plague-fill',
+        type: 'fill',
+        source: 'plague',
+        paint: { 'fill-color': C.venue, 'fill-opacity': 0.14 },
+      },
+      {
+        id: 'plague-line',
+        type: 'line',
+        source: 'plague',
+        paint: { 'line-color': C.venue, 'line-width': 2.5, 'line-dasharray': [1, 1] },
       },
       {
         id: 'zone-fill',

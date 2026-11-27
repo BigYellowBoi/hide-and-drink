@@ -368,6 +368,12 @@ export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
       const closedBy = action === 'randomize' && p.as_veto === true ? 'veto' : action
       return update(state, id, (x) => ({ ...x, closedBy, answeredAt: time(p.played_at, e.created_at) }))
     }
+    case 'mine_triggered': {
+      // Minefield: the seekers asked the mined question; the server closed it as a veto.
+      const id = str(p.question_id)
+      if (!id) return state
+      return update(state, id, (x) => ({ ...x, closedBy: 'veto', answeredAt: Date.parse(e.created_at) }))
+    }
     case 'move_started': {
       const m = parseMoveStarted(e)
       if (!m) return state

@@ -80,6 +80,30 @@ export interface Effect {
   trivia: Trivia | null
   /** seeker_confirm curses: what the seekers are asked before it starts (params.seeker_confirm). */
   seekerConfirm: string | null
+  /** Minefield (params.mine): the mined question's label, hider-only (null for seekers). */
+  mineLabel: string | null
+  /** Minefield: the question it went off on, once the seekers asked it. */
+  mineTriggered: string | null
+}
+
+/** The hiders' number for a card with params.hider_count, or Time Bank's drinks (public). */
+export interface CardCount {
+  /** What the hiders sent (null for Time Bank: the minutes stay private). */
+  count: number | null
+  /** What it comes to: drinks for the seekers, or extra cards (reward 'extra_draw'). */
+  amount: number
+  unit: string
+  reward: string | null
+}
+
+/** Plagued World: no questions within radiusM of here until endsAt. */
+export interface PlagueSpot {
+  effectId: string
+  questionId: string | null
+  lng: number
+  lat: number
+  radiusM: number
+  endsAt: number
 }
 
 export interface PlayedCard {
@@ -143,6 +167,8 @@ export interface DrinkProof {
   instanceId: string | null
   /** Closed by the host without a photo: not owed, or drunk without proof. */
   resolution: 'cancelled' | 'waived' | null
+  /** A first step the hiders may skip (params.hider_proof_optional): nothing waits for it. */
+  optional: boolean
   /** Server time the photo came in or the host closed it, for the "done" toast. */
   doneAt: number | null
   /** Who sent the photo. */
@@ -164,6 +190,11 @@ export interface CardsState {
   effects: Effect[]
   /** Reward multiplier the next answer gets (next_question_modifier cards; 1 = none). */
   nextRewardMultiplier: number
+  /** Extra cards the next answer draws (Beer Bonus: hider_count reward 'extra_draw'). */
+  nextExtraDraw: number
+  /** Hider counts by played card (card_count_set). */
+  counts: Record<string, CardCount>
+  plagueSpots: PlagueSpot[]
   bans: Ban[]
   vetoes: Veto[]
   /** The hider played Move and hasn't locked in the new bar yet. */
@@ -184,6 +215,9 @@ export const emptyCards: CardsState = {
   played: [],
   effects: [],
   nextRewardMultiplier: 1,
+  nextExtraDraw: 0,
+  counts: {},
+  plagueSpots: [],
   bans: [],
   vetoes: [],
   moving: false,
@@ -350,6 +384,8 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
                   ? { count: num(p.count) ?? triviaCount(card), need: triviaNeed(card), topic: triviaTopic(card), questions: null, forced: false, lastFailed: null }
                   : null,
               seekerConfirm: awaiting ? (str(p.seeker_confirm) ?? 'Does this curse apply to you right now?') : null,
+              mineLabel: null,
+              mineTriggered: null,
             },
           ],
         }
@@ -369,7 +405,59 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
     }
     case 'question_answered':
       // The server spends every waiting modifier on the next answer.
-      return state.nextRewardMultiplier === 1 ? state : { ...state, nextRewardMultiplier: 1 }
+      return state.nextRewardMultiplier === 1 && state.nextExtraDraw === 0 ? state : { ...state, nextRewardMultiplier: 1, nextExtraDraw: 0 }
+    case 'card_count_set': {
+      const instanceId = str(p.instance_id)
+      const amount = num(p.amount)
+      if (!instanceId || amount === null) return state
+      const count: CardCount = { count: num(p.count), amount, unit: str(p.unit) ?? 'drink', reward: str(p.reward) }
+      const name = str(p.name) ?? state.played.find((x) => x.instanceId === instanceId)?.card.name ?? 'Card'
+      const next: CardsState = {
+        ...state,
+        counts: { ...state.counts, [instanceId]: count },
+        nextExtraDraw: count.reward === 'extra_draw' ? state.nextExtraDraw + amount : state.nextExtraDraw,
+      }
+      return log({ kind: count.reward ? 'card' : 'penalty', text: `${name}: ${countText(count)}`, instanceId }, next)
+    }
+    case 'bonuses_banked': {
+      // Time Bank (hider-only): the time bonuses discarded.
+      const ids = new Set(strings(p.discarded))
+      const mins = num(p.minutes) ?? 0
+      return log(
+        { kind: 'card', text: `Banked ${ids.size} time bonus${ids.size === 1 ? '' : 'es'} (${mins} min)`, private: true, ...linkTo(str(p.instance_id)) },
+        { ...state, hand: state.hand.filter((c) => !ids.has(c.instanceId)) },
+      )
+    }
+    case 'mine_set': {
+      const id = str(p.effect_id)
+      const label = mineLabel(p)
+      const next = updateEffect(state, id, (x) => ({ ...x, mineLabel: label }))
+      return log({ kind: 'card', text: `Mine planted on ${label}`, private: true, ...effectLink(next, id) }, next)
+    }
+    case 'mine_triggered': {
+      const id = str(p.effect_id)
+      const label = mineLabel(p)
+      const next = updateEffect(state, id, (x) => ({ ...x, mineTriggered: label, blocksQuestions: true }))
+      return log(
+        { kind: 'penalty', text: `Mine! ${label} was mined: vetoed, every seeker drinks before the next question`, ...effectLink(next, id) },
+        next,
+      )
+    }
+    case 'plague_spot': {
+      const effectId = str(p.effect_id)
+      const lng = num(p.lng)
+      const lat = num(p.lat)
+      if (!effectId || lng === null || lat === null) return state
+      const spot: PlagueSpot = {
+        effectId,
+        questionId: str(p.question_id),
+        lng,
+        lat,
+        radiusM: num(p.radius_m) ?? 250,
+        endsAt: time(p.ends_at, e.created_at),
+      }
+      return { ...state, plagueSpots: [...state.plagueSpots, spot] }
+    }
     case 'hider_moved':
       return log(
         { kind: 'card', text: p.period_over === true ? 'Move over: seekers can move and ask again' : 'Hider has moved to a new bar' },
@@ -430,6 +518,7 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
         effectId: null,
         instanceId: str(p.instance_id),
         resolution: null,
+        optional: false,
         doneAt: null,
         by: null,
       }
@@ -457,6 +546,7 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
         effectId,
         instanceId,
         resolution: null,
+        optional: p.optional === true,
         doneAt: null,
         by: null,
       }
@@ -525,7 +615,7 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
       const id = str(p.effect_id)
       const next = updateEffect(state, id, (x) => ({ ...x, status: 'cleared' }))
       const name = next.effects.find((x) => x.id === id)?.card.name ?? 'Curse'
-      return log({ kind: 'card', text: `${name} cleared`, ...effectLink(next, id) }, next)
+      return log({ kind: 'card', text: p.self_cleared === true ? `Seekers did ${name}` : `${name} cleared`, ...effectLink(next, id) }, next)
     }
     case 'trivia_set': {
       const id = str(p.effect_id)
@@ -782,6 +872,8 @@ export function effectPhase(e: Effect, now: number): EffectPhase {
  */
 export function clearable(e: Effect, now: number): boolean {
   if (e.status !== 'active' || e.behaviour === 'trivia') return false
+  // A mine has nothing to clear until it goes off.
+  if (isMine(e.card) && !e.mineTriggered) return false
   const phase = effectPhase(e, now)
   if (e.behaviour === 'until_cleared') return phase === 'until_cleared'
   return e.followupS !== null && e.followupEndsAt === null && (phase === 'running' || phase === 'followup_available')
@@ -866,8 +958,14 @@ export type CastChoice =
   | { kind: 'target' }
   | { kind: 'discard'; count: number }
   | { kind: 'bans'; count: number; distinctTypes: boolean }
+  /** Minefield: the one question to mine. */
+  | { kind: 'mine' }
+  /** Time Bank: any number of time bonuses from the hand. */
+  | { kind: 'bonuses' }
 
 export function castChoice(c: CardDef): CastChoice {
+  if (isMine(c)) return { kind: 'mine' }
+  if (bankParams(c)) return { kind: 'bonuses' }
   if (c.behaviour === 'question_ban') {
     return { kind: 'bans', count: Math.max(1, Math.floor(num(c.params.count) ?? 1)), distinctTypes: c.params.distinct_types === true }
   }
@@ -973,7 +1071,7 @@ export function cardFacts(c: CardDef): string[] {
   const d = num(c.params.duration_s)
   const f = num(c.params.followup_s)
   if (c.behaviour === 'timed' && d) out.push(f ? `${minutes(d)}, then ${minutes(f)} if missed` : minutes(d))
-  if (c.behaviour === 'until_cleared') out.push(c.params.blocks_questions === true ? 'Blocks questions' : 'Until done')
+  if (c.behaviour === 'until_cleared' && !isMine(c)) out.push(c.params.blocks_questions === true ? 'Blocks questions' : 'Until done')
   if (c.behaviour === 'trivia') {
     const n = triviaCount(c)
     const need = triviaNeed(c)
@@ -981,6 +1079,17 @@ export function cardFacts(c: CardDef): string[] {
     if (c.params.blocks_questions === true) out.push('Blocks questions')
   }
   if (c.behaviour === 'time_bonus' && num(c.params.minutes)) out.push(`+${num(c.params.minutes)} min`)
+  if (isMine(c)) out.push('Mines a question')
+  const count = hiderCount(c)
+  if (count) out.push(count.timeS ? `Hiders drink ${minutes(count.timeS)}, then count` : 'Hiders send a count')
+  const bank = bankParams(c)
+  if (bank) out.push(`1 ${bank.unit} per ${bank.minutesPer} min banked`)
+  if (c.params.drink_per_question === 'drink' || c.params.drink_per_question === 'shot') out.push(`A ${c.params.drink_per_question} per question`)
+  const plague = num(c.params.plague_radius_m)
+  if (plague) out.push(`No questions within ${plague} m of the last`)
+  const zone = num(c.params.zone_radius_multiplier)
+  if (zone) out.push(`Hiding zone ×${zone}`)
+  if (selfClear(c)) out.push('Seekers say when done')
   if (c.behaviour === 'next_question_modifier') out.push(`Next reward ×${num(c.params.reward_multiplier) ?? 2}`)
   if (c.behaviour === 'question_ban') {
     const n = num(c.params.count) ?? 1
@@ -1033,9 +1142,12 @@ export function castMedia(c: CardDef, drinkProofs: boolean): { cost: boolean; se
     c.params.seeker_confirm !== 'false'
   return {
     cost: drinkProofs && !!castCost(c) && costPayer(c) === 'hiders',
-    setup: confirmFirst ? null : hiderProofKind(c),
+    setup: confirmFirst || hiderProofOptional(c) ? null : hiderProofKind(c),
   }
 }
+
+/** params.hider_proof_optional: the first step is optional, sent with the count instead of at cast. */
+export const hiderProofOptional = (c: CardDef) => c.params.hider_proof_optional === true
 
 /** params.hider_proof: what the hiders send first when they cast it ('photo' or 'video'). */
 export function hiderProofKind(c: CardDef): 'photo' | 'video' | null {
@@ -1119,7 +1231,23 @@ export function cardDetails(c: CardDef): { label: string; value: string }[] {
     rows.push({ label: 'Proof', value: 'Video: the seekers send one before they can say they did it' })
   }
   const first = hiderProofKind(c)
-  if (first) rows.push({ label: 'Hiders first', value: `The hiders send a ${first} when they cast it` })
+  if (first) {
+    rows.push({
+      label: 'Hiders first',
+      value: hiderProofOptional(c) ? `The hiders can send a ${first} with their count` : `The hiders send a ${first} when they cast it`,
+    })
+  }
+  const count = hiderCount(c)
+  if (count) {
+    rows.push({
+      label: 'Count',
+      value:
+        count.reward === 'extra_draw'
+          ? `The hiders say how many; that many extra cards on the next reward`
+          : `The hiders say how many; the seekers drink 1 ${count.unit} per ${count.per > 1 ? count.per : ''}${count.per > 1 ? ' ' : ''}counted (rounded down)`,
+    })
+  }
+  if (isMine(c)) rows.push({ label: 'Mine', value: 'The hiders pick a question in secret. Asking it vetoes it and every seeker drinks' })
   const facts = cardFacts(c).filter((f) => !/ proof$/.test(f) && f !== "Can't veto")
   if (facts.length) rows.push({ label: 'Rules', value: facts.join(' · ') })
   if ((c.behaviour === 'until_cleared' || c.behaviour === 'trivia') && typeof c.params.blocks === 'string') rows.push({ label: 'Blocks', value: cap(c.params.blocks) })
@@ -1159,3 +1287,102 @@ export function proofToastText(p: DrinkProof, team: 'hiders' | 'seekers' | null,
   return { title: `${who === 'Your team' ? 'Your team' : who} drank: ${p.label}`, body: `${p.cost === 'shot' ? 'Shot' : 'Drink'} done, photo by ${by}.` }
 }
 
+
+// ---------------------------------------------------------------- custom curse params
+
+/** params.mine (Minefield): the hiders mine one question when they cast it. */
+export const isMine = (c: CardDef) => c.params.mine === true
+
+const mineLabel = (p: Record<string, unknown>) => str(p.label) ?? str(p.option_id) ?? 'a question'
+
+/** params.hider_count: the number the hiders send after casting (Brothel, Equivalent Exchange, Beer Bonus). */
+export interface HiderCount {
+  prompt: string
+  /** Every `per` counted is one of `unit` (Brothel: 2 people = 1 shot). */
+  per: number
+  unit: string
+  /** Seconds of drinking before the count (shown as a countdown), or null. */
+  timeS: number | null
+  /** 'extra_draw': the amount is extra cards on the next reward, not drinks for the seekers. */
+  reward: string | null
+}
+
+export function hiderCount(c: CardDef): HiderCount | null {
+  const h = c.params.hider_count
+  if (!isObject(h)) return null
+  const per = num(h.per)
+  const t = num(h.time_s)
+  return {
+    prompt: str(h.prompt)?.trim() || 'How many?',
+    per: per && per >= 1 ? per : 1,
+    unit: str(h.unit)?.trim() || 'drink',
+    timeS: t && t > 0 ? t : null,
+    reward: str(h.reward),
+  }
+}
+
+/** params.bank_time_bonuses (Time Bank): discard time bonuses, the seekers drink per `minutesPer`. */
+export function bankParams(c: CardDef): { minutesPer: number; unit: string } | null {
+  const b = c.params.bank_time_bonuses
+  if (!isObject(b)) return null
+  const m = num(b.minutes_per)
+  return { minutesPer: m && m >= 1 ? m : 4, unit: str(b.unit)?.trim() || 'drink' }
+}
+
+/** "3 shots", "1 standard drink". */
+export const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`
+
+/** Drinks Time Bank costs the seekers for these minutes (rounded down, as the server does). */
+export const bankDrinks = (minutes: number, minutesPer: number) => Math.floor(minutes / minutesPer)
+
+/** What a count means, for the log and the curse. */
+export function countText(c: CardCount): string {
+  const counted = c.count !== null ? `hiders counted ${c.count}, ` : ''
+  if (c.reward === 'extra_draw') return `${counted}${plural(c.amount, 'extra card')} on the next reward`
+  return c.amount > 0 ? `${counted}seekers drink ${plural(c.amount, c.unit)}` : `${counted}nothing to drink`
+}
+
+/** The count a played card is waiting for: needed and not sent yet. */
+export const countPending = (s: CardsState, p: PlayedCard) => !!hiderCount(p.card) && !s.counts[p.instanceId]
+
+/**
+ * Cards whose count the hiders still owe, oldest first: played this round with
+ * params.hider_count, no count yet, and not over (cleared or vetoed).
+ */
+export function countsOwed(s: CardsState): PlayedCard[] {
+  return s.played.filter((p) => {
+    if (!countPending(s, p) || s.vetoes.some((v) => v.instanceId === p.instanceId)) return false
+    const e = p.effectId ? s.effects.find((x) => x.id === p.effectId) : null
+    return !e || e.status === 'active' || e.status === 'clear_requested'
+  })
+}
+
+/** How much the hiding zone has grown this round (Prosperous Home), 1 = not at all. */
+export function zoneMultiplier(s: Pick<CardsState, 'played' | 'vetoes'>): number {
+  return s.played.reduce((m, p) => {
+    const z = num(p.card.params.zone_radius_multiplier)
+    return z && z > 0 && z <= 10 && !s.vetoes.some((v) => v.instanceId === p.instanceId) ? m * z : m
+  }, 1)
+}
+
+/** Plagued World spots in force now. */
+export function activePlagueSpots(s: CardsState, now: number): PlagueSpot[] {
+  return s.plagueSpots.filter((x) => {
+    const e = s.effects.find((f) => f.id === x.effectId)
+    return x.endsAt > now && (!e || e.status === 'active')
+  })
+}
+
+/** A running curse that makes every question cost a drink (params.drink_per_question, Happy Hour). */
+export function drinkPerQuestion(s: CardsState, now: number): Effect[] {
+  return s.effects.filter(
+    (e) =>
+      (e.card.params.drink_per_question === 'drink' || e.card.params.drink_per_question === 'shot') &&
+      e.status === 'active' &&
+      e.endsAt !== null &&
+      e.endsAt > now,
+  )
+}
+
+/** params.self_clear (Rewind): the seekers' "Okay, done" clears it, no hider confirm. */
+export const selfClear = (c: CardDef) => c.params.self_clear === true
