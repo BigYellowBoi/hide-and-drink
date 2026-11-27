@@ -26,7 +26,7 @@ const lock = (l: Pick<LogEntry, 'private'>) => (l.private ? ' (hiders only)' : '
 /** One step as text lines (the first one carries the clock). */
 export function stepLines(step: ReplayStep, replay: Replay, nameOf: (id: string | null) => string): string[] {
   const r = replay.rounds.find((x) => x.round === step.round)
-  const clock = r ? clockLabel(step.at, r.started.startedAt, r.started.hidingPeriodS) : ''
+  const clock = r ? clockLabel(step.at, r.started.startedAt, r.started.hidingPeriodS, r.started.pauses) : ''
   if (step.kind !== 'item') return []
   const it = step.item
   const sub = (entries: readonly LogEntry[]) => entries.map((l) => `      ${l.text}${photoNote(l)}${lock(l)}`)

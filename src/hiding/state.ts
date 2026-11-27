@@ -1,4 +1,5 @@
 import type { GameEvent } from '../sync/types'
+import { pausedMs } from './move'
 
 /** The hider's locked-in bar for a round (from the hider-only bar_chosen event). */
 export interface ChosenBar {
@@ -45,11 +46,12 @@ export function deriveHiding(events: readonly GameEvent[], round: number): Hidin
           radiusM: num(p.radius_m) ?? 100,
           late: p.late === true,
         },
-        moving: false,
+        // During a Move period the hiders can change their pick until it ends.
+        moving: e.payload.move_open === true,
       }
     } else if (e.type === 'card_played' && isObj(e.payload.card) && isObj(e.payload.card.params) && e.payload.card.params.action === 'move') {
       state = { ...state, moving: true }
-    } else if (e.type === 'move_cancelled') {
+    } else if (e.type === 'move_cancelled' || e.type === 'hider_moved') {
       state = { ...state, moving: false }
     } else if (e.type === 'freeze_changed' && typeof e.payload.frozen === 'boolean') {
       state = { ...state, frozen: e.payload.frozen }
@@ -100,10 +102,17 @@ export function hidingPeriodAt(
   return left != null ? (serverNow + left - started.startedAt) / 1000 : started.hidingPeriodS
 }
 
-/** Where the round is on server time. */
-export function roundClock(startedAt: number, hidingPeriodS: number, serverNow: number): RoundClock {
+/** Where the round is on server time. Seeking time leaves out Move periods (pauses). */
+export function roundClock(
+  startedAt: number,
+  hidingPeriodS: number,
+  serverNow: number,
+  pauses: readonly { from: number; to: number }[] = [],
+): RoundClock {
   const endsAt = startedAt + hidingPeriodS * 1000
-  return serverNow < endsAt ? { phase: 'hiding', ms: endsAt - serverNow } : { phase: 'seeking', ms: serverNow - endsAt }
+  return serverNow < endsAt
+    ? { phase: 'hiding', ms: endsAt - serverNow }
+    : { phase: 'seeking', ms: serverNow - endsAt - pausedMs(pauses, endsAt, serverNow) }
 }
 
 /**
@@ -111,8 +120,13 @@ export function roundClock(startedAt: number, hidingPeriodS: number, serverNow: 
  * (time left to hide) during the hiding period. Counted from when seeking started, not from
  * the start of the round, so it matches the clock in the top bar.
  */
-export function clockLabel(at: number, startedAt: number, hidingPeriodS: number): string {
-  const c = roundClock(startedAt, hidingPeriodS, at)
+export function clockLabel(
+  at: number,
+  startedAt: number,
+  hidingPeriodS: number,
+  pauses: readonly { from: number; to: number }[] = [],
+): string {
+  const c = roundClock(startedAt, hidingPeriodS, at, pauses)
   return c.phase === 'hiding' ? `−${formatClock(c.ms)}` : `+${formatClock(c.ms, { up: true })}`
 }
 

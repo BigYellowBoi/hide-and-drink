@@ -28,6 +28,7 @@ import {
   type PackFeature,
 } from './features'
 import { candidatesOf, NULL_ANSWER, radarParams, thermometerParams, type Question } from './state'
+import type { MovePeriod } from '../hiding/move'
 import type { BBox, Point } from 'geojson'
 
 /** City pack context for questions about features (matching, tentacles, bonus count rules). */
@@ -159,9 +160,23 @@ function cachedConstraint(q: Question, ctx?: PackContext): Constraint | null {
   return constraintCache.get(key) ?? null
 }
 
-export function shade(playArea: AreaCollection, answered: readonly Question[], ctx?: PackContext): Shading {
+/**
+ * After a Move the hider is within radiusM of the old bar (plus their own bar circle):
+ * everything else is ruled out. null without a radius.
+ */
+export function moveConstraint(move: MovePeriod | null, barRadiusM: number): Constraint | null {
+  if (!move || move.radiusM === null) return null
+  return { keep: radarCircle([move.from.lng, move.from.lat], move.radiusM + barRadiusM) }
+}
+
+export function shade(
+  playArea: AreaCollection,
+  answered: readonly Question[],
+  ctx?: PackContext,
+  extra: readonly Constraint[] = [],
+): Shading {
   const area = areaFeature(playArea)
-  const constraints = answered.map((q) => cachedConstraint(q, ctx)).filter((c): c is Constraint => c !== null)
+  const constraints = [...extra, ...answered.map((q) => cachedConstraint(q, ctx)).filter((c): c is Constraint => c !== null)]
   if (!constraints.length) return { remaining: area, ruledOut: EMPTY }
   // Answers are applied to a box well past the play area, so where they reach its edge they
   // cross it instead of running along it. Cutting the play area by the result then leaves no

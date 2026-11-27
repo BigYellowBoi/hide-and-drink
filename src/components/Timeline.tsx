@@ -42,7 +42,7 @@ const FALLBACK = '#A9B4BF'
 export function Timeline({ questions, log, cards, now, lobby, types, team, round, canAct, shownId, onShow, onShade, nameOf }: Props) {
   // Times read like the main clock: from when seeking started (−m:ss while hiding).
   const started = lobby.started
-  const clock = (at: number) => (started ? clockLabel(at, started.startedAt, hidingPeriodAt(started, now)) : '')
+  const clock = (at: number) => (started ? clockLabel(at, started.startedAt, hidingPeriodAt(started, now), started.pauses) : '')
   const items = buildTimeline(questions, log, cards.played)
   return (
     <section className="card">

@@ -1,6 +1,7 @@
 import type { Feature, MultiPolygon, Polygon } from 'geojson'
 import type { GameEvent } from '../sync/types'
 import { isLngLat, type LngLat } from './geo'
+import { moveEndAt, parseMoveStarted, type MovePeriod } from '../hiding/move'
 
 /** Question types the app can ask and answer. */
 export const SUPPORTED_TYPES = ['radar', 'thermometer', 'matching', 'measuring', 'tentacles', 'photos', 'bonus'] as const
@@ -136,8 +137,12 @@ export interface PlayState {
   questions: Question[]
   pending: Question | null
   penalties: number
-  /** Seq of the last hider_moved: answers before it describe the old bar. */
+  /** Seq of the last move (Move period start, or hider_moved): answers before it describe the old bar. */
   movedSeq: number
+  /** movedSeq before the last Move period, to go back to if the host cancels it (hider stayed). */
+  movedSeqBefore: number
+  /** The round's last Move period: the old bar and how far they may go from it. */
+  move: MovePeriod | null
   log: LogEntry[]
 }
 
@@ -150,6 +155,8 @@ export const emptyPlay: PlayState = {
   pending: null,
   penalties: 0,
   movedSeq: 0,
+  movedSeqBefore: 0,
+  move: null,
   log: [],
 }
 
@@ -231,6 +238,13 @@ export function thermometerParams(q: Pick<Question, 'type' | 'params'>): Thermom
   return q.type === 'thermometer' && isLngLat(start) && isLngLat(end)
     ? { start, end, distance_m: num(q.params.distance_m) ?? 0, travelled_m: num(q.params.travelled_m) ?? 0 }
     : null
+}
+
+/** Timeline line for a Move period starting. */
+export function moveText(m: MovePeriod): string {
+  const mins = Math.round((m.endsAt - m.startedAt) / 60_000)
+  const within = m.radiusM !== null ? ` within ${m.radiusM >= 1000 ? `${+(m.radiusM / 1000).toFixed(1)} km` : `${Math.round(m.radiusM)} m`}` : ''
+  return `Hiders left ${m.from.name}: ${mins} min to settle at a new bar${within}. Seekers frozen, hide timer paused`
 }
 
 const isOpen = (q: Question) => q.answer === null && q.closedBy === null
@@ -354,8 +368,28 @@ export function applyPlayEvent(state: PlayState, e: GameEvent): PlayState {
       const closedBy = action === 'randomize' && p.as_veto === true ? 'veto' : action
       return update(state, id, (x) => ({ ...x, closedBy, answeredAt: time(p.played_at, e.created_at) }))
     }
+    case 'move_started': {
+      const m = parseMoveStarted(e)
+      if (!m) return state
+      return {
+        ...state,
+        move: m,
+        movedSeq: e.seq,
+        movedSeqBefore: state.movedSeq,
+        log: [...state.log, { seq: e.seq, kind: 'card', at: m.startedAt, text: moveText(m), by: e.actor_id }],
+      }
+    }
     case 'hider_moved':
-      return { ...state, movedSeq: e.seq }
+    case 'move_cancelled': {
+      const at = moveEndAt(e)
+      const open = state.move && state.move.endedAt === null ? state.move : null
+      if (open && at !== null) {
+        const move = { ...open, endedAt: Math.min(at, open.endsAt) }
+        // Cancelled: the hiders stayed at the old bar, so earlier answers still hold.
+        return e.type === 'move_cancelled' ? { ...state, move, movedSeq: state.movedSeqBefore } : { ...state, move }
+      }
+      return e.type === 'hider_moved' ? { ...state, movedSeq: e.seq } : state
+    }
     case 'question_shading_set': {
       const id = str(p.question_id)
       const q = state.questions.find((x) => x.id === id)
@@ -474,6 +508,7 @@ export const outcomeText = (q: Question): string =>
 /** What a phone should ask the server to settle now (null: nothing due). Server decides. */
 export function dueTimer(s: PlayState, serverNow: number): string | null {
   if (!s.seekingStarted && s.seekingAt !== null && serverNow >= s.seekingAt) return `seeking:${s.round}`
+  if (s.move && s.move.endedAt === null && serverNow >= s.move.endsAt) return `move:${s.move.seq}`
   if (s.pending && !s.pending.overdue && serverNow >= s.pending.deadlineAt) return `overdue:${s.pending.id}`
   return null
 }

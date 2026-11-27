@@ -7,7 +7,8 @@ import type { HidingZoneConfig } from '../hiding/state'
 import type { Fix } from '../hiding/useGeolocation'
 import { loadCityPack, type CityPack } from '../map/cityPack'
 import { packWithVenues, type VenueEdits } from '../venues/state'
-import { formatDistance } from '../map/geo'
+import { distanceM, formatDistance } from '../map/geo'
+import { radarCircle } from '../play/geo'
 import { useServerNow } from '../hiding/useServerNow'
 import type { GameSync } from '../sync/engine'
 import type { MapDot } from './GameMap'
@@ -37,6 +38,10 @@ interface Props {
   hiderNames?: ReadonlyMap<string, string>
   /** Picking a new bar after the Move powerup. */
   moving?: boolean
+  /** Move period: only bars this close to the old one (outlined on the map). */
+  within?: { lng: number; lat: number; radiusM: number } | null
+  /** Move period: the bar the team is at now (the old one, or their pick so far). */
+  current?: string | null
 }
 
 /** A teammate's pick counts as live for this long after its last report (they re-send every PICK_HEARTBEAT_MS). */
@@ -89,6 +94,8 @@ export function BarPicker({
   userId = null,
   hiderNames = NO_NAMES,
   moving = false,
+  within = null,
+  current = null,
 }: Props) {
   const [basePack, setPack] = useState<CityPack | null>(null)
   const pack = useMemo(() => (basePack ? packWithVenues(basePack, venues) : null), [basePack, venues])
@@ -119,8 +126,22 @@ export function BarPicker({
   // Distances move with the phone, but only re-sort every ~50 m so the list doesn't jitter.
   const fromKey = fix ? `${fix.lng.toFixed(3)},${fix.lat.toFixed(3)}` : null
   const from = useMemo(() => (fromKey ? (fromKey.split(',').map(Number) as [number, number]) : null), [fromKey])
-  const all = useMemo(() => (pack && validIds ? barOptions(pack, validIds, from) : []), [pack, validIds, from])
-  const shown = useMemo(() => (pack && validIds ? barOptions(pack, validIds, from, search) : []), [pack, validIds, from, search])
+  const inReach = useMemo(
+    () => (within ? (b: { lng: number; lat: number }) => distanceM([b.lng, b.lat], [within.lng, within.lat]) <= within.radiusM : () => true),
+    [within],
+  )
+  const all = useMemo(() => (pack && validIds ? barOptions(pack, validIds, from).filter(inReach) : []), [pack, validIds, from, inReach])
+  const shown = useMemo(
+    () => (pack && validIds ? barOptions(pack, validIds, from, search).filter(inReach) : []),
+    [pack, validIds, from, search, inReach],
+  )
+  const reach = useMemo(
+    () =>
+      within
+        ? { type: 'FeatureCollection' as const, features: [radarCircle([within.lng, within.lat], within.radiusM)] }
+        : undefined,
+    [within],
+  )
   const chosen = all.find((b) => b.id === selected) ?? null
   const teamPicks = useTeamPicks(sync, started.round, selected, canAct, userId)
   const picking = useMemo(
@@ -156,8 +177,9 @@ export function BarPicker({
           p.bar ? [{ id: `pick:${p.userId}`, lng: p.bar.lng, lat: p.bar.lat, team: 'hiders' as const, name: `${p.who}'s pick` }] : [],
         ),
       ],
+      remaining: reach,
     }),
-    [all, selected, chosen, zone.barRadiusM, fix, seekers, pin, picking],
+    [all, selected, chosen, zone.barRadiusM, fix, seekers, pin, picking, reach],
   )
 
   const addBar = async () => {
@@ -312,7 +334,8 @@ export function BarPicker({
           <>
             <label className="field">
               <span>
-                {all.length} bars {fix ? 'by distance' : 'A to Z (no GPS fix yet)'}
+                {all.length} bars {within ? `within ${formatDistance(within.radiusM)} of your old bar, ` : ''}
+                {fix ? 'by distance' : 'A to Z (no GPS fix yet)'}
               </span>
               <input type="search" placeholder="Search bars" value={search} onChange={(e) => setSearch(e.target.value)} />
             </label>
@@ -325,7 +348,10 @@ export function BarPicker({
                     aria-pressed={b.id === selected}
                     onClick={() => setSelected(b.id)}
                   >
-                    <span className="bar-name">{b.name}</span>
+                    <span className="bar-name">
+                      {b.name}
+                      {b.id === current && <span className="muted"> (you're here now)</span>}
+                    </span>
                     <span className="bar-meta">
                       {b.kind?.replace(/_/g, ' ')}
                       {b.distanceM !== null && ` · ${formatDistance(b.distanceM)}`}
@@ -352,8 +378,8 @@ export function BarPicker({
       <div className={`picker-confirm${chosen ? ' picker-confirm-floating' : ''}`}>
         {error && <p className="bad">{error}</p>}
         <SlideToConfirm
-          label={chosen ? `Lock in ${chosen.name}` : 'Choose a bar first'}
-          disabled={!chosen || !canAct || busy}
+          label={chosen ? (chosen.id === current ? `Staying at ${chosen.name}` : `Lock in ${chosen.name}`) : 'Choose a bar first'}
+          disabled={!chosen || !canAct || busy || chosen.id === current}
           onConfirm={() => void lockIn()}
         />
       </div>

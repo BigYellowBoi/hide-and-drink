@@ -11,7 +11,9 @@ import { useWakeLock } from '../hiding/useWakeLock'
 import { readLocal, writeLocal } from '../lib/storage'
 import { distanceM, formatDistance } from '../map/geo'
 import { questionTool } from '../play/overlays'
-import { shade, type HiderZone } from '../play/shading'
+import { moveConstraint, shade, type HiderZone } from '../play/shading'
+import { moveRunning } from '../hiding/move'
+import { MoveBanner } from './MoveBanner'
 import { deriveOverrides, openRequests, type OverrideRequest } from '../overrides/state'
 import { optionOf } from '../overrides/catalogue'
 import { describeError } from '../lobby/messages'
@@ -162,9 +164,11 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
   )
   const team = lobby.players.find((p) => p.userId === userId)?.team ?? null
   // Seekers only: the hiders never see what the seekers have narrowed down.
+  // After a Move the hider is near the old bar: the map starts again from that circle.
+  const moveKeep = useMemo(() => moveConstraint(play.move, zone.barRadiusM), [play.move, zone.barRadiusM])
   const shading = useMemo(
-    () => (playArea && team === 'seekers' ? shade(playArea, answered, ctx) : null),
-    [playArea, answered, ctx, team],
+    () => (playArea && team === 'seekers' ? shade(playArea, answered, ctx, moveKeep ? [moveKeep] : []) : null),
+    [playArea, answered, ctx, team, moveKeep],
   )
   // While a question is open, or one picked from the timeline: otherwise the white outline of
   // what's left says it all.
@@ -195,7 +199,7 @@ export function Round({ sync, lobby, userId, canAct, events, positions, presence
 
   if (!started) return null
   const hiderCount = lobby.players.filter((p) => p.team === 'hiders').length
-  const clock = roundClock(started.startedAt, hidingPeriodAt(started, now), now)
+  const clock = roundClock(started.startedAt, hidingPeriodAt(started, now), now, started.pauses)
   const tabs = team ? TABS[team] : TABS.seekers
   const nameOf = (id: string | null) => lobby.players.find((p) => p.userId === id)?.name ?? 'a seeker'
   const shared: Shared = {
@@ -410,7 +414,7 @@ type Clock = ReturnType<typeof roundClock>
  */
 export function TopbarClock({ sync, started, bonusS = 0 }: { sync: GameSync; started: StartedRound; bonusS?: number }) {
   const now = useServerNow(sync)
-  const clock = roundClock(started.startedAt, hidingPeriodAt(started, now), now)
+  const clock = roundClock(started.startedAt, hidingPeriodAt(started, now), now, started.pauses)
   const hidingLeft = clock.phase === 'hiding' ? clock.ms : started.startedAt + hidingPeriodAt(started, now) * 1000 - now
   // Buzz a minute before seeking starts and when it does (every phone, both teams).
   useTimerAlert(`hiding:${started.round}`, hidingLeft)
@@ -506,7 +510,8 @@ function HiderView({
         </div>
       )}
       <DrinkProofs sync={sync} cards={cards} team="hiders" canAct={canAct} />
-      {hiding.moving && (
+      <MoveBanner move={play.move} team="hiders" now={now} />
+      {hiding.moving && !moveRunning(play.move, now) && (
         <div className="blocked-banner" role="status">
           <strong>Moving</strong>
           <p>Pick your new bar on the Map tab. Seekers can't ask until you lock it in.</p>
@@ -564,7 +569,14 @@ function HiderView({
             sync={sync}
             cards={cards}
             canAct={canAct}
-            ctx={{ city: lobby.city, pendingQuestion: !!play.pending, barChosen: !!bar, drinkProofs: lobby.config.photo_proof_for_drinks !== false }}
+            ctx={{
+              city: lobby.city,
+              pendingQuestion: !!play.pending,
+              barChosen: !!bar,
+              seeking: clock.phase === 'seeking',
+              frozen: hiding.frozen,
+              drinkProofs: lobby.config.photo_proof_for_drinks !== false,
+            }}
           />
           <EffectsPanel
             sync={sync}
@@ -584,7 +596,9 @@ function HiderView({
             <h2>{hiding.moving ? 'Pick your new bar' : 'Pick your bar'}</h2>
             <p className="muted small">
               {hiding.moving
-                ? 'You played Move.'
+                ? moveRunning(play.move, now)
+                  ? `You played Move: ${formatClock(play.move.endsAt - now)} left.`
+                  : 'You played Move.'
                 : clock.phase === 'hiding'
                   ? `${formatClock(clock.ms)} left to hide`
                   : 'Hiding is over. Lock one in now.'}
@@ -610,10 +624,22 @@ function HiderView({
             fix={fix}
             onLongPress={place}
             moving={hiding.moving}
+            within={
+              hiding.moving && moveRunning(play.move, now) && play.move.radiusM !== null
+                ? { lng: play.move.from.lng, lat: play.move.from.lat, radiusM: play.move.radiusM }
+                : null
+            }
+            current={hiding.moving ? (bar?.venueId ?? null) : null}
             userId={userId}
             hiderNames={hiderNames}
             late={clock.phase === 'seeking' && !hiding.moving}
-            timeNote={hiding.moving ? `Moving from ${bar?.name ?? 'your bar'}` : `${formatClock(clock.ms)} left to hide`}
+            timeNote={
+              hiding.moving
+                ? moveRunning(play.move, now)
+                  ? `Moving from ${play.move.from.name} · ${formatClock(play.move.endsAt - now)} left${bar && (bar.lng !== play.move.from.lng || bar.lat !== play.move.from.lat) ? ` · picked ${bar.name}` : ''}`
+                  : `Moving from ${bar?.name ?? 'your bar'}`
+                : `${formatClock(clock.ms)} left to hide`
+            }
           />
         ) : (
           <>
@@ -702,15 +728,22 @@ function SeekerView({
   // Web apps get no GPS in the background, so sharing needs the app open with the screen on.
   const [keepAwake, setKeepAwake] = useState(() => readLocal(AWAKE_KEY) !== 'off')
   const wake = useWakeLock(keepAwake)
+  // The bar the hiders left with Move (public): the new one is near it.
+  const moveFrom = play.move?.from ?? null
   const overlay = useMemo(
     () => ({
-      dots: [...seekerDots, ...(fix ? [{ id: 'me', lng: fix.lng, lat: fix.lat, team: 'seekers' as const, me: true }] : [])],
+      dots: [
+        ...seekerDots,
+        ...(fix ? [{ id: 'me', lng: fix.lng, lat: fix.lat, team: 'seekers' as const, me: true }] : []),
+        ...(moveFrom ? [{ id: 'move-from', lng: moveFrom.lng, lat: moveFrom.lat, team: 'hiders' as const, name: `Left: ${moveFrom.name}` }] : []),
+      ],
       ruled,
       remaining,
       tool,
     }),
-    [seekerDots, fix, ruled, remaining, tool],
+    [seekerDots, fix, ruled, remaining, tool, moveFrom],
   )
+  const frozen = moveRunning(play.move, now)
   const pending = play.pending
   const blocked = questionsBlockedBy(cards)
   const banned = useMemo(() => bannedSet(cards), [cards])
@@ -727,7 +760,8 @@ function SeekerView({
       {blocked.length > 0 && tab !== 'effects' && <BlockedBanner effects={blocked} team="seekers" onOpen={goEffects} />}
       {tab !== 'effects' && <OtherBlockedBanners cards={cards} team="seekers" onOpen={goEffects} />}
       {tab !== 'effects' && <LockBanner cards={cards} team="seekers" now={now} />}
-      {cards.moving && tab !== 'effects' && (
+      <MoveBanner move={play.move} team="seekers" now={now} />
+      {cards.moving && !frozen && tab !== 'effects' && (
         <div className="blocked-banner" role="status">
           <strong>Hider is moving</strong>
           <p>Stay put: questions open once they lock in a new bar.</p>
@@ -795,7 +829,7 @@ function SeekerView({
         </section>
       )}
 
-      {tab === 'map' && clock.phase === 'seeking' && <FoundButton sync={sync} canAct={canAct} />}
+      {tab === 'map' && clock.phase === 'seeking' && !frozen && <FoundButton sync={sync} canAct={canAct} />}
 
       {tab === 'ask' && (
         <AskPanel
@@ -812,9 +846,11 @@ function SeekerView({
           blocked={
             blocked.length
               ? `Questions are blocked until you complete ${blocked.map((e) => e.card.name).join(' and ')}.`
-              : cards.moving
-                ? 'The hider is moving. Questions open once they lock in a new bar.'
-                : null
+              : frozen
+                ? 'You are frozen while the hiders move. Questions open when the time is up.'
+                : cards.moving
+                  ? 'The hider is moving. Questions open once they lock in a new bar.'
+                  : null
           }
           banned={banned}
           locked={!!locked}
