@@ -829,7 +829,7 @@ function SeekerView({
         </section>
       )}
 
-      {tab === 'map' && clock.phase === 'seeking' && !frozen && <FoundButton sync={sync} canAct={canAct} />}
+      {tab === 'map' && clock.phase === 'seeking' && <FoundButton sync={sync} canAct={canAct} />}
 
       {tab === 'ask' && (
         <AskPanel

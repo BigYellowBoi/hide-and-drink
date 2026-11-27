@@ -18,7 +18,7 @@ export function MoveBanner({ move, team, now }: { move: MovePeriod | null; team:
     <div className="freeze-banner" role="alert">
       <strong>Frozen {formatClock(left)}</strong>
       <p>
-        The hiders are moving. Stay where you are: no travelling, no questions. They left {move.from.name} (on your map) and
+        The hiders are moving. Stay where you are: no travelling, no questions (you can still call Found if you spot them). They left {move.from.name} (on your map) and
         will be{within} of it.
       </p>
     </div>

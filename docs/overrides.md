@@ -109,7 +109,7 @@ This is the audit of `supabase/migrations/` (up to `20261219090100_rounds_scorin
 | `questions_blocked` | `ask_question` | `set_blocking`, `clear_effect`, `ask_question` override |
 | `question_banned` | `ask_question` | `lift_ban`, `ask_question` override |
 | `question_used` (each option once per run) | `ask_question` | `ask_question` override; `void_answer` the earlier one (voided ones don't count) |
-| `hider_moving` | `ask_question`, `found_hider` (Move period) | `cancel_move`, `set_bar`, `ask_question` override |
+| `hider_moving` | `ask_question` | `cancel_move`, `set_bar`, `ask_question` override |
 | `question_type_not_supported`, `no_map_data`, `option_not_configured`, `position_outside_map`, `invalid_distance`, `not_far_enough`, `invalid_params` | `ask_question` (`_question_params`) | `ask_question` override (sent without map data) and `set_answer` |
 | `question_not_pending` | `answer_question`, `set_trivia`... | `reopen_question`, `set_answer` |
 | `invalid_answer`, `photo_not_uploaded` (answers) | `answer_question` (`_check_answer`) | `set_answer` (free text) |

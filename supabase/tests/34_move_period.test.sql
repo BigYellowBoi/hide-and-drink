@@ -7,7 +7,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(32);
+select plan(34);
 
 insert into auth.users (id) values
   ('11111111-1111-1111-1111-111111111111'),
@@ -155,9 +155,6 @@ set local role authenticated;
 -- ---------------------------------------------------------------- frozen seekers, picking
 
 select throws_ok($$ select pg_temp.ask(20) $$, 'P0001', 'hider_moving', 'seekers cannot ask');
-select pg_temp.seeker();
-select throws_ok($$ select public.found_hider(pg_temp.gid(), pg_temp.uid(21), pg_temp.seq()) $$,
-  'P0001', 'hider_moving', 'or find them');
 select throws_ok(format($$ select pg_temp.choose(%L, 22) $$, current_setting('test.far')),
   'P0001', 'too_far_to_move', 'new bar must be within the radius');
 select lives_ok(format($$ select pg_temp.choose(%L, 23) $$, current_setting('test.near')), 'hider picks a near bar');
@@ -195,6 +192,25 @@ set local role authenticated;
 select lives_ok($$ select pg_temp.ask(27) $$, 'seekers can ask again');
 select throws_ok(format($$ select pg_temp.choose(%L, 28) $$, current_setting('test.near')),
   'P0001', 'bar_already_chosen', 'no more picks after the period');
+
+-- ---------------------------------------------------------------- found while moving
+
+reset role;
+select set_config('test.q', (select id::text from public.questions where game_id = pg_temp.gid() and answered_at is null), true);
+set local role authenticated;
+select pg_temp.hider();
+select public.answer_question(pg_temp.gid(), current_setting('test.q')::uuid, 'yes', pg_temp.uid(29), pg_temp.seq());
+reset role;
+update public.card_instances set location = 'hand' where id = current_setting('test.move2')::uuid;
+update public.games set round_started_at = now() - interval '40 minutes' where id = pg_temp.gid();
+set local role authenticated;
+select lives_ok(format($$ select pg_temp.play(%L, 30) $$, current_setting('test.move2')), 'a second Move');
+select pg_temp.seeker();
+select lives_ok($$ select public.found_hider(pg_temp.gid(), pg_temp.uid(31), pg_temp.seq()) $$,
+  'seekers can still find the hiders while they move');
+reset role;
+-- Seeking started 10 min ago; the Move started now, so nothing is paused yet.
+select is((select hide_s from public.game_rounds where game_id = pg_temp.gid()), 600, 'scored to the find');
 
 select * from finish();
 rollback;

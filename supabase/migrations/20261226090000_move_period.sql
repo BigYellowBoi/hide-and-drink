@@ -16,7 +16,7 @@
 -- * _settle_timers ends the period at ends_at: public hider_moved (no actor, at = ends_at).
 --   If no new bar was picked the hiders stay at the old one.
 -- * Seekers are frozen meanwhile: ask_question already refuses hider_moving while
---   move_pending; found_hider now does too.
+--   move_pending. found_hider still works (the hiders can be spotted on the way).
 -- * The hide timer pauses: found_hider leaves out time spent in move periods
 --   (_move_paused_s, from the events: move_started to its hider_moved or move_cancelled).
 -- * Push: move_started and hider_moved to the seekers.
@@ -357,8 +357,8 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------------
--- found_hider: as in 20261219090100_rounds_scoring.sql, but not while the seekers are frozen
--- by a Move, and the hide time leaves out Move periods.
+-- found_hider: as in 20261219090100_rounds_scoring.sql, but the hide time leaves out Move
+-- periods. Still allowed during one: the hiders can be spotted while moving.
 -- ---------------------------------------------------------------------------
 
 create or replace function public.found_hider(p_game_id uuid, p_client_action_id uuid, p_last_seen_seq bigint)
@@ -393,11 +393,6 @@ begin
   if v_game.status <> 'seeking' then
     raise exception 'not_seeking_yet' using errcode = 'P0001';
   end if;
-  select * into v_bar from public.hider_bars where game_id = p_game_id and round = v_game.round;
-  if v_bar.move_pending and v_bar.move_ends_at is not null then
-    raise exception 'hider_moving' using errcode = 'P0001';
-  end if;
-
   v_seeking_at := v_game.round_started_at + make_interval(secs => v_game.hiding_period_s);
   -- Time bonuses count while held in the hand at the end of the round.
   select coalesce(sum(round((g.params ->> 'minutes')::numeric * 60)), 0)::integer into v_bonus
@@ -406,6 +401,7 @@ begin
    where i.game_id = p_game_id and i.round = v_game.round and i.location = 'hand'
      and g.behaviour = 'time_bonus' and jsonb_typeof(g.params -> 'minutes') = 'number'
      and (g.params ->> 'minutes')::numeric > 0;
+  select * into v_bar from public.hider_bars where game_id = p_game_id and round = v_game.round;
 
   insert into public.game_rounds (game_id, round, hiders, seekers, seeking_at, found_by, bar_name, hide_s, bonus_s)
   values (p_game_id, v_game.round, public._team_list(p_game_id, 'hiders'), public._team_list(p_game_id, 'seekers'),
