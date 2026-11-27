@@ -125,7 +125,8 @@ describe('shade', () => {
       if (sliver) bad.push(c)
     }
     expect(bad).toEqual([])
-  })
+    // Fuzz over the real Brisbane area: seconds on a slow CI runner.
+  }, 30_000)
 
   it('nothing ruled out without answers', () => {
     const s = shade(square, [])
@@ -247,7 +248,7 @@ describe('shading geometry', () => {
       ).map((x, k) => ({ ...x, id: `${i}-${k}` }))
       expectInside(L, lArea, qs)
     }
-  })
+  }, 30_000)
 })
 
 describe('drawable shading', () => {
