@@ -28,6 +28,8 @@ export interface MapOverlay {
   tool?: FeatureCollection
   /** Replay: each player's path so far, in team colour. */
   paths?: MapPath[]
+  /** Plagued World: circles where questions can't be asked (dashed yellow). */
+  plague?: { lng: number; lat: number; radiusM: number }[]
 }
 
 export interface MapPath {
@@ -385,6 +387,7 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
   const remaining = overlay?.remaining
   const tool = overlay?.tool
   const paths = overlay?.paths
+  const plague = overlay?.plague
   useEffect(() => {
     const map = mapRef.current
     if (!map || !loaded) return
@@ -406,7 +409,11 @@ export function GameMap({ city, playArea, onReady, className, tapNames = true, o
     ;(map.getSource('ruled') as GeoJSONSource | undefined)?.setData(ruled ?? EMPTY)
     ;(map.getSource('remaining') as GeoJSONSource | undefined)?.setData(remaining ?? EMPTY)
     ;(map.getSource('tool') as GeoJSONSource | undefined)?.setData(tool ?? EMPTY)
-  }, [ruled, remaining, tool, loaded])
+    ;(map.getSource('plague') as GeoJSONSource | undefined)?.setData({
+      type: 'FeatureCollection',
+      features: (plague ?? []).map((c) => ({ ...circlePolygon([c.lng, c.lat], c.radiusM), properties: {} })),
+    })
+  }, [ruled, remaining, tool, plague, loaded])
 
   // Name tags under other people's dots (the style has no glyphs, so these are HTML markers).
   // Tapping one shows the straight-line distance from this phone.

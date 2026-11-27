@@ -160,14 +160,15 @@ export function AskPanel({
     setBusy(true)
     setErr(null)
     try {
-      const params =
+      // Where this phone is (Plagued World keeps a no-question circle around it).
+      const params = { ...(gpsPoint ? { here: gpsPoint } : {}), ...(
         type === 'radar'
           ? { center: here, ...(option.distance_m == null ? { distance_m: distance } : {}) }
           : type === 'thermometer'
             ? { start, end: here }
             : MAP_TYPES.includes(type)
               ? { center: here }
-              : {}
+              : {}) }
       await sync.action('ask_question', { p_type: type, p_option_id: option.id, p_params: params })
       if (type === 'thermometer') saveStart(null)
       setSent(true)

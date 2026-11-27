@@ -18,6 +18,8 @@ export interface HidingState {
   frozen: boolean
   /** The hider played Move: pick a new bar (the old one stays until then). */
   moving: boolean
+  /** How much the hiding zone has grown (Prosperous Home), 1 = not at all. bar.radiusM includes it. */
+  zoneMultiplier: number
 }
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
@@ -28,9 +30,17 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object
  * for them this is always empty.
  */
 export function deriveHiding(events: readonly GameEvent[], round: number): HidingState {
-  let state: HidingState = { bar: null, frozen: false, moving: false }
+  let state: HidingState = { bar: null, frozen: false, moving: false, zoneMultiplier: 1 }
+  // Prosperous Home (params.zone_radius_multiplier), unless vetoed.
+  const boosts = new Map<string, number>()
   for (const e of events) {
     if (e.payload.round !== round) continue
+    if (e.type === 'card_played' && isObj(e.payload.card) && isObj(e.payload.card.params)) {
+      const m = num(e.payload.card.params.zone_radius_multiplier)
+      if (m !== null && m > 0 && m <= 10 && typeof e.payload.instance_id === 'string') boosts.set(e.payload.instance_id, m)
+    } else if (e.type === 'curse_vetoed' && typeof e.payload.instance_id === 'string') {
+      boosts.delete(e.payload.instance_id)
+    }
     if (e.type === 'bar_chosen') {
       const p = e.payload
       const lng = num(p.lng)
@@ -57,8 +67,13 @@ export function deriveHiding(events: readonly GameEvent[], round: number): Hidin
       state = { ...state, frozen: e.payload.frozen }
     }
   }
-  return state
+  const zoneMultiplier = [...boosts.values()].reduce((a, b) => a * b, 1)
+  return { ...state, zoneMultiplier, bar: state.bar && { ...state.bar, radiusM: state.bar.radiusM * zoneMultiplier } }
 }
+
+/** The hiding settings grown by a zone multiplier (Prosperous Home), as the server's freeze uses. */
+export const grownZone = (z: HidingZoneConfig, multiplier: number): HidingZoneConfig =>
+  multiplier === 1 ? z : { ...z, barRadiusM: z.barRadiusM * multiplier, freezeRadiusM: z.freezeRadiusM * multiplier }
 
 export interface HidingZoneConfig {
   barRadiusM: number

@@ -1,5 +1,5 @@
 import type { GameEvent, Team } from '../sync/types'
-import { judgeOf, parseCard, powerupAction, type CardsState } from './state'
+import { judgeOf, parseCard, plural, powerupAction, type CardsState } from './state'
 
 /** A box pinned on top until this phone taps OK: what the other team just did. */
 export interface Notice {
@@ -85,6 +85,24 @@ export function teamNotices(events: readonly GameEvent[], cards: CardsState, tea
           ? p.bans.map((b) => (isObject(b) ? str(b.label) : null)).filter((x): x is string => !!x)
           : []
         add('The hiders played a card', card.name, bans.length ? `Banned: ${bans.join(', ')}.` : card.text)
+        break
+      }
+      case 'card_count_set': {
+        // The hiders' count (Brothel, Equivalent Exchange, Time Bank): what the seekers drink.
+        if (team !== 'seekers' || typeof p.reward === 'string') break
+        const n = typeof p.amount === 'number' ? p.amount : 0
+        const unit = str(p.unit) ?? 'drink'
+        add(
+          'The hiders counted',
+          str(p.name) ?? 'Curse',
+          n > 0 ? `Drink ${plural(n, unit)}${typeof p.count === 'number' ? ` (they counted ${p.count})` : ''}.` : 'Nothing to drink.',
+        )
+        break
+      }
+      case 'mine_triggered': {
+        const label = str(p.label) ?? 'That question'
+        if (team === 'seekers') add('Mine!', `${label} was mined`, "It's vetoed. Every seeker drinks, then send the photo to ask again.")
+        else add('Your mine went off', `The seekers asked ${label}`, "It's vetoed. They drink before their next question.")
         break
       }
       case 'dice_rolled':

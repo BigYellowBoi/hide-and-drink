@@ -1,7 +1,7 @@
 import { Suspense, useMemo, useState } from 'react'
 import type { FeatureCollection } from 'geojson'
 import type { LobbyState, StartedRound } from '../lobby/state'
-import { deriveHiding, formatClock, hidingPeriodAt, hidingZone, positionAge, roundClock, type HidingZoneConfig } from '../hiding/state'
+import { deriveHiding, formatClock, grownZone, hidingPeriodAt, hidingZone, positionAge, roundClock, type HidingZoneConfig } from '../hiding/state'
 import type { GeoError } from '../hiding/useGeolocation'
 import { isDevMode } from '../hiding/devPosition'
 import { usePosition } from '../hiding/usePosition'
@@ -39,6 +39,9 @@ import {
   questionsBlockedBy,
   triviaWaiting,
   vetoable,
+  zoneMultiplier,
+  activePlagueSpots,
+  drinkPerQuestion,
   type CardsState,
 } from '../cards/state'
 import { DrinkProofs, LockBanner } from './CardExtras'
@@ -61,6 +64,7 @@ import {
   EffectsPanel,
   OtherBlockedBanners,
   SetupProofs,
+  CountPrompts,
   TriviaPrompt,
 } from './EffectsPanel'
 import { ProofToast } from './ProofToast'
@@ -140,9 +144,11 @@ interface Shared {
 export function Round({ sync, lobby, userId, canAct, events, positions, presence, transport, fix, setFix }: Props) {
   const started = lobby.started
   const now = useServerNow(sync)
-  const zone = useMemo(() => hidingZone(lobby.config), [lobby.config])
   const play = useMemo(() => derivePlay(events), [events])
   const cards = useMemo(() => deriveCards(events), [events])
+  // Prosperous Home grows the bar circle and the freeze radius (the server's freeze does the same).
+  const growth = zoneMultiplier(cards)
+  const zone = useMemo(() => grownZone(hidingZone(lobby.config), growth), [lobby.config, growth])
   const log = useMemo(() => [...play.log, ...cards.log].sort((a, b) => a.seq - b.seq), [play.log, cards.log])
   const overrides = useMemo(() => deriveOverrides(events), [events])
   const [voteErr, setVoteErr] = useState<{ id: string; msg: string } | null>(null)
@@ -537,6 +543,7 @@ function HiderView({
         />
       )}
       <SetupProofs sync={sync} cards={cards} canAct={canAct} />
+      <CountPrompts sync={sync} cards={cards} canAct={canAct} now={now} />
       {cards.effects
         .filter((e) => e.status === 'clear_requested')
         .map((e) => (
@@ -576,6 +583,9 @@ function HiderView({
               seeking: clock.phase === 'seeking',
               frozen: hiding.frozen,
               drinkProofs: lobby.config.photo_proof_for_drinks !== false,
+              used: new Set(
+                play.questions.filter((q) => q.round === started.round && q.closedBy !== 'void').map((q) => banKey(q.type, q.optionId)),
+              ),
             }}
           />
           <EffectsPanel
@@ -730,6 +740,17 @@ function SeekerView({
   const wake = useWakeLock(keepAwake)
   // The bar the hiders left with Move (public): the new one is near it.
   const moveFrom = play.move?.from ?? null
+  // Plagued World: where questions can't be asked, and how far this phone is from leaving.
+  // Keyed on the spots, not the clock, so the map isn't redrawn every second.
+  const plagueKey = activePlagueSpots(cards, now).map((x) => `${x.lng},${x.lat},${x.radiusM}`).join(';')
+  const plague = useMemo(
+    () => (plagueKey ? plagueKey.split(';').map((k) => k.split(',').map(Number)).map(([lng, lat, radiusM]) => ({ lng, lat, radiusM })) : []),
+    [plagueKey],
+  )
+  const plagueLeft = fix
+    ? Math.max(0, ...plague.map((x) => x.radiusM - distanceM([fix.lng, fix.lat], [x.lng, x.lat])))
+    : 0
+  const happyHour = drinkPerQuestion(cards, now)
   const overlay = useMemo(
     () => ({
       dots: [
@@ -740,8 +761,9 @@ function SeekerView({
       ruled,
       remaining,
       tool,
+      plague,
     }),
-    [seekerDots, fix, ruled, remaining, tool, moveFrom],
+    [seekerDots, fix, ruled, remaining, tool, moveFrom, plague],
   )
   const frozen = moveRunning(play.move, now)
   const pending = play.pending
@@ -831,6 +853,19 @@ function SeekerView({
 
       {tab === 'map' && clock.phase === 'seeking' && <FoundButton sync={sync} canAct={canAct} />}
 
+      {tab === 'ask' && happyHour.length > 0 && (
+        <p className="flag" role="status">
+          {happyHour[0].card.name}: every question you ask costs you a {String(happyHour[0].card.params.drink_per_question)}. The app asks
+          for the photo when you send it.
+        </p>
+      )}
+      {tab === 'ask' && plague.length > 0 && (
+        <p className={plagueLeft > 0 ? 'flag' : 'ok small-note'} role="status">
+          {plagueLeft > 0
+            ? `Plagued World: you're inside a no-question circle. Move ${Math.ceil(plagueLeft)} m further out (dashed yellow on the map).`
+            : 'Plagued World: you are clear of the no-question circles (dashed yellow on the map).'}
+        </p>
+      )}
       {tab === 'ask' && (
         <AskPanel
           sync={sync}
@@ -846,6 +881,8 @@ function SeekerView({
           blocked={
             blocked.length
               ? `Questions are blocked until you complete ${blocked.map((e) => e.card.name).join(' and ')}.`
+              : plagueLeft > 0
+                ? `Plagued World: move ${Math.ceil(plagueLeft)} m further from where you last asked.`
               : frozen
                 ? 'You are frozen while the hiders move. Questions open when the time is up.'
                 : cards.moving
