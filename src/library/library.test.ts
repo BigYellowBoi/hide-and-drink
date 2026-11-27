@@ -95,7 +95,7 @@ describe('card params', () => {
   })
 
   it('splits off params the editor has no field for', () => {
-    expect(otherParams({ duration_s: 1, radius_m: 150, utility: 'dice' })).toEqual({ radius_m: 150 })
+    expect(otherParams({ duration_s: 1, old_key: 150, utility: 'dice' })).toEqual({ old_key: 150 })
   })
 
   it('flags what the server would refuse', () => {

@@ -1,3 +1,4 @@
+import type { MovePeriod } from '../hiding/move'
 import type { GameEvent, Team } from '../sync/types'
 import { deriveLobby, type StartedRound } from '../lobby/state'
 import { derivePlay, shadable, type Question } from '../play/state'
@@ -158,4 +159,10 @@ export function trackAt(
  */
 export function shadableAt(round: ReplayRound, seq: number): Question[] {
   return shadable(derivePlay(round.events.filter((e) => e.seq <= seq)))
+}
+
+/** The round's last Move period as of a step (seq): its circle shades the map from then. */
+export function moveAt(round: ReplayRound, seq: number): MovePeriod | null {
+  const play = derivePlay(round.events.filter((e) => e.seq <= seq))
+  return play.round === round.round ? play.move : null
 }

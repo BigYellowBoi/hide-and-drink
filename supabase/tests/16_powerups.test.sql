@@ -15,6 +15,8 @@ update public.question_types set options = (select jsonb_agg(o || '{"reusable": 
                                               from jsonb_array_elements(options) with ordinality t(o, i));
 update public.question_types set extra = extra - 'randomize_vetoes';
 update public.cards set params = params - 'seeker_confirm' - 'need_right';
+-- Move as it was before 20261226090000_move_period.sql (no period): tested in 34_move_period.test.sql.
+update public.cards set params = '{"action": "move"}'::jsonb where id = 'move';
 
 insert into auth.users (id) values
   ('11111111-1111-1111-1111-111111111111'),

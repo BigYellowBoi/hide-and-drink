@@ -37,6 +37,10 @@ export interface CastContext {
   city: string
   pendingQuestion: boolean
   barChosen: boolean
+  /** Seeking has started (Move with a period is seeking only). */
+  seeking?: boolean
+  /** A seeker is inside the bar zone: the endgame. */
+  frozen?: boolean
   /** Config photo_proof_for_drinks: the cast cost's drink needs a photo. */
   drinkProofs: boolean
 }
@@ -64,7 +68,14 @@ function Hand({ sync, cards, canAct, ctx }: Props & { ctx: CastContext }) {
   const def = current ? cardOf(cards, current.cardId) : null
   const choice = def ? castChoice(def) : { kind: 'none' as const }
   const blocker = def
-    ? castBlocker(def, { pendingQuestion: ctx.pendingQuestion, barChosen: ctx.barChosen, moving: cards.moving, handSize: hand.length })
+    ? castBlocker(def, {
+        pendingQuestion: ctx.pendingQuestion,
+        barChosen: ctx.barChosen,
+        moving: cards.moving,
+        handSize: hand.length,
+        seeking: ctx.seeking,
+        frozen: ctx.frozen,
+      })
     : null
   const need = choice.kind === 'target' ? 1 : choice.kind === 'discard' || choice.kind === 'bans' ? choice.count : 0
   // Media sent with the card: the drink photo for its cost, and the curse's first step.

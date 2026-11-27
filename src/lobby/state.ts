@@ -1,6 +1,7 @@
 import type { GameEvent, Team } from '../sync/types'
 import { asAreaCollection, type AreaCollection } from '../map/playArea'
 import { applyVenueEvent, noVenueEdits, type VenueEdits } from '../venues/state'
+import { moveEndAt, parseMoveStarted } from '../hiding/move'
 
 export interface LobbyPlayer {
   userId: string
@@ -16,6 +17,8 @@ export interface StartedRound {
   hidingPeriodS: number
   /** The hiding period is paused (host override): time left, ms. */
   hidingPausedLeftMs?: number | null
+  /** Move periods: the seeking clock (hide time) stands still in these, server ms. */
+  pauses?: { from: number; to: number }[]
   playAreaName: string | null
   /** Polygon snapshotted at start (null if the event had none). */
   playArea: AreaCollection | null
@@ -164,6 +167,20 @@ function applyCoreEvent(state: LobbyState, e: GameEvent): LobbyState {
       if (!started || Number.isNaN(at)) return { ...state, status: 'seeking' }
       const hidingPeriodS = Math.max(0, Math.min(started.hidingPeriodS, Math.round((at - started.startedAt) / 1000)))
       return { ...state, status: 'seeking', started: { ...started, hidingPeriodS } }
+    }
+    case 'move_started': {
+      const m = parseMoveStarted(e)
+      if (!m || !state.started) return state
+      return { ...state, started: { ...state.started, pauses: [...(state.started.pauses ?? []), { from: m.startedAt, to: m.endsAt }] } }
+    }
+    case 'hider_moved':
+    case 'move_cancelled': {
+      const at = moveEndAt(e)
+      const pauses = state.started?.pauses
+      if (at === null || !state.started || !pauses?.length) return state
+      const last = pauses[pauses.length - 1]
+      if (at >= last.to) return state
+      return { ...state, started: { ...state.started, pauses: [...pauses.slice(0, -1), { ...last, to: Math.max(last.from, at) }] } }
     }
     case 'round_ended':
     case 'round_redone':

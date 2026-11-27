@@ -371,7 +371,10 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
       // The server spends every waiting modifier on the next answer.
       return state.nextRewardMultiplier === 1 ? state : { ...state, nextRewardMultiplier: 1 }
     case 'hider_moved':
-      return log({ kind: 'card', text: 'Hider has moved to a new bar' }, { ...state, moving: false })
+      return log(
+        { kind: 'card', text: p.period_over === true ? 'Move over: seekers can move and ask again' : 'Hider has moved to a new bar' },
+        { ...state, moving: false },
+      )
     case 'curse_vetoed': {
       const instanceId = str(p.instance_id)
       if (!instanceId) return state
@@ -620,6 +623,17 @@ export function applyCardEvent(state: CardsState, e: GameEvent): CardsState {
         hand: [...state.hand, { instanceId, cardId: card.id }],
       }
     }
+    case 'hand_discarded': {
+      // Move discards the whole hand (hider-only).
+      const ids = new Set(
+        (Array.isArray(p.cards) ? p.cards : []).flatMap((c) => (isObject(c) && str(c.instance_id) ? [str(c.instance_id)!] : [])),
+      )
+      if (!ids.size) return state
+      return log(
+        { kind: 'card', text: `Discarded your hand (${ids.size} card${ids.size > 1 ? 's' : ''})`, private: true },
+        { ...state, hand: state.hand.filter((c) => !ids.has(c.instanceId)) },
+      )
+    }
     case 'card_removed': {
       const id = str(p.instance_id)
       return { ...state, hand: state.hand.filter((c) => c.instanceId !== id) }
@@ -830,7 +844,7 @@ function playedText(s: CardsState, card: CardDef, p: Record<string, unknown>): s
     case 'randomize':
       return p.as_veto === true ? 'Hider randomized the thermometer: counts as a veto (no reward)' : 'Hider randomized the question'
     case 'move':
-      return 'Hider is moving to a new bar. Questions wait until they lock it in'
+      return num(card.params.duration_s) ? 'Hider played Move' : 'Hider is moving to a new bar. Questions wait until they lock it in'
     case 'duplicate': {
       const dup = isObject(p.duplicate) ? str(p.duplicate.card_id) : null
       return `Duplicated ${dup ? cardOf(s, dup).name : 'a card'}`
@@ -866,7 +880,7 @@ export function castChoice(c: CardDef): CastChoice {
 /** Why a powerup can't be cast right now (null: it can). The server checks the same. */
 export function castBlocker(
   c: CardDef,
-  ctx: { pendingQuestion: boolean; barChosen: boolean; moving: boolean; handSize: number },
+  ctx: { pendingQuestion: boolean; barChosen: boolean; moving: boolean; handSize: number; seeking?: boolean; frozen?: boolean },
 ): string | null {
   const a = powerupAction(c)
   if ((a === 'veto' || a === 'randomize') && !ctx.pendingQuestion) return 'Play this while a question is waiting for you.'
@@ -874,6 +888,11 @@ export function castBlocker(
     if (!ctx.barChosen) return 'Lock in a bar first.'
     if (ctx.moving) return 'You are already moving.'
     if (ctx.pendingQuestion) return 'Answer the waiting question first.'
+    // A Move with a period (params.duration_s): seeking only, never in the endgame.
+    if (num(c.params.duration_s)) {
+      if (ctx.seeking === false) return 'Play this once seeking has started.'
+      if (ctx.frozen) return "Can't move in the endgame: a seeker is inside your bar's zone."
+    }
   }
   if (a === 'duplicate' && ctx.handSize < 2) return 'You need another card in your hand to copy.'
   const choice = castChoice(c)

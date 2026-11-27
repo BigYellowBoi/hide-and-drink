@@ -75,9 +75,12 @@
       "category": "powerup",
       "behaviour": "powerup",
       "copies": 1,
-      "text": "Move to a new hiding bar.",
+      "text": "Discard your hand and send the seekers the location of your bar. You get 10 minutes to establish a new hiding bar within 1.5 km of it. The seekers are frozen and your hiding timer is paused until the 10 minutes are up. Can't be played during the endgame (a seeker inside your bar's zone).",
       "params": {
-        "action": "move"
+        "action": "move",
+        "duration_s": 600,
+        "radius_m": 1500,
+        "discard_hand": true
       },
       "active": true
     },

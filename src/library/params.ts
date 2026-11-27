@@ -70,6 +70,15 @@ const BY_BEHAVIOUR: Record<string, ParamField[]> = {
     },
     { key: 'discard', label: 'Discard', kind: 'int', required: true, when: (p) => p.action === 'discard_draw' },
     { key: 'draw', label: 'Draw', kind: 'int', required: true, when: (p) => p.action === 'discard_draw' },
+    {
+      key: 'duration_s',
+      label: 'Time to move',
+      kind: 'minutes',
+      when: (p) => p.action === 'move',
+      hint: 'Seekers frozen and hide timer paused this long. Empty: done once the new bar is locked in',
+    },
+    { key: 'radius_m', label: 'Within (m) of the old bar', kind: 'int', when: (p) => p.action === 'move', hint: 'Empty: anywhere' },
+    { key: 'discard_hand', label: 'Discard the rest of the hand', kind: 'bool', when: (p) => p.action === 'move' },
   ],
   question_ban: [
     { key: 'count', label: 'Questions banned', kind: 'int', hint: 'Default 1' },

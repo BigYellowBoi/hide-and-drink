@@ -82,7 +82,9 @@ This is the audit of `supabase/migrations/` (up to `20261219090100_rounds_scorin
 | A seeker_confirm curse waits (`awaiting_seekers`), then starts or drops on the seekers' answer (`curse_checked`) | `play_card`, `check_curse` | `reinstate_effect` (starts it, or brings back one dropped by mistake), `clear_effect` (drops it), `timer` effect |
 | Curse timer ending (`ends_at`, `followup_ends_at`) | time | `timer` effect/followup, `reinstate_effect`, `clear_effect` |
 | Veto lock length and chaining | `veto_curse` (`base_lock_s + step_s × vetoes`) | `timer` veto_lock, `cancel_veto` |
-| `hider_moved` | `choose_bar` after Move | `set_bar` (completes it), `cancel_move` |
+| `hider_moved` | `choose_bar` after a Move with no period; `_settle_timers` when a Move period (`params.duration_s`) ends (`period_over`, no actor) | `set_bar` (completes it now), `cancel_move` (ends it now, hiders stay at the bar they hold) |
+| Move period: `move_started` (old bar to everyone), seekers frozen (`hider_moving`), hide timer paused (`_move_paused_s`) | `play_card` move with `params.duration_s` | `cancel_move` or `set_bar` (end it early); `adjust_score` (pause length) |
+| `hand_discarded` (hider-only, Move with `params.discard_hand`) | `play_card` move | `give_card` (put cards back) |
 | Round score: hide time (found − seeking start), time bonuses held | `found_hider` | `adjust_score`; `redo_round` |
 | Role swap at round end (`team_changed`, no actor) | `found_hider` | `set_team` between rounds (host moves anyone); `redo_round` puts that round's teams back |
 | Winner (`game_ended`) | `end_game`, `end_stale_games` | none: final. Adjust scores before ending. An auto-ended game frees its code for a new one |
@@ -114,9 +116,10 @@ This is the audit of `supabase/migrations/` (up to `20261219090100_rounds_scorin
 | `media_not_allowed`, `media_too_big`, `invalid_media_type` (uploads; R2 full sends them to Supabase, reduced videos squeezed: `docs/r2.md`) | Edge Function `media-upload-url` (`media_upload_grant`) | `set_answer` (answer without the photo), `waive_proof` (proof without it) |
 | `no_pending_question`, `nothing_to_randomize` | `play_card` veto/randomize | `void_answer` (= veto), `ask_question` (= randomize) |
 | `bar_already_chosen` | `choose_bar` | `set_bar` |
-| `venue_not_allowed`, `venue_not_found`, `same_bar` | `choose_bar` | `set_bar` (any known venue, or a pin) |
+| `venue_not_allowed`, `venue_not_found`, `same_bar`, `too_far_to_move`, `move_over` | `choose_bar` | `set_bar` (any known venue, or a pin) |
 | `venue_outside_play_area`, `too_many_venues`, `venue_outside_map_data`, `invalid_venue_name` | `add_venue` | `set_bar` with a pin (no area or count check) |
 | `no_bar_yet`, `already_moving` | `play_card` move | `set_bar`, `cancel_move` |
+| `not_seeking_yet`, `endgame` (a seeker inside the bar zone: `hider_bars.frozen`) | `play_card` move with a period | `timer` hiding end; `freeze` (set to not frozen), then play it |
 | `hand_full` | `keep_cards` | `set_hand_limit`, `remove_card` |
 | `deck_empty` | `_deal_deck` at start (lobby: fix the deck), empty pile in play | `reshuffle`, `draw_cards` |
 | `draw_not_pending`, `invalid_keep`, `card_not_in_hand` | `keep_cards`, `play_card` | `give_card`, `remove_card`, `draw_cards` |

@@ -8,7 +8,7 @@ import { useQuestionTypes } from '../play/useQuestionTypes'
 import type { Question } from '../play/state'
 import { deriveRounds, formatDuration, names } from '../rounds/state'
 import { fetchReplay, type ReplayData } from '../replay/api'
-import { buildReplay, roundAt, shadableAt, stepAt, trackAt, type Replay as ReplayModel, type ReplayRound, type ReplayStep } from '../replay/state'
+import { buildReplay, moveAt, roundAt, shadableAt, stepAt, trackAt, type Replay as ReplayModel, type ReplayRound, type ReplayStep } from '../replay/state'
 import { LazyGameMap } from './lazyMap'
 import { TimelineItemView } from './Timeline'
 import { PrivateWordContext } from './hiderCount'
@@ -21,7 +21,7 @@ import type { FeatureCollection } from 'geojson'
 import { deriveLobby } from '../lobby/state'
 import { hidingZone } from '../hiding/state'
 import { shadingBounds } from '../play/features'
-import { shade } from '../play/shading'
+import { moveConstraint, shade } from '../play/shading'
 import { useCityLayers } from '../play/useCityLayers'
 
 const PLAY_EVERY_MS = 2500
@@ -133,11 +133,13 @@ function ReplayView({
   // Everything before the next reveal: a question's step shows its answer's shading too.
   const cutSeq = idx >= 0 ? (steps[idx + 1]?.seq ?? Infinity) - 1 : (round?.fromSeq ?? 0)
   const answered = useMemo(() => (round ? shadableAt(round, cutSeq) : []), [round, cutSeq])
+  const move = useMemo(() => (round ? moveAt(round, cutSeq) : null), [round, cutSeq])
   const shading = useMemo(() => {
-    if (!playArea || !answered.length) return null
+    const keep = moveConstraint(move, barRadiusM)
+    if (!playArea || (!answered.length && !keep)) return null
     const ctx = layer ? { layer, bounds: shadingBounds(playArea), barRadiusM } : undefined
-    return shade(playArea, answered, ctx)
-  }, [playArea, answered, layer, barRadiusM])
+    return shade(playArea, answered, ctx, keep ? [keep] : [])
+  }, [playArea, answered, layer, barRadiusM, move])
   const track = useMemo(() => (round ? trackAt(data.track, round.round, t, nameOf) : { paths: [], dots: [] }), [data.track, round, t, nameOf])
   const overlay = useMemo(
     () => ({
@@ -155,7 +157,7 @@ function ReplayView({
   )
   const current = idx >= 0 ? steps[idx] : null
   const earlier = steps.slice(0, Math.max(0, idx)).reverse()
-  const clockFor = (r: ReplayRound | null) => (at: number) => (r ? clockLabel(at, r.started.startedAt, r.started.hidingPeriodS) : '')
+  const clockFor = (r: ReplayRound | null) => (at: number) => (r ? clockLabel(at, r.started.startedAt, r.started.hidingPeriodS, r.started.pauses) : '')
 
   return (
     <PrivateWordContext.Provider value="hiders only">
